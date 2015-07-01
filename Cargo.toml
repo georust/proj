@@ -1,0 +1,15 @@
+[package]
+name = "proj"
+description = "Rust bindings for proj"
+version = "0.1.0"
+authors = [
+  "Corey Farwell <coreyf@rwell.org>",
+  "Alex Morega <alex@grep.ro>",
+]
+repository = "https://github.com/georust/rust-gdal"
+keywords = ["proj", "projection", "osgeo", "geo"]
+license = "Apache-2.0"
+
+[dependencies]
+geo ="0.0.4"
+libc = "0.1.7"
