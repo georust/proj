@@ -6,7 +6,7 @@ authors = [
   "Corey Farwell <coreyf@rwell.org>",
   "Alex Morega <alex@grep.ro>",
 ]
-repository = "https://github.com/georust/rust-gdal"
+repository = "https://github.com/georust/rust-proj"
 keywords = ["proj", "projection", "osgeo", "geo"]
 license = "Apache-2.0"
 
