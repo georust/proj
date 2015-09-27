@@ -86,7 +86,7 @@ impl Drop for Proj {
 
 #[cfg(test)]
 mod test {
-    use super::super::geom::Point;
+    use geo::{Coordinate, Point};
     use super::Proj;
 
 
@@ -113,12 +113,12 @@ mod test {
         let wgs84 = Proj::new(wgs84_name).unwrap();
         let stereo70 = Proj::new("+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000 +ellps=krass +units=m +no_defs").unwrap();
 
-        let rv = stereo70.project(&wgs84, Point::new(500000., 500000.));
-        assert_almost_eq(rv.x, 0.436332);
-        assert_almost_eq(rv.y, 0.802851);
+        let rv = stereo70.project(&wgs84, Point(Coordinate {x: 500000., y: 500000.}));
+        assert_almost_eq(rv.0.x, 0.436332);
+        assert_almost_eq(rv.0.y, 0.802851);
 
-        let rv = wgs84.project(&stereo70, Point::new(0.436332, 0.802851));
-        assert_almost_eq(rv.x, 500000.);
-        assert_almost_eq(rv.y, 500000.);
+        let rv = wgs84.project(&stereo70, Point(Coordinate {x: 0.436332, y: 0.802851}));
+        assert_almost_eq(rv.0.x, 500000.);
+        assert_almost_eq(rv.0.y, 500000.);
     }
 }
