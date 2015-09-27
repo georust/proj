@@ -1,0 +1,9 @@
+language: rust
+rust:
+  - 1.0.0
+  - stable
+  - beta
+  - nightly
+before_install:
+  - sudo apt-get update
+  - sudo apt-get install libproj-dev
