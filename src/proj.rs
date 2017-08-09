@@ -1,6 +1,7 @@
 use libc::{c_int, c_char, c_long, c_double};
 use std::ffi::CString;
 use geo::{Point, Coordinate};
+use num_traits::Float;
 use std::ffi::CStr;
 use std::str;
 
@@ -15,19 +16,18 @@ pub struct Proj {
 
 
 #[link(name="proj")]
-extern {
+extern "C" {
     fn pj_init_plus(definition: *const c_char) -> *const ();
     fn pj_free(pj: *const ());
     fn pj_get_def(pj: *const ()) -> *const c_char;
-    fn pj_transform(
-        srcdefn: *const (),
-        dstdefn: *const (),
-        point_count: c_long,
-        point_offset: c_int,
-        x: *mut c_double,
-        y: *mut c_double,
-        z: *mut c_double
-    ) -> c_int;
+    fn pj_transform(srcdefn: *const (),
+                    dstdefn: *const (),
+                    point_count: c_long,
+                    point_offset: c_int,
+                    x: *mut c_double,
+                    y: *mut c_double,
+                    z: *mut c_double)
+                    -> c_int;
     fn pj_strerrno(code: c_int) -> *const c_char;
 }
 
@@ -43,9 +43,9 @@ impl Proj {
         let c_definition = CString::new(definition.as_bytes()).unwrap();
         let c_proj = unsafe { pj_init_plus(c_definition.as_ptr()) };
         return match c_proj.is_null() {
-            true  => None,
-            false => Some(Proj{c_proj: c_proj}),
-        };
+                   true => None,
+                   false => Some(Proj { c_proj: c_proj }),
+               };
     }
 
     pub fn def(&self) -> String {
@@ -53,33 +53,38 @@ impl Proj {
         return _string(rv);
     }
 
-    pub fn project(&self, target: &Proj, point: Point) -> Point {
-        let mut c_x: c_double = point.0.x;
-        let mut c_y: c_double = point.0.y;
+    pub fn project<T>(&self, target: &Proj, point: Point<T>) -> Point<T>
+        where T: Float
+    {
+        let mut c_x: c_double = point.0.x.to_f64().unwrap();
+        let mut c_y: c_double = point.0.y.to_f64().unwrap();
         let mut c_z: c_double = 0.;
         unsafe {
-            let rv = pj_transform(
-                self.c_proj,
-                target.c_proj,
-                1,
-                1,
-                &mut c_x,
-                &mut c_y,
-                &mut c_z
-            );
+            let rv = pj_transform(self.c_proj,
+                                  target.c_proj,
+                                  1,
+                                  1,
+                                  &mut c_x,
+                                  &mut c_y,
+                                  &mut c_z);
             if rv != 0 {
                 println!("{}", error_message(rv));
             }
             assert!(rv == 0);
         }
-        return Point(Coordinate{x: c_x, y: c_y});
+        return Point(Coordinate {
+                         x: T::from(c_x).unwrap(),
+                         y: T::from(c_y).unwrap(),
+                     });
     }
 }
 
 
 impl Drop for Proj {
     fn drop(&mut self) {
-        unsafe { pj_free(self.c_proj); }
+        unsafe {
+            pj_free(self.c_proj);
+        }
     }
 }
 
@@ -94,9 +99,8 @@ mod test {
     fn test_new_projection() {
         let wgs84 = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs";
         let proj = Proj::new(wgs84).unwrap();
-        assert_eq!(
-            proj.def(),
-            " +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs +towgs84=0,0,0");
+        assert_eq!(proj.def(),
+                   " +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs +towgs84=0,0,0");
     }
 
 
@@ -113,11 +117,19 @@ mod test {
         let wgs84 = Proj::new(wgs84_name).unwrap();
         let stereo70 = Proj::new("+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000 +ellps=krass +units=m +no_defs").unwrap();
 
-        let rv = stereo70.project(&wgs84, Point(Coordinate {x: 500000., y: 500000.}));
+        let rv = stereo70.project(&wgs84,
+                                  Point(Coordinate {
+                                            x: 500000.,
+                                            y: 500000.,
+                                        }));
         assert_almost_eq(rv.0.x, 0.436332);
         assert_almost_eq(rv.0.y, 0.802851);
 
-        let rv = wgs84.project(&stereo70, Point(Coordinate {x: 0.436332, y: 0.802851}));
+        let rv = wgs84.project(&stereo70,
+                               Point(Coordinate {
+                                         x: 0.436332,
+                                         y: 0.802851,
+                                     }));
         assert_almost_eq(rv.0.x, 500000.);
         assert_almost_eq(rv.0.y, 500000.);
     }
