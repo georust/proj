@@ -13,4 +13,4 @@ license = "Apache-2.0"
 [dependencies]
 geo ="^0.4"
 libc = "0.1.7"
-num-traits = "0.1.39"
+num-traits = "^0.1"
