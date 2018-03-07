@@ -1,9 +1,12 @@
-use libc::{c_char, c_double, c_int, c_long, c_void};
+use libc::{c_char, c_double};
 use std::ffi::CString;
 use geo::Point;
 use num_traits::Float;
 use std::ffi::CStr;
 use std::str;
+
+use proj_sys::{proj_context_create, proj_create, proj_destroy, proj_pj_info, proj_trans, PJconsts,
+               PJ_COORD, PJ_LP, PJ_XY};
 
 fn _string(raw_ptr: *const c_char) -> String {
     let c_str = unsafe { CStr::from_ptr(raw_ptr) };
@@ -12,79 +15,53 @@ fn _string(raw_ptr: *const c_char) -> String {
 
 /// A `proj.4` instance
 pub struct Proj {
-    c_proj: *const c_void,
-}
-
-#[link(name = "proj")]
-extern "C" {
-    fn pj_init_plus(definition: *const c_char) -> *const c_void;
-    fn pj_free(pj: *const c_void);
-    fn pj_get_def(pj: *const c_void) -> *const c_char;
-    fn pj_transform(
-        srcdefn: *const c_void,
-        dstdefn: *const c_void,
-        point_count: c_long,
-        point_offset: c_int,
-        x: *mut c_double,
-        y: *mut c_double,
-        z: *mut c_double,
-    ) -> c_int;
-    fn pj_strerrno(code: c_int) -> *const c_char;
-}
-
-fn error_message(code: c_int) -> String {
-    let rv = unsafe { pj_strerrno(code) };
-    _string(rv)
+    c_proj: *mut PJconsts,
 }
 
 impl Proj {
     /// Try to instantiate a new `proj.4` projection instance
+    /// The definition specifies a **target** projection
+    /// Projection is meant in the sense of `proj.4`'s [definition](http://proj4.org/operations/projections/index.html):
+    /// "Projections map the spherical 3D space to a flat 2D space."
     pub fn new(definition: &str) -> Option<Proj> {
         let c_definition = CString::new(definition.as_bytes()).unwrap();
-        let c_proj = unsafe { pj_init_plus(c_definition.as_ptr()) };
-        if c_proj.is_null() {
+        let ctx = unsafe { proj_context_create() };
+        let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
+        if new_c_proj.is_null() {
             None
         } else {
-            Some(Proj { c_proj })
+            Some(Proj { c_proj: new_c_proj })
         }
     }
 
     /// Get the current projection's definition from `proj.4`
     pub fn def(&self) -> String {
-        let rv = unsafe { pj_get_def(self.c_proj) };
-        _string(rv)
+        let rv = unsafe { proj_pj_info(self.c_proj) };
+        _string(rv.definition)
     }
-    /// Project a `Point` into `target`'s coordinates
-    pub fn project<T>(&self, target: &Proj, point: Point<T>) -> Point<T>
+    /// Project the Point coordinates
+    pub fn project<T>(&self, point: Point<T>) -> Point<T>
     where
         T: Float,
     {
-        let mut c_x: c_double = point.0.x.to_f64().unwrap();
-        let mut c_y: c_double = point.0.y.to_f64().unwrap();
-        let mut c_z: c_double = 0.;
+        let c_x: c_double = point.0.x.to_f64().unwrap();
+        let c_y: c_double = point.0.y.to_f64().unwrap();
+        let new_x;
+        let new_y;
+        let coords = PJ_LP { lam: c_x, phi: c_y };
         unsafe {
-            let rv = pj_transform(
-                self.c_proj,
-                target.c_proj,
-                1,
-                1,
-                &mut c_x,
-                &mut c_y,
-                &mut c_z,
-            );
-            if rv != 0 {
-                println!("{}", error_message(rv));
-            }
-            assert!(rv == 0);
+            let trans = proj_trans(self.c_proj, -1, PJ_COORD { lp: coords });
+            new_x = trans.xy.x;
+            new_y = trans.xy.y;
         }
-        Point::new(T::from(c_x).unwrap(), T::from(c_y).unwrap())
+        Point::new(T::from(new_x).unwrap(), T::from(new_y).unwrap())
     }
 }
 
 impl Drop for Proj {
     fn drop(&mut self) {
         unsafe {
-            pj_free(self.c_proj);
+            proj_destroy(self.c_proj);
         }
     }
 }
@@ -96,11 +73,11 @@ mod test {
 
     #[test]
     fn test_new_projection() {
-        let wgs84 = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs";
+        let wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
         let proj = Proj::new(wgs84).unwrap();
         assert_eq!(
             proj.def(),
-            " +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs +towgs84=0,0,0"
+            "proj=longlat datum=WGS84 no_defs ellps=WGS84 towgs84=0,0,0"
         );
     }
 
@@ -112,18 +89,15 @@ mod test {
 
     #[test]
     fn test_transform() {
-        let wgs84_name = "+proj=longlat +datum=WGS84 +no_defs";
-        let wgs84 = Proj::new(wgs84_name).unwrap();
-        let stereo70 = Proj::new(
-            "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000 +ellps=krass +units=m +no_defs"
-            ).unwrap();
-
-        let rv = stereo70.project(&wgs84, Point::new(500000., 500000.));
-        assert_almost_eq(rv.0.x, 0.436332);
-        assert_almost_eq(rv.0.y, 0.802851);
-
-        let rv = wgs84.project(&stereo70, Point::new(0.436332, 0.802851));
-        assert_almost_eq(rv.0.x, 500000.);
-        assert_almost_eq(rv.0.y, 500000.);
+        // EPSG:4326
+        // let wgs84 = NProj::new("+proj=longlat +datum=WGS84 +no_defs ").unwrap();
+        // EPSG:27700
+        let osgb36 = Proj::new("
+            +proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy +towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 +units=m +no_defs
+            ").unwrap();
+        // London, approximately
+        let t = osgb36.project(Point::new(0.1290895, 51.5078878));
+        assert_almost_eq(t.x(), 529937.885402);
+        assert_almost_eq(t.y(), 180432.041828);
     }
 }

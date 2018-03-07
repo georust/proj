@@ -3,6 +3,7 @@
 extern crate num_traits;
 extern crate geo;
 extern crate libc;
+extern crate proj_sys;
 
 mod proj;
 

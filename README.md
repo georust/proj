@@ -1,6 +1,6 @@
 # rust-proj
 
-Rust bindings for [PROJ.4 v4.9.x](https://github.com/OSGeo/proj.4)
+Rust bindings for [proj.4](https://github.com/OSGeo/proj.4), v5.0
 
 # Example
 ## Reproject from [Stereo70](https://epsg.io/3844) to [WGS84](https://epsg.io/4326)
