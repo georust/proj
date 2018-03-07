@@ -11,7 +11,7 @@ keywords = ["proj", "projection", "osgeo", "geo"]
 license = "Apache-2.0"
 
 [dependencies]
-proj-sys = "0.1.0"
+proj-sys = "0.2.0"
 geo ="^0.7"
 libc = "0.2.39"
 num-traits = "^0.1"

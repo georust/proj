@@ -6,7 +6,7 @@ use std::ffi::CStr;
 use std::str;
 
 use proj_sys::{proj_context_create, proj_create, proj_destroy, proj_pj_info, proj_trans, PJconsts,
-               PJ_COORD, PJ_LP, PJ_XY};
+               PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_XY};
 
 fn _string(raw_ptr: *const c_char) -> String {
     let c_str = unsafe { CStr::from_ptr(raw_ptr) };
@@ -20,9 +20,18 @@ pub struct Proj {
 
 impl Proj {
     /// Try to instantiate a new `proj.4` projection instance
-    /// The definition specifies a **target** projection
-    /// Projection is meant in the sense of `proj.4`'s [definition](http://proj4.org/operations/projections/index.html):
-    /// "Projections map the spherical 3D space to a flat 2D space."
+    /// definition specifies the output projection
+    /// if `inverse` is set to `true` when calling `project()`,
+    /// output will be a WGS84 lon, lat coord
+
+    // Projection is meant in the sense of `proj.4`'s [definition](http://proj4.org/operations/projections/index.html):
+    // "Projections map the spherical 3D space to a flat 2D space."
+
+    // In contrast to proj.4 v4.x, the type of transformation
+    // is signalled by the choice of enum used as input to the PJ_COORD union
+    // PJ_LP signals projection of geodetic coordinates, with output being PJ_XY
+    // and vice versa, or using PJ_XY for both to stay in projected coords
+    // TODO: ascertain how this interacts with inverse
     pub fn new(definition: &str) -> Option<Proj> {
         let c_definition = CString::new(definition.as_bytes()).unwrap();
         let ctx = unsafe { proj_context_create() };
@@ -40,17 +49,28 @@ impl Proj {
         _string(rv.definition)
     }
     /// Project the Point coordinates
-    pub fn project<T>(&self, point: Point<T>) -> Point<T>
+    pub fn project<T>(&self, point: Point<T>, inverse: bool) -> Point<T>
     where
         T: Float,
     {
-        let c_x: c_double = point.0.x.to_f64().unwrap();
-        let c_y: c_double = point.0.y.to_f64().unwrap();
+        let inv = if inverse {
+            PJ_DIRECTION_PJ_INV
+        } else {
+            PJ_DIRECTION_PJ_FWD
+        };
+        let c_x: c_double = point.x().to_f64().unwrap();
+        let c_y: c_double = point.y().to_f64().unwrap();
         let new_x;
         let new_y;
-        let coords = PJ_LP { lam: c_x, phi: c_y };
+        // if we define input coords in terms of lambda & phi, using the PJ_LP struct,
+        // this signals to proj_trans that we wish to project geodetic coordinates.
+        // For conversion (i.e. between projected coordinates) we use
+        // PJ_XY {x: , y: }
+        let coords = PJ_XY { x: c_x, y: c_y };
         unsafe {
-            let trans = proj_trans(self.c_proj, -1, PJ_COORD { lp: coords });
+            // PJ_DIRECTION_* determines a forward or inverse transformation
+            let trans = proj_trans(self.c_proj, inv, PJ_COORD { xy: coords });
+            // output of projected coordinates uses the PJ_COORD:PJ_XY struct
             new_x = trans.xy.x;
             new_y = trans.xy.y;
         }
@@ -88,16 +108,23 @@ mod test {
     }
 
     #[test]
-    fn test_transform() {
-        // EPSG:4326
-        // let wgs84 = NProj::new("+proj=longlat +datum=WGS84 +no_defs ").unwrap();
-        // EPSG:27700
-        let osgb36 = Proj::new("
-            +proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy +towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 +units=m +no_defs
-            ").unwrap();
-        // London, approximately
-        let t = osgb36.project(Point::new(0.1290895, 51.5078878));
-        assert_almost_eq(t.x(), 529937.885402);
-        assert_almost_eq(t.y(), 180432.041828);
+    fn test_transform_stereo() {
+        let stereo70 = Proj::new(
+            "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000 +ellps=krass +units=m +no_defs"
+            ).unwrap();
+        // stereo70 -> WGS84
+        let t = stereo70.project(Point::new(500000., 500000.), true);
+        assert_almost_eq(t.x(), 0.436332);
+        assert_almost_eq(t.y(), 0.802851);
+    }
+    #[test]
+    fn test_transform_wgs84() {
+        let stereo70 = Proj::new(
+            "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000 +ellps=krass +units=m +no_defs"
+            ).unwrap();
+        // WGS84 -> stereo70
+        let t = stereo70.project(Point::new(0.436332, 0.802851), false);
+        assert_almost_eq(t.x(), 500000.);
+        assert_almost_eq(t.y(), 500000.);
     }
 }
