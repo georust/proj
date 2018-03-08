@@ -7,9 +7,9 @@ use num_traits::Float;
 use std::ffi::CStr;
 use std::str;
 use failure::Error;
-use proj_sys::{pj_strerrno, proj_context_create, proj_create, proj_destroy, proj_pj_info,
-               proj_trans, PJconsts, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_LP,
-               PJ_XY};
+use proj_sys::{pj_strerrno, proj_context_create, proj_create, proj_create_crs_to_crs,
+               proj_destroy, proj_pj_info, proj_trans, PJconsts, PJ_AREA, PJ_COORD,
+               PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_LP, PJ_XY};
 
 /// Easily get a String from the external library
 fn _string(raw_ptr: *const c_char) -> String {
@@ -52,6 +52,24 @@ impl Proj {
             Some(Proj { c_proj: new_c_proj })
         }
     }
+
+    // FIXME: we can't implement this yet because PJ_AREA isn't implemented
+    // /// Create a transformation object from two known EPSG CRS codes
+    // pub fn new_known_crs(from: &str, to: &str) -> Option<Proj> {
+    //     let from_c = CString::new(from.as_bytes()).unwrap();
+    //     let to_c = CString::new(to.as_bytes()).unwrap();
+    //     let ctx = unsafe { proj_context_create() };
+    //     // not implemented yet, see http://proj4.org/development/reference/datatypes.html#c.PJ_AREA
+    //     let mut area = PJ_AREA { area: 0 };
+    //     let raw_area = &mut area as *mut PJ_AREA;
+    //     let new_c_proj =
+    //         unsafe { proj_create_crs_to_crs(ctx, from_c.as_ptr(), to_c.as_ptr(), raw_area) };
+    //     if new_c_proj.is_null() {
+    //         None
+    //     } else {
+    //         Some(Proj { c_proj: new_c_proj })
+    //     }
+    // }
 
     /// Get the current definition from `proj.4`
     pub fn def(&self) -> String {
