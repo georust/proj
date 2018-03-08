@@ -2,7 +2,28 @@
 
 Rust bindings for [proj.4](https://github.com/OSGeo/proj.4), v5.0.x
 
-# Example
+# Examples
+Note that as of v5.0.0, proj.5 uses the [`pipeline`](http://proj4.org/operations/pipeline.html) operator, which allows an arbitrary number of steps in a conversion. The first example below works as follows:
+
+- define the operation as a `pipeline` operation
+- define `step` 1 as an `inv`erse transform, yielding geodetic coordinates
+- define `step` 2 as a forward transform to projected coordinates, yielding metres.
+
+## Convert from [NAD 83 US Survey Feet](https://epsg.io/2230) to [NAD 83 Meters](https://epsg.io/26946)
+```rust
+extern crate proj;
+use proj::Proj;
+
+extern crate geo;
+use geo::types::Point;
+
+let nad_ft_to_m = Proj::new("+proj=pipeline +step +inv +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666 +lon_0=-116.25 +x_0=2000000.0001016 +y_0=500000.0001016001 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=us-ft +no_defs +step +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666 +lon_0=-116.25 +x_0=2000000 +y_0=500000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs").unwrap();
+# The Presidio, approximately
+let result = nad_ft_to_m.convert(Point::new(4760096.421921, 3744293.729449)).unwrap();
+assert_eq!(result.x(), 1450880.29);
+assert_eq!(result.y(), 1141263.01);
+```
+
 ## Inverse Projection from [Stereo70](https://epsg.io/3844) to Geodetic
 ```rust
 extern crate proj;
