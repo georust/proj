@@ -3,7 +3,7 @@
 Rust bindings for [proj.4](https://github.com/OSGeo/proj.4), v5.0.x
 
 # Example
-## Reproject from [Stereo70](https://epsg.io/3844) to [WGS84](https://epsg.io/4326)
+## Inverse Projection from [Stereo70](https://epsg.io/3844) to Geodetic
 ```rust
 extern crate proj;
 use proj::Proj;
