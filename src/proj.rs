@@ -91,6 +91,11 @@ mod test {
     use geo::Point;
     use super::Proj;
 
+    fn assert_almost_eq(a: f64, b: f64) {
+        let f: f64 = a / b;
+        assert!(f < 1.00001);
+        assert!(f > 0.99999);
+    }
     #[test]
     fn test_new_projection() {
         let wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
@@ -100,25 +105,9 @@ mod test {
             "proj=longlat datum=WGS84 no_defs ellps=WGS84 towgs84=0,0,0"
         );
     }
-
-    fn assert_almost_eq(a: f64, b: f64) {
-        let f: f64 = a / b;
-        assert!(f < 1.00001);
-        assert!(f > 0.99999);
-    }
-
     #[test]
-    fn test_transform_stereo() {
-        let stereo70 = Proj::new(
-            "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000 +ellps=krass +units=m +no_defs"
-            ).unwrap();
-        // stereo70 -> WGS84
-        let t = stereo70.project(Point::new(500000., 500000.), true);
-        assert_almost_eq(t.x(), 0.436332);
-        assert_almost_eq(t.y(), 0.802851);
-    }
-    #[test]
-    fn test_transform_wgs84() {
+    // Carry out a projection from geodetic coordinates
+    fn test_project() {
         let stereo70 = Proj::new(
             "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000 +ellps=krass +units=m +no_defs"
             ).unwrap();
@@ -126,5 +115,16 @@ mod test {
         let t = stereo70.project(Point::new(0.436332, 0.802851), false);
         assert_almost_eq(t.x(), 500000.);
         assert_almost_eq(t.y(), 500000.);
+    }
+    #[test]
+    // Carry out an inverse projection to geodetic coordinates
+    fn test_inverse_project() {
+        let stereo70 = Proj::new(
+            "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000 +ellps=krass +units=m +no_defs"
+            ).unwrap();
+        // stereo70 -> WGS84
+        let t = stereo70.project(Point::new(500000., 500000.), true);
+        assert_almost_eq(t.x(), 0.436332);
+        assert_almost_eq(t.y(), 0.802851);
     }
 }
