@@ -21,14 +21,12 @@ pub struct Proj {
 impl Proj {
     /// Try to instantiate a new `proj.4` instance
     ///
-    /// **Note:** `definition` specifies the **output** projection; input coordinates
+    /// **Note:** for projection operations, `definition` specifies
+    // the **output** projection; input coordinates
     /// are assumed to be geodetic, unless an inverse projection is intended.
-    /// If you're unsure about the differences between geodetic and projected
-    /// coordinates, and between projection and conversion,
-    /// [These answers](https://gis.stackexchange.com/a/1328/20618) will help.
-
-    // Projection is meant in the sense of `proj.4`'s [definition](http://proj4.org/operations/projections/index.html):
-    // "Projections map the spherical 3D space to a flat 2D space."
+    ///
+    /// For conversion operations, `definition` defines input, output, and
+    /// any intermediate steps that are required. See the `convert` example for more details.
 
     // In contrast to proj.4 v4.x, the type of transformation
     // is signalled by the choice of enum used as input to the PJ_COORD union
@@ -54,33 +52,6 @@ impl Proj {
     ///
     /// **Note:** specifying `inverse` as `true` carries out an inverse projection *to* geodetic coordinates
     /// from the projection specified by `definition`.
-    ///
-    /// This method makes use of the [`pipeline`](http://proj4.org/operations/pipeline.html)
-    /// functionality available since v5.0.0, which differs significantly from the v4.x series
-    ///
-    /// It has the advantage of being able to chain an arbitrary combination of projection, conversion,
-    /// and transformation steps, allowing for extremely complex operations.
-    ///
-    /// The following example converts from NAD83 US Survey Feet (EPSG 2230) to NAD83 Metres (EPSG 26946)
-    /// Note the steps:
-    ///
-    /// - define the operation as a `pipeline` operation
-    /// - define `step` 1 as an `inv`erse transform, yielding geodetic coordinates
-    /// - define `step` 2 as a forward transform to projected coordinates, yielding metres.
-    ///
-    /// ```rust,ignore
-    /// extern crate proj;
-    /// use proj::Proj;
-    ///
-    /// extern crate geo;
-    /// use geo::Point;
-    ///
-    /// let nad_ft_to_m = Proj::new("+proj=pipeline +step +inv +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666 +lon_0=-116.25 +x_0=2000000.0001016 +y_0=500000.0001016001 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=us-ft +no_defs +step +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666 +lon_0=-116.25 +x_0=2000000 +y_0=500000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs").unwrap();
-    /// let result = nad_ft_to_m.convert(Point::new(4760096.421921, 3744293.729449));
-    /// assert_eq!(result.x(), 1450880.29);
-    /// assert_eq!(result.y(), 1141263.01);
-    ///
-    /// ```
     pub fn project<T>(&self, point: Point<T>, inverse: bool) -> Point<T>
     where
         T: Float,
@@ -109,12 +80,34 @@ impl Proj {
         Point::new(T::from(new_x).unwrap(), T::from(new_y).unwrap())
     }
 
-    /// Convert `Point` coordinates between projections
+    /// Convert `Point` coordinates using the proj.4 `pipeline` operator
     ///
-    /// **Note:** This method is **not** intended for use with geodetic coordinates.
+    /// This method makes use of the [`pipeline`](http://proj4.org/operations/pipeline.html)
+    /// functionality available since v5.0.0, which differs significantly from the v4.x series
     ///
-    /// Conversions do **not** constitute a change in Datum (reference frame);
-    /// `proj.4` considers those operations to be transformations.
+    /// It has the advantage of being able to chain an arbitrary combination of projection, conversion,
+    /// and transformation steps, allowing for extremely complex operations.
+    ///
+    /// The following example converts from NAD83 US Survey Feet (EPSG 2230) to NAD83 Metres (EPSG 26946)
+    /// Note the steps:
+    ///
+    /// - define the operation as a `pipeline` operation
+    /// - define `step` 1 as an `inv`erse transform, yielding geodetic coordinates
+    /// - define `step` 2 as a forward transform to projected coordinates, yielding metres.
+    ///
+    /// ```rust,ignore
+    /// extern crate proj;
+    /// use proj::Proj;
+    ///
+    /// extern crate geo;
+    /// use geo::Point;
+    ///
+    /// let nad_ft_to_m = Proj::new("+proj=pipeline +step +inv +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666 +lon_0=-116.25 +x_0=2000000.0001016 +y_0=500000.0001016001 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=us-ft +no_defs +step +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666 +lon_0=-116.25 +x_0=2000000 +y_0=500000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs").unwrap();
+    /// let result = nad_ft_to_m.convert(Point::new(4760096.421921, 3744293.729449));
+    /// assert_eq!(result.x(), 1450880.29);
+    /// assert_eq!(result.y(), 1141263.01);
+    ///
+    /// ```
     pub fn convert<T>(&self, point: Point<T>) -> Point<T>
     where
         T: Float,
