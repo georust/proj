@@ -6,7 +6,7 @@ use std::ffi::CStr;
 use std::str;
 
 use proj_sys::{proj_context_create, proj_create, proj_destroy, proj_pj_info, proj_trans, PJconsts,
-               PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_XY};
+               PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_XY, PJ_LP};
 
 fn _string(raw_ptr: *const c_char) -> String {
     let c_str = unsafe { CStr::from_ptr(raw_ptr) };
@@ -19,10 +19,13 @@ pub struct Proj {
 }
 
 impl Proj {
-    /// Try to instantiate a new `proj.4` projection instance
-    /// definition specifies the output projection
-    /// if `inverse` is set to `true` when calling `project()`,
-    /// output will be a WGS84 lon, lat coord
+    /// Try to instantiate a new `proj.4` instance
+    ///
+    /// **Note:** `definition` specifies the **output** projection; input coordinates
+    /// are assumed to be geodetic, unless an inverse projection is intended.
+    /// If you're unsure about the differences between geodetic and projected
+    /// coordinates, and between projection and conversion,
+    /// [These answers](https://gis.stackexchange.com/a/1328/20618) will help.
 
     // Projection is meant in the sense of `proj.4`'s [definition](http://proj4.org/operations/projections/index.html):
     // "Projections map the spherical 3D space to a flat 2D space."
@@ -30,8 +33,7 @@ impl Proj {
     // In contrast to proj.4 v4.x, the type of transformation
     // is signalled by the choice of enum used as input to the PJ_COORD union
     // PJ_LP signals projection of geodetic coordinates, with output being PJ_XY
-    // and vice versa, or using PJ_XY for both to stay in projected coords
-    // TODO: ascertain how this interacts with inverse
+    // and vice versa, or using PJ_XY for conversion operations
     pub fn new(definition: &str) -> Option<Proj> {
         let c_definition = CString::new(definition.as_bytes()).unwrap();
         let ctx = unsafe { proj_context_create() };
@@ -43,12 +45,15 @@ impl Proj {
         }
     }
 
-    /// Get the current projection's definition from `proj.4`
+    /// Get the current definition from `proj.4`
     pub fn def(&self) -> String {
         let rv = unsafe { proj_pj_info(self.c_proj) };
         _string(rv.definition)
     }
-    /// Project the Point coordinates
+    /// Project geodetic `Point` coordinates into the projection specified by `definition`
+    ///
+    /// **Note:** specifying `inverse` as `true` carries out an inverse projection *to* geodetic coordinates
+    /// from the projection specified by `definition`.
     pub fn project<T>(&self, point: Point<T>, inverse: bool) -> Point<T>
     where
         T: Float,
@@ -62,15 +67,38 @@ impl Proj {
         let c_y: c_double = point.y().to_f64().unwrap();
         let new_x;
         let new_y;
-        // if we define input coords in terms of lambda & phi, using the PJ_LP struct,
-        // this signals to proj_trans that we wish to project geodetic coordinates.
-        // For conversion (i.e. between projected coordinates) we use
+        // Input coords are defined in terms of lambda & phi, using the PJ_LP struct.
+        // This signals that we wish to project geodetic coordinates.
+        // For conversion (i.e. between projected coordinates) you should use
         // PJ_XY {x: , y: }
+        let coords = PJ_LP { lam: c_x, phi: c_y };
+        unsafe {
+            // PJ_DIRECTION_* determines a forward or inverse projection
+            let trans = proj_trans(self.c_proj, inv, PJ_COORD { lp: coords });
+            // output of coordinates uses the PJ_XY struct
+            new_x = trans.xy.x;
+            new_y = trans.xy.y;
+        }
+        Point::new(T::from(new_x).unwrap(), T::from(new_y).unwrap())
+    }
+
+    /// Convert `Point` coordinates between projections
+    ///
+    /// **Note:** This method is **not** intended for use with geodetic coordinates.
+    ///
+    /// Conversions do **not** constitute a change in Datum (reference frame);
+    /// `proj.4` considers those operations to be transformations.
+    pub fn convert<T>(&self, point: Point<T>) -> Point<T>
+    where
+        T: Float,
+    {
+        let c_x: c_double = point.x().to_f64().unwrap();
+        let c_y: c_double = point.y().to_f64().unwrap();
+        let new_x;
+        let new_y;
         let coords = PJ_XY { x: c_x, y: c_y };
         unsafe {
-            // PJ_DIRECTION_* determines a forward or inverse transformation
-            let trans = proj_trans(self.c_proj, inv, PJ_COORD { xy: coords });
-            // output of projected coordinates uses the PJ_COORD:PJ_XY struct
+            let trans = proj_trans(self.c_proj, PJ_DIRECTION_PJ_FWD, PJ_COORD { xy: coords });
             new_x = trans.xy.x;
             new_y = trans.xy.y;
         }
@@ -97,7 +125,7 @@ mod test {
         assert!(f > 0.99999);
     }
     #[test]
-    fn test_new_projection() {
+    fn test_definition() {
         let wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
         let proj = Proj::new(wgs84).unwrap();
         assert_eq!(
@@ -107,24 +135,36 @@ mod test {
     }
     #[test]
     // Carry out a projection from geodetic coordinates
-    fn test_project() {
+    fn test_projection() {
         let stereo70 = Proj::new(
-            "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000 +ellps=krass +units=m +no_defs"
+            "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000 +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs"
             ).unwrap();
-        // WGS84 -> stereo70
+        // Geodetic -> Pulkovo 1942(58) / Stereo70 (EPSG 3844)
         let t = stereo70.project(Point::new(0.436332, 0.802851), false);
-        assert_almost_eq(t.x(), 500000.);
-        assert_almost_eq(t.y(), 500000.);
+        assert_almost_eq(t.x(), 500119.70352012233);
+        assert_almost_eq(t.y(), 500027.77896348457);
     }
     #[test]
     // Carry out an inverse projection to geodetic coordinates
-    fn test_inverse_project() {
+    fn test_inverse_projection() {
         let stereo70 = Proj::new(
-            "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000 +ellps=krass +units=m +no_defs"
+            "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000 +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs"
             ).unwrap();
-        // stereo70 -> WGS84
-        let t = stereo70.project(Point::new(500000., 500000.), true);
+        // Pulkovo 1942(58) / Stereo70 (EPSG 3844) -> Geodetic
+        let t = stereo70.project(Point::new(500119.70352012233, 500027.77896348457), true);
         assert_almost_eq(t.x(), 0.436332);
         assert_almost_eq(t.y(), 0.802851);
+    }
+    #[test]
+    // Carry out a conversion from NAD83 feet (EPSG 2230) to NAD83 metres (EPSG 26946)
+    fn test_conversion() {
+        let nad83_m = Proj::new(
+            "+proj=pipeline +step +inv +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666 +lon_0=-116.25 +x_0=2000000.0001016 +y_0=500000.0001016001 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=us-ft +no_defs +step +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666 +lon_0=-116.25 +x_0=2000000 +y_0=500000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
+        ).unwrap();
+        // Presidio, San Francisco
+        let t = nad83_m.convert(Point::new(4760096.421921, 3744293.729449));
+        println!("{:?}", t);
+        assert_almost_eq(t.x(), 1450880.29);
+        assert_almost_eq(t.y(), 1141263.01);
     }
 }
