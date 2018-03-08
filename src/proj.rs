@@ -1,3 +1,5 @@
+use libc::c_int;
+use proj_sys::proj_errno;
 use libc::{c_char, c_double};
 use std::ffi::CString;
 use geo::Point;
@@ -5,12 +7,20 @@ use num_traits::Float;
 use std::ffi::CStr;
 use std::str;
 use failure::Error;
-use proj_sys::{proj_context_create, proj_create, proj_destroy, proj_pj_info, proj_trans, PJconsts,
-               PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_LP, PJ_XY};
+use proj_sys::{pj_strerrno, proj_context_create, proj_create, proj_destroy, proj_pj_info,
+               proj_trans, PJconsts, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_LP,
+               PJ_XY};
 
+/// Easily get a String from the external library
 fn _string(raw_ptr: *const c_char) -> String {
     let c_str = unsafe { CStr::from_ptr(raw_ptr) };
     str::from_utf8(c_str.to_bytes()).unwrap().to_string()
+}
+
+/// Look up an error message using the error code
+fn error_message(code: c_int) -> String {
+    let rv = unsafe { pj_strerrno(code) };
+    return _string(rv);
 }
 
 /// A `proj.4` instance
@@ -116,20 +126,21 @@ impl Proj {
         let c_y: c_double = point.y().to_f64().unwrap();
         let new_x;
         let new_y;
+        let err;
         let coords = PJ_XY { x: c_x, y: c_y };
         unsafe {
             let trans = proj_trans(self.c_proj, PJ_DIRECTION_PJ_FWD, PJ_COORD { xy: coords });
             new_x = trans.xy.x;
             new_y = trans.xy.y;
+            err = proj_errno(self.c_proj);
         }
         // TODO: replace this with a proj error when we know how to detect them
-        let e = 0;
-        if e == 0 {
+        if err == 0 {
             Ok(Point::new(T::from(new_x).unwrap(), T::from(new_y).unwrap()))
         } else {
             Err(format_err!(
                 "The conversion failed with the following error: {}",
-                "Some proj error"
+                error_message(err)
             ))
         }
     }
