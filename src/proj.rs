@@ -4,7 +4,7 @@ use geo::Point;
 use num_traits::Float;
 use std::ffi::CStr;
 use std::str;
-
+use failure::Error;
 use proj_sys::{proj_context_create, proj_create, proj_destroy, proj_pj_info, proj_trans, PJconsts,
                PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_LP, PJ_XY};
 
@@ -108,7 +108,7 @@ impl Proj {
     /// assert_eq!(result.y(), 1141263.01);
     ///
     /// ```
-    pub fn convert<T>(&self, point: Point<T>) -> Point<T>
+    pub fn convert<T>(&self, point: Point<T>) -> Result<Point<T>, Error>
     where
         T: Float,
     {
@@ -122,7 +122,16 @@ impl Proj {
             new_x = trans.xy.x;
             new_y = trans.xy.y;
         }
-        Point::new(T::from(new_x).unwrap(), T::from(new_y).unwrap())
+        // TODO: replace this with a proj error when we know how to detect them
+        let e = 0;
+        if e == 0 {
+            Ok(Point::new(T::from(new_x).unwrap(), T::from(new_y).unwrap()))
+        } else {
+            Err(format_err!(
+                "The conversion failed with the following error: {}",
+                "Some proj error"
+            ))
+        }
     }
 }
 
@@ -182,7 +191,9 @@ mod test {
             "+proj=pipeline +step +inv +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666 +lon_0=-116.25 +x_0=2000000.0001016 +y_0=500000.0001016001 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=us-ft +no_defs +step +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666 +lon_0=-116.25 +x_0=2000000 +y_0=500000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
         ).unwrap();
         // Presidio, San Francisco
-        let t = nad83_m.convert(Point::new(4760096.421921, 3744293.729449));
+        let t = nad83_m
+            .convert(Point::new(4760096.421921, 3744293.729449))
+            .unwrap();
         println!("{:?}", t);
         assert_almost_eq(t.x(), 1450880.29);
         assert_almost_eq(t.y(), 1141263.01);

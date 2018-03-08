@@ -6,9 +6,11 @@
 //! coordinate systems. The proj.4 [documentation](http://proj4.org/operations/index.html)
 //! explains the distinction between these operations.
 
-extern crate num_traits;
+#[macro_use]
+extern crate failure;
 extern crate geo;
 extern crate libc;
+extern crate num_traits;
 extern crate proj_sys;
 
 mod proj;
