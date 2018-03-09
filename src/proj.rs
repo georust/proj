@@ -152,7 +152,6 @@ impl Proj {
             new_y = trans.xy.y;
             err = proj_errno(self.c_proj);
         }
-        // TODO: replace this with a proj error when we know how to detect them
         if err == 0 {
             Ok(Point::new(T::from(new_x).unwrap(), T::from(new_y).unwrap()))
         } else {
