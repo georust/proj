@@ -13,6 +13,7 @@ fn main() {
     // the resulting bindings.
     let bindings = bindgen::Builder::default()
         .trust_clang_mangling(false)
+        .blacklist_type("max_align_t")
         // The input header we would like to generate
         // bindings for.
         .header("wrapper.h")
