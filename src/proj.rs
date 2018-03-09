@@ -226,4 +226,12 @@ mod test {
         assert_almost_eq(t.x(), 1450880.29);
         assert_almost_eq(t.y(), 1141263.01);
     }
+    #[test]
+    #[should_panic]
+    // Test that instantiation fails wth bad input
+    fn test_bad_proj_string() {
+        let ugh = Proj::new(
+            "ugh"
+        ).unwrap();
+    }
 }
