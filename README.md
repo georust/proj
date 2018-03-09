@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/georust/proj-sys.svg?branch=master)](https://travis-ci.org/georust/proj-sys)
+
 # Bindings for proj.4 v5.0.0
 **This is a `-sys` crate. Please don't use its API directly.**  
 
