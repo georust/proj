@@ -12,6 +12,7 @@ fn main() {
     // to bindgen, and lets you build up options for
     // the resulting bindings.
     let bindings = bindgen::Builder::default()
+        .trust_clang_mangling(false)
         // The input header we would like to generate
         // bindings for.
         .header("wrapper.h")
