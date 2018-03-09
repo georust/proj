@@ -6,5 +6,12 @@ A guide to the functions can be found here: http://proj4.org/development/referen
 # Requirements
 `proj.4 v5.0.x` must be present on your system.
 
-# License
-MIT / Apache 2.0, at your option
+## License
+
+Licensed under either of
+
+ * Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+ * MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+
+at your option.
+
