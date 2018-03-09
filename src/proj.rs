@@ -234,7 +234,6 @@ mod test {
         ).unwrap();
         // OSGB36 (EPSG 27700) -> Geodetic
         let t = osgb36.project(Point::new(548295.39, 182498.46), true);
-        println!("{:?}", t);
         assert_almost_eq(t.x(), 0.0023780939236960497);
         assert_almost_eq(t.y(), 0.8992266861799759);
     }
@@ -255,7 +254,6 @@ mod test {
         let t = nad83_m
             .convert(Point::new(4760096.421921, 3744293.729449))
             .unwrap();
-        println!("{:?}", t);
         assert_almost_eq(t.x(), 1450880.29);
         assert_almost_eq(t.y(), 1141263.01);
     }
@@ -266,10 +264,8 @@ mod test {
         let _ = Proj::new("ugh").unwrap();
     }
     #[test]
-    #[should_panic]
-    // This will panic with an error message containing the proj error string,
-    // because step 1 isn't an inverse conversion, which means it's expecting lon lat input
     fn test_conversion_error() {
+        // because step 1 isn't an inverse conversion, it's expecting lon lat input
         let nad83_m = Proj::new("
             +proj=pipeline
             +step +proj=lcc +lat_1=33.88333333333333
@@ -280,9 +276,12 @@ mod test {
             +lon_0=-116.25 +x_0=2000000 +y_0=500000
             +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs
         ").unwrap();
-        // Presidio, San Francisco
-        let _ = nad83_m
+        let err = nad83_m
             .convert(Point::new(4760096.421921, 3744293.729449))
-            .unwrap();
+            .unwrap_err();
+        assert_eq!(
+            "The conversion failed with the following error: latitude or longitude exceeded limits",
+            err.root_cause().to_string()
+        );
     }
 }
