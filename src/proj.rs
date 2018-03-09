@@ -130,7 +130,16 @@ impl Proj {
     /// extern crate geo;
     /// use geo::Point;
     ///
-    /// let nad_ft_to_m = Proj::new("+proj=pipeline +step +inv +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666 +lon_0=-116.25 +x_0=2000000.0001016 +y_0=500000.0001016001 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=us-ft +no_defs +step +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666 +lon_0=-116.25 +x_0=2000000 +y_0=500000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs").unwrap();
+    /// let nad_ft_to_m = Proj::new("
+    ///     +proj=pipeline
+    ///     +step +inv +proj=lcc +lat_1=33.88333333333333
+    ///     +lat_2=32.78333333333333 +lat_0=32.16666666666666
+    ///     +lon_0=-116.25 +x_0=2000000.0001016 +y_0=500000.0001016001 +ellps=GRS80
+    ///     +towgs84=0,0,0,0,0,0,0 +units=us-ft +no_defs
+    ///     +step +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666
+    ///     +lon_0=-116.25 +x_0=2000000 +y_0=500000
+    ///     +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs
+    /// ").unwrap();
     /// let result = nad_ft_to_m.convert(Point::new(4760096.421921, 3744293.729449)).unwrap();
     /// assert_eq!(result.x(), 1450880.29);
     /// assert_eq!(result.y(), 1141263.01);
@@ -194,8 +203,9 @@ mod test {
     // Carry out a projection from geodetic coordinates
     fn test_projection() {
         let stereo70 = Proj::new(
-            "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000 +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs"
-            ).unwrap();
+            "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
+            +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs",
+        ).unwrap();
         // Geodetic -> Pulkovo 1942(58) / Stereo70 (EPSG 3844)
         let t = stereo70.project(Point::new(0.436332, 0.802851), false);
         assert_almost_eq(t.x(), 500119.70352012233);
@@ -205,7 +215,8 @@ mod test {
     // Carry out an inverse projection to geodetic coordinates
     fn test_inverse_projection() {
         let stereo70 = Proj::new(
-            "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000 +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs"
+            "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
+            +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs"
             ).unwrap();
         // Pulkovo 1942(58) / Stereo70 (EPSG 3844) -> Geodetic
         let t = stereo70.project(Point::new(500119.70352012233, 500027.77896348457), true);
@@ -215,9 +226,16 @@ mod test {
     #[test]
     // Carry out a conversion from NAD83 feet (EPSG 2230) to NAD83 metres (EPSG 26946)
     fn test_conversion() {
-        let nad83_m = Proj::new(
-            "+proj=pipeline +step +inv +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666 +lon_0=-116.25 +x_0=2000000.0001016 +y_0=500000.0001016001 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=us-ft +no_defs +step +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666 +lon_0=-116.25 +x_0=2000000 +y_0=500000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
-        ).unwrap();
+        let nad83_m = Proj::new("
+            +proj=pipeline
+            +step +inv +proj=lcc +lat_1=33.88333333333333
+            +lat_2=32.78333333333333 +lat_0=32.16666666666666
+            +lon_0=-116.25 +x_0=2000000.0001016 +y_0=500000.0001016001 +ellps=GRS80
+            +towgs84=0,0,0,0,0,0,0 +units=us-ft +no_defs
+            +step +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666
+            +lon_0=-116.25 +x_0=2000000 +y_0=500000
+            +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs
+        ").unwrap();
         // Presidio, San Francisco
         let t = nad83_m
             .convert(Point::new(4760096.421921, 3744293.729449))
@@ -230,8 +248,6 @@ mod test {
     #[should_panic]
     // Test that instantiation fails wth bad input
     fn test_bad_proj_string() {
-        let ugh = Proj::new(
-            "ugh"
-        ).unwrap();
+        let _ = Proj::new("ugh").unwrap();
     }
 }
