@@ -32,8 +32,8 @@ impl Proj {
     /// Try to instantiate a new `proj.4` instance
     ///
     /// **Note:** for projection operations, `definition` specifies
-    // the **output** projection; input coordinates
-    /// are assumed to be geodetic, unless an inverse projection is intended.
+    /// the **output** projection; input coordinates
+    /// are assumed to be geodetic in radians, unless an inverse projection is intended.
     ///
     /// For conversion operations, `definition` defines input, output, and
     /// any intermediate steps that are required. See the `convert` example for more details.
@@ -76,10 +76,10 @@ impl Proj {
         let rv = unsafe { proj_pj_info(self.c_proj) };
         _string(rv.definition)
     }
-    /// Project geodetic `Point` coordinates into the projection specified by `definition`
+    /// Project geodetic `Point` coordinates (in radians) into the projection specified by `definition`
     ///
     /// **Note:** specifying `inverse` as `true` carries out an inverse projection *to* geodetic coordinates
-    /// from the projection specified by `definition`.
+    /// (in radians) from the projection specified by `definition`.
     pub fn project<T>(&self, point: Point<T>, inverse: bool) -> Point<T>
     where
         T: Float,
