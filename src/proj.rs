@@ -224,6 +224,19 @@ mod test {
         assert_almost_eq(t.y(), 0.802851);
     }
     #[test]
+    // Carry out an inverse projection to geodetic coordinates
+    fn test_london_inverse() {
+        let osgb36 = Proj::new("
+            +proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy
+            +towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 +units=m +no_defs
+            ").unwrap();
+        // OSGB36 (EPSG 27700) -> Geodetic
+        let t = osgb36.project(Point::new(548295.39, 182498.46), true);
+        println!("{:?}", t);
+        assert_almost_eq(t.x(), 0.0023780939236960497);
+        assert_almost_eq(t.y(),  0.8992266861799759);
+    }
+    #[test]
     // Carry out a conversion from NAD83 feet (EPSG 2230) to NAD83 metres (EPSG 26946)
     fn test_conversion() {
         let nad83_m = Proj::new("
