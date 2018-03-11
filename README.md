@@ -18,5 +18,5 @@ let stereo70 = Proj::new(
     "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000 +ellps=krass +units=m +no_defs"
     ).unwrap();
 let rp = stereo70.project(&wgs84, Point::new(500000., 500000.));
-assert_eq(rp, Point::new(0.436332, 0.802851))
+assert_eq(rp, Point::new(0.436332, 0.802851));
 ```
