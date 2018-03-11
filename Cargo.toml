@@ -1,7 +1,7 @@
 [package]
 name = "proj"
-description = "Rust bindings for proj"
-version = "0.2.0"
+description = "Rust bindings for proj.4"
+version = "0.3.0"
 authors = [
   "Corey Farwell <coreyf@rwell.org>",
   "Alex Morega <alex@grep.ro>",
@@ -11,6 +11,6 @@ keywords = ["proj", "projection", "osgeo", "geo"]
 license = "Apache-2.0"
 
 [dependencies]
-geo ="^0.4"
-libc = "0.1.7"
+geo ="^0.7"
+libc = "0.2.39"
 num-traits = "^0.1"
