@@ -243,8 +243,8 @@ mod test {
         ).unwrap();
         // OSGB36 (EPSG 27700) -> Geodetic
         let t = osgb36.project(Point::new(548295.39, 182498.46), true).unwrap();
-        assert_almost_eq(t.x(), 0.0023780939236960497);
-        assert_almost_eq(t.y(), 0.8992266861799759);
+        assert_almost_eq(t.x(), 0.0023755864848281206);
+        assert_almost_eq(t.y(), 0.8992274896304518);
     }
     #[test]
     // Carry out a conversion from NAD83 feet (EPSG 2230) to NAD83 metres (EPSG 26946)
