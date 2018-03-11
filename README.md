@@ -27,7 +27,7 @@ let nad_ft_to_m = Proj::new("
     +lon_0=-116.25 +x_0=2000000 +y_0=500000
     +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs
 ").unwrap();
-# The Presidio, approximately
+// The Presidio, approximately
 let result = nad_ft_to_m.convert(Point::new(4760096.421921, 3744293.729449)).unwrap();
 assert_eq!(result.x(), 1450880.29);
 assert_eq!(result.y(), 1141263.01);
@@ -41,13 +41,11 @@ use proj::Proj;
 extern crate geo;
 use geo::types::Point;
 
-// reproject coordinates from Stereo70 with custom params into geodetic coordinates (in radians)
-let wgs84_name = "+proj=longlat +datum=WGS84 +no_defs";
-let wgs84 = Proj::new(wgs84_name).unwrap();
+// Carry out an inverse projection from Pulkovo 1942(58) / Stereo70 (EPSG 3844) into geodetic lon and lat coordinates (in radians)
 let stereo70 = Proj::new(
     "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000 +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs"
     ).unwrap();
-let rp = stereo70.project(&wgs84, Point::new(500000., 500000.));
+let rp = stereo70.project(Point::new(500119.70352012233, 500027.77896348457), true).unwrap();
 assert_eq(rp, Point::new(0.436332, 0.802851));
 ```
 
