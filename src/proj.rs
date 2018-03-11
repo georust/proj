@@ -80,7 +80,7 @@ impl Proj {
     ///
     /// **Note:** specifying `inverse` as `true` carries out an inverse projection *to* geodetic coordinates
     /// (in radians) from the projection specified by `definition`.
-    pub fn project<T>(&self, point: Point<T>, inverse: bool) -> Point<T>
+    pub fn project<T>(&self, point: Point<T>, inverse: bool) -> Result<Point<T>, Error>
     where
         T: Float,
     {
@@ -93,6 +93,7 @@ impl Proj {
         let c_y: c_double = point.y().to_f64().unwrap();
         let new_x;
         let new_y;
+        let err;
         // Input coords are defined in terms of lambda & phi, using the PJ_LP struct.
         // This signals that we wish to project geodetic coordinates.
         // For conversion (i.e. between projected coordinates) you should use
@@ -104,8 +105,16 @@ impl Proj {
             // output of coordinates uses the PJ_XY struct
             new_x = trans.xy.x;
             new_y = trans.xy.y;
+            err = proj_errno(self.c_proj);
         }
-        Point::new(T::from(new_x).unwrap(), T::from(new_y).unwrap())
+        if err == 0 {
+            Ok(Point::new(T::from(new_x).unwrap(), T::from(new_y).unwrap()))
+        } else {
+            Err(format_err!(
+                "The projection failed with the following error: {}",
+                error_message(err)
+            ))
+        }
     }
 
     /// Convert `Point` coordinates using the proj.4 `pipeline` operator
@@ -207,7 +216,7 @@ mod test {
             +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs",
         ).unwrap();
         // Geodetic -> Pulkovo 1942(58) / Stereo70 (EPSG 3844)
-        let t = stereo70.project(Point::new(0.436332, 0.802851), false);
+        let t = stereo70.project(Point::new(0.436332, 0.802851), false).unwrap();
         assert_almost_eq(t.x(), 500119.70352012233);
         assert_almost_eq(t.y(), 500027.77896348457);
     }
@@ -219,7 +228,7 @@ mod test {
             +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs",
         ).unwrap();
         // Pulkovo 1942(58) / Stereo70 (EPSG 3844) -> Geodetic
-        let t = stereo70.project(Point::new(500119.70352012233, 500027.77896348457), true);
+        let t = stereo70.project(Point::new(500119.70352012233, 500027.77896348457), true).unwrap();
         assert_almost_eq(t.x(), 0.436332);
         assert_almost_eq(t.y(), 0.802851);
     }
@@ -233,7 +242,7 @@ mod test {
             ",
         ).unwrap();
         // OSGB36 (EPSG 27700) -> Geodetic
-        let t = osgb36.project(Point::new(548295.39, 182498.46), true);
+        let t = osgb36.project(Point::new(548295.39, 182498.46), true).unwrap();
         assert_almost_eq(t.x(), 0.0023780939236960497);
         assert_almost_eq(t.y(), 0.8992266861799759);
     }
