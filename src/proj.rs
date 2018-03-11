@@ -54,7 +54,7 @@ impl Proj {
         let rv = unsafe { pj_get_def(self.c_proj) };
         _string(rv)
     }
-    /// Project a Point into `target`'s coordinates
+    /// Project a `Point` into `target`'s coordinates
     pub fn project<T>(&self, target: &Proj, point: Point<T>) -> Point<T>
     where
         T: Float,
