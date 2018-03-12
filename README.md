@@ -1,9 +1,9 @@
 # rust-proj
 
-Rust bindings for [proj.4](https://github.com/OSGeo/proj.4), v5.0.x
+Rust bindings for [PROJ.4](https://github.com/OSGeo/proj.4), v5.0.x
 
 # Examples
-Note that as of v5.0.0, proj.5 uses the [`pipeline`](http://proj4.org/operations/pipeline.html) operator, which allows an arbitrary number of steps in a conversion. The first example below works as follows:
+Note that as of v5.0.0, PROJ.4 uses the [`pipeline`](http://proj4.org/operations/pipeline.html) operator, which allows an arbitrary number of steps in a conversion. The first example below works as follows:
 
 - define the operation as a `pipeline` operation
 - define `step` 1 as an `inv`erse transform, yielding geodetic coordinates
@@ -46,7 +46,7 @@ let stereo70 = Proj::new(
     "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000 +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs"
     ).unwrap();
 let rp = stereo70.project(Point::new(500119.70352012233, 500027.77896348457), true).unwrap();
-assert_eq(rp, Point::new(0.436332, 0.802851));
+assert_eq!(rp, Point::new(0.436332, 0.802851));
 ```
 
 ## License

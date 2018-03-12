@@ -29,7 +29,7 @@ pub struct Proj {
 }
 
 impl Proj {
-    /// Try to instantiate a new `proj.4` instance
+    /// Try to instantiate a new `PROJ.4` instance
     ///
     /// **Note:** for projection operations, `definition` specifies
     /// the **output** projection; input coordinates
@@ -71,7 +71,7 @@ impl Proj {
     //     }
     // }
 
-    /// Get the current definition from `proj.4`
+    /// Get the current definition from `PROJ.4`
     pub fn def(&self) -> String {
         let rv = unsafe { proj_pj_info(self.c_proj) };
         _string(rv.definition)
@@ -117,7 +117,7 @@ impl Proj {
         }
     }
 
-    /// Convert `Point` coordinates using the proj.4 `pipeline` operator
+    /// Convert `Point` coordinates using the PROJ.4 `pipeline` operator
     ///
     /// This method makes use of the [`pipeline`](http://proj4.org/operations/pipeline.html)
     /// functionality available since v5.0.0, which differs significantly from the v4.x series
@@ -267,10 +267,9 @@ mod test {
         assert_almost_eq(t.y(), 1141263.01);
     }
     #[test]
-    #[should_panic]
     // Test that instantiation fails wth bad proj string input
     fn test_init_error() {
-        let _ = Proj::new("ugh").unwrap();
+        assert!(Proj::new("ugh").is_none());
     }
     #[test]
     fn test_conversion_error() {
