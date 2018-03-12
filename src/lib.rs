@@ -1,8 +1,17 @@
-//! Rust bindings for [PROJ.4](https://github.com/OSGeo/proj.4) v4.9.x
+//! `proj` provides bindings to the [proj.4](http://proj4.org), v5.0.x API
+//!
+//! Two coordinate operations are currently provided: projection (and inverse projection)
+//! and conversion. Projection is intended for transforming between geodetic and projected coordinates,
+//! and vice versa (inverse projection), while conversion is intended for transforming between projected
+//! coordinate systems. The proj.4 [documentation](http://proj4.org/operations/index.html)
+//! explains the distinction between these operations.
 
-extern crate num_traits;
+#[macro_use]
+extern crate failure;
 extern crate geo;
 extern crate libc;
+extern crate num_traits;
+extern crate proj_sys;
 
 mod proj;
 
