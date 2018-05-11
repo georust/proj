@@ -8,7 +8,7 @@
 
 #[macro_use]
 extern crate failure;
-extern crate geo;
+extern crate geo_types;
 extern crate libc;
 extern crate num_traits;
 extern crate proj_sys;
