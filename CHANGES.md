@@ -1,5 +1,9 @@
 # Changes
 
+## 0.5.0
+
+* [Switch to `geo-types` crate](https://github.com/georust/rust-proj/pull/8)
+
 ## 0.4.0
 
 * [Switch to `proj-sys` crate, and PROJ.4 v5.0.0 API](https://github.com/georust/rust-proj/pull/6)
