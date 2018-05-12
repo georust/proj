@@ -275,14 +275,7 @@ mod test {
     fn test_conversion_error() {
         // because step 1 isn't an inverse conversion, it's expecting lon lat input
         let nad83_m = Proj::new("
-            +proj=pipeline
-            +step +proj=lcc +lat_1=33.88333333333333
-            +lat_2=32.78333333333333 +lat_0=32.16666666666666
-            +lon_0=-116.25 +x_0=2000000.0001016 +y_0=500000.0001016001 +ellps=GRS80
-            +towgs84=0,0,0,0,0,0,0 +units=us-ft +no_defs
-            +step +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666
-            +lon_0=-116.25 +x_0=2000000 +y_0=500000
-            +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs
+            +proj=geos +lon_0=0.00 +lat_0=0.00 +a=6378169.00 +b=6356583.80 +h=35785831.0
         ").unwrap();
         let err = nad83_m
             .convert(Point::new(4760096.421921, 3744293.729449))

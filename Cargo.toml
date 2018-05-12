@@ -1,10 +1,11 @@
 [package]
 name = "proj"
 description = "Rust bindings for proj.4"
-version = "0.4.0"
+version = "0.4.1"
 authors = [
   "Corey Farwell <coreyf@rwell.org>",
   "Alex Morega <alex@grep.ro>",
+  "Stephan Hügel <urschrei@gmail.com>"
 ]
 repository = "https://github.com/georust/rust-proj"
 keywords = ["proj", "projection", "osgeo", "geo"]
