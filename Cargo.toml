@@ -5,7 +5,7 @@ repository = "https://github.com/urschrei/proj-sys"
 version = "0.6.2"
 readme = "README.md"
 authors = ["Stephan Hügel <urschrei@gmail.com>"]
-keywords = ["proj.4", "projection", "osgeo", "geo", "geospatial"]
+keywords = ["proj", "projection", "osgeo", "geo", "geospatial"]
 license = "MIT/Apache-2.0"
 
 [dependencies]
