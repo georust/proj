@@ -14,8 +14,8 @@ Note that as of v5.0.0, PROJ.4 uses the [`pipeline`](http://proj4.org/operations
 extern crate proj;
 use proj::Proj;
 
-extern crate geo;
-use geo::types::Point;
+extern crate geo_types;
+use geo_types::Point;
 
 let nad_ft_to_m = Proj::new("
     +proj=pipeline
@@ -38,8 +38,8 @@ assert_eq!(result.y(), 1141263.01);
 extern crate proj;
 use proj::Proj;
 
-extern crate geo;
-use geo::types::Point;
+extern crate geo_types;
+use geo_types::Point;
 
 // Carry out an inverse projection from Pulkovo 1942(58) / Stereo70 (EPSG 3844) into geodetic lon and lat coordinates (in radians)
 let stereo70 = Proj::new(

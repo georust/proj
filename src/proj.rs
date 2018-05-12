@@ -2,7 +2,7 @@ use libc::c_int;
 use proj_sys::proj_errno;
 use libc::{c_char, c_double};
 use std::ffi::CString;
-use geo::Point;
+use geo_types::Point;
 use num_traits::Float;
 use std::ffi::CStr;
 use std::str;
@@ -136,8 +136,8 @@ impl Proj {
     /// extern crate proj;
     /// use proj::Proj;
     ///
-    /// extern crate geo;
-    /// use geo::Point;
+    /// extern crate geo_types;
+    /// use geo_types::Point;
     ///
     /// let nad_ft_to_m = Proj::new("
     ///     +proj=pipeline
@@ -191,7 +191,7 @@ impl Drop for Proj {
 
 #[cfg(test)]
 mod test {
-    use geo::Point;
+    use geo_types::Point;
     use super::Proj;
 
     fn assert_almost_eq(a: f64, b: f64) {
