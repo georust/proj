@@ -1,4 +1,4 @@
-# rust-proj
+# proj
 
 Rust bindings for [PROJ.4](https://github.com/OSGeo/proj.4), v5.0.x
 
