@@ -5,7 +5,7 @@ use libc::{c_char, c_double};
 use num_traits::Float;
 use proj_sys::proj_errno;
 use proj_sys::{
-    pj_strerrno, proj_context_create, proj_create, proj_create_crs_to_crs, proj_destroy,
+    proj_errno_string, proj_context_create, proj_create, proj_create_crs_to_crs, proj_destroy,
     proj_pj_info, proj_trans, PJconsts, PJ_AREA, PJ_COORD, PJ_DIRECTION_PJ_FWD,
     PJ_DIRECTION_PJ_INV, PJ_LP, PJ_XY,
 };
@@ -21,7 +21,7 @@ fn _string(raw_ptr: *const c_char) -> String {
 
 /// Look up an error message using the error code
 fn error_message(code: c_int) -> String {
-    let rv = unsafe { pj_strerrno(code) };
+    let rv = unsafe { proj_errno_string(code) };
     _string(rv)
 }
 
