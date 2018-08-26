@@ -1,6 +1,6 @@
-# proj
+# PROJ
 
-Rust bindings for [PROJ.4](https://github.com/OSGeo/proj.4), v5.0.x / 5.1.x
+Rust bindings for [PROJ.4](https://github.com/OSGeo/proj.4), v5.1.x
 
 # Examples
 Note that as of v5.0.0, PROJ.4 uses the [`pipeline`](http://proj4.org/operations/pipeline.html) operator, which allows an arbitrary number of steps in a conversion. The first example below works as follows:
