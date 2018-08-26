@@ -1,5 +1,11 @@
 # Changes
 
+## 0.6.0
+
+* Update proj-sys to v0.7.0
+    * This requires a minimum PROJ.4 version of 5.1.0
+* Deprecate use of `pj_strerrno` in favour of proj_errno_string
+
 ## 0.5.0
 
 * [Switch to `geo-types` crate](https://github.com/georust/rust-proj/pull/8)
