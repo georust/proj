@@ -1,15 +1,17 @@
-use libc::c_int;
-use proj_sys::proj_errno;
-use libc::{c_char, c_double};
-use std::ffi::CString;
-use geo_types::Point;
-use num_traits::Float;
-use std::ffi::CStr;
-use std::str;
 use failure::Error;
-use proj_sys::{pj_strerrno, proj_context_create, proj_create, proj_create_crs_to_crs,
-               proj_destroy, proj_pj_info, proj_trans, PJconsts, PJ_AREA, PJ_COORD,
-               PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_LP, PJ_XY};
+use geo_types::Point;
+use libc::c_int;
+use libc::{c_char, c_double};
+use num_traits::Float;
+use proj_sys::proj_errno;
+use proj_sys::{
+    proj_errno_string, proj_context_create, proj_create, proj_create_crs_to_crs, proj_destroy,
+    proj_pj_info, proj_trans, PJconsts, PJ_AREA, PJ_COORD, PJ_DIRECTION_PJ_FWD,
+    PJ_DIRECTION_PJ_INV, PJ_LP, PJ_XY,
+};
+use std::ffi::CStr;
+use std::ffi::CString;
+use std::str;
 
 /// Easily get a String from the external library
 fn _string(raw_ptr: *const c_char) -> String {
@@ -19,8 +21,8 @@ fn _string(raw_ptr: *const c_char) -> String {
 
 /// Look up an error message using the error code
 fn error_message(code: c_int) -> String {
-    let rv = unsafe { pj_strerrno(code) };
-    return _string(rv);
+    let rv = unsafe { proj_errno_string(code) };
+    _string(rv)
 }
 
 /// A `proj.4` instance
@@ -191,8 +193,8 @@ impl Drop for Proj {
 
 #[cfg(test)]
 mod test {
-    use geo_types::Point;
     use super::Proj;
+    use geo_types::Point;
 
     fn assert_almost_eq(a: f64, b: f64) {
         let f: f64 = a / b;
@@ -216,7 +218,9 @@ mod test {
             +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs",
         ).unwrap();
         // Geodetic -> Pulkovo 1942(58) / Stereo70 (EPSG 3844)
-        let t = stereo70.project(Point::new(0.436332, 0.802851), false).unwrap();
+        let t = stereo70
+            .project(Point::new(0.436332, 0.802851), false)
+            .unwrap();
         assert_almost_eq(t.x(), 500119.70352012233);
         assert_almost_eq(t.y(), 500027.77896348457);
     }
@@ -228,7 +232,9 @@ mod test {
             +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs",
         ).unwrap();
         // Pulkovo 1942(58) / Stereo70 (EPSG 3844) -> Geodetic
-        let t = stereo70.project(Point::new(500119.70352012233, 500027.77896348457), true).unwrap();
+        let t = stereo70
+            .project(Point::new(500119.70352012233, 500027.77896348457), true)
+            .unwrap();
         assert_almost_eq(t.x(), 0.436332);
         assert_almost_eq(t.y(), 0.802851);
     }
@@ -242,7 +248,9 @@ mod test {
             ",
         ).unwrap();
         // OSGB36 (EPSG 27700) -> Geodetic
-        let t = osgb36.project(Point::new(548295.39, 182498.46), true).unwrap();
+        let t = osgb36
+            .project(Point::new(548295.39, 182498.46), true)
+            .unwrap();
         assert_almost_eq(t.x(), 0.0023755864848281206);
         assert_almost_eq(t.y(), 0.8992274896304518);
     }
@@ -274,15 +282,17 @@ mod test {
     #[test]
     fn test_conversion_error() {
         // because step 1 isn't an inverse conversion, it's expecting lon lat input
-        let nad83_m = Proj::new("
+        let nad83_m = Proj::new(
+            "
             +proj=geos +lon_0=0.00 +lat_0=0.00 +a=6378169.00 +b=6356583.80 +h=35785831.0
-        ").unwrap();
+        ",
+        ).unwrap();
         let err = nad83_m
             .convert(Point::new(4760096.421921, 3744293.729449))
             .unwrap_err();
         assert_eq!(
             "The conversion failed with the following error: latitude or longitude exceeded limits",
-            err.root_cause().to_string()
+            err.find_root_cause().to_string()
         );
     }
 }
