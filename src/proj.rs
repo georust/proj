@@ -282,7 +282,7 @@ mod test {
             .unwrap_err();
         assert_eq!(
             "The conversion failed with the following error: latitude or longitude exceeded limits",
-            err.root_cause().to_string()
+            err.find_root_cause().to_string()
         );
     }
 }
