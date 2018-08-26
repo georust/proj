@@ -22,7 +22,7 @@ fn _string(raw_ptr: *const c_char) -> String {
 /// Look up an error message using the error code
 fn error_message(code: c_int) -> String {
     let rv = unsafe { pj_strerrno(code) };
-    return _string(rv);
+    _string(rv)
 }
 
 /// A `proj.4` instance
