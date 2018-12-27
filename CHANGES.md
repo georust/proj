@@ -1,5 +1,9 @@
 # Changes
 
+## 0.7.0
+* Update proj-sys to v0.8.0
+    * This requires a minimum PROJ.4 version of 5.2.0
+
 ## 0.6.0
 
 * Update proj-sys to v0.7.0
