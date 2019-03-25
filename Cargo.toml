@@ -7,6 +7,7 @@ readme = "README.md"
 authors = ["Stephan Hügel <urschrei@gmail.com>"]
 keywords = ["proj", "projection", "osgeo", "geo", "geospatial"]
 license = "MIT/Apache-2.0"
+edition = "2018"
 
 [dependencies]
 
