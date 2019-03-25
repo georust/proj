@@ -5,9 +5,9 @@ use libc::{c_char, c_double};
 use num_traits::Float;
 use proj_sys::proj_errno;
 use proj_sys::{
-    proj_context_create, proj_create, proj_context_errno, proj_create_crs_to_crs, proj_destroy, proj_errno_string,
-    proj_pj_info, proj_trans, PJconsts, PJ_AREA, PJ_COORD, PJ_DIRECTION_PJ_FWD,
-    PJ_DIRECTION_PJ_INV, PJ_LP, PJ_XY,
+    proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_context_create, proj_create,
+    proj_create_crs_to_crs, proj_destroy, proj_errno_string, proj_pj_info, proj_trans, PJconsts,
+    PJ_AREA, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_LP, PJ_XY,
 };
 use std::ffi::CStr;
 use std::ffi::CString;
@@ -28,6 +28,7 @@ fn error_message(code: c_int) -> String {
 /// A `proj.4` instance
 pub struct Proj {
     c_proj: *mut PJconsts,
+    area: Option<*mut PJ_AREA>,
 }
 
 impl Proj {
@@ -48,30 +49,55 @@ impl Proj {
         let c_definition = CString::new(definition.as_bytes()).unwrap();
         let ctx = unsafe { proj_context_create() };
         let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
+        // check for unexpected returned object type
+        // let return_code: i32 = unsafe { proj_get_type(new_c_proj) };
         if new_c_proj.is_null() {
             None
         } else {
-            Some(Proj { c_proj: new_c_proj })
+            Some(Proj {
+                c_proj: new_c_proj,
+                area: None,
+            })
         }
     }
 
-    // FIXME: we can't implement this yet because PJ_AREA isn't implemented
-    // /// Create a transformation object from two known EPSG CRS codes
-    // pub fn new_known_crs(from: &str, to: &str) -> Option<Proj> {
-    //     let from_c = CString::new(from.as_bytes()).unwrap();
-    //     let to_c = CString::new(to.as_bytes()).unwrap();
-    //     let ctx = unsafe { proj_context_create() };
-    //     // not implemented yet, see http://proj4.org/development/reference/datatypes.html#c.PJ_AREA
-    //     let mut area = PJ_AREA { area: 0 };
-    //     let raw_area = &mut area as *mut PJ_AREA;
-    //     let new_c_proj =
-    //         unsafe { proj_create_crs_to_crs(ctx, from_c.as_ptr(), to_c.as_ptr(), raw_area) };
-    //     if new_c_proj.is_null() {
-    //         None
-    //     } else {
-    //         Some(Proj { c_proj: new_c_proj })
-    //     }
-    // }
+    /// Create a transformation object that is a pipeline between two known coordinate reference systems.
+    /// `from` and `to` can be:
+    ///
+    /// - an “AUTHORITY:CODE”, like EPSG:25832. When using that syntax for a source CRS, the created pipeline will expect that the values passed to `project()` or `convert()` respect the axis order and axis unit of the official definition ( so for example, for EPSG:4326, with latitude first and longitude next, in degrees). Similarly, when using that syntax for a target CRS, output values will be emitted according to the official definition of this CRS.
+    /// - a PROJ string, like “+proj=longlat +datum=WGS84”. When using that syntax, the axis order and unit for geographic CRS will be longitude, latitude, and the unit degrees.
+    /// - the name of a CRS as found in the PROJ database, e.g “WGS84”, “NAD27”, etc.
+    /// - more generally, any string accepted by `new()`
+    ///
+    /// If you wish to specify a particular area of use, you may set it using `area_set_bbox()`
+    pub fn new_known_crs(from: &str, to: &str) -> Option<Proj> {
+        let from_c = CString::new(from.as_bytes()).unwrap();
+        let to_c = CString::new(to.as_bytes()).unwrap();
+        let ctx = unsafe { proj_context_create() };
+        let area = unsafe { proj_area_create() };
+        let new_c_proj =
+            unsafe { proj_create_crs_to_crs(ctx, from_c.as_ptr(), to_c.as_ptr(), area) };
+        if new_c_proj.is_null() {
+            None
+        } else {
+            Some(Proj {
+                c_proj: new_c_proj,
+                area: Some(area),
+            })
+        }
+    }
+
+    /// Set the bounding box of the area of use
+    ///
+    /// Such an area of use will be used to specify the area of use
+    /// for the choice of relevant coordinate operations.
+    /// In the case of an area of use crossing the antimeridian (longitude +/- 180 degrees),
+    /// west_lon_degree will be greater than east_lon_degree.
+    pub fn area_set_bbox(&self, west: f64, south: f64, east: f64, north: f64) {
+        if let Some(area) = self.area {
+            unsafe { proj_area_set_bbox(area, west, south, east, north) }
+        }
+    }
 
     /// Get the current definition from `PROJ.4`
     pub fn def(&self) -> String {
@@ -187,6 +213,9 @@ impl Drop for Proj {
     fn drop(&mut self) {
         unsafe {
             proj_destroy(self.c_proj);
+            if let Some(area) = self.area {
+                proj_area_destroy(area)
+            }
         }
     }
 }
@@ -280,13 +309,13 @@ mod test {
     #[test]
     // Test that instantiation fails wth bad proj string input
     fn test_init_error() {
-        assert!(Proj::new("ugh").is_none());
+        assert!(Proj::new("🦀").is_none());
     }
     #[test]
     fn test_conversion_error() {
         // because step 1 isn't an inverse conversion, it's expecting lon lat input
         let nad83_m = Proj::new(
-            "+proj=geos +lon_0=0.00 +lat_0=0.00 +a=6378169.00 +b=6356583.80 +h=35785831.0"
+            "+proj=geos +lon_0=0.00 +lat_0=0.00 +a=6378169.00 +b=6356583.80 +h=35785831.0",
         )
         .unwrap();
         let err = nad83_m
