@@ -15,4 +15,4 @@ extern crate proj_sys;
 
 mod proj;
 
-pub use proj::Proj;
+pub use crate::proj::Proj;

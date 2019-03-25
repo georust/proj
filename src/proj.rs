@@ -5,7 +5,7 @@ use libc::{c_char, c_double};
 use num_traits::Float;
 use proj_sys::proj_errno;
 use proj_sys::{
-    proj_errno_string, proj_context_create, proj_create, proj_create_crs_to_crs, proj_destroy,
+    proj_context_create, proj_create, proj_context_errno, proj_create_crs_to_crs, proj_destroy, proj_errno_string,
     proj_pj_info, proj_trans, PJconsts, PJ_AREA, PJ_COORD, PJ_DIRECTION_PJ_FWD,
     PJ_DIRECTION_PJ_INV, PJ_LP, PJ_XY,
 };
@@ -216,7 +216,8 @@ mod test {
         let stereo70 = Proj::new(
             "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
             +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs",
-        ).unwrap();
+        )
+        .unwrap();
         // Geodetic -> Pulkovo 1942(58) / Stereo70 (EPSG 3844)
         let t = stereo70
             .project(Point::new(0.436332, 0.802851), false)
@@ -230,7 +231,8 @@ mod test {
         let stereo70 = Proj::new(
             "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
             +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs",
-        ).unwrap();
+        )
+        .unwrap();
         // Pulkovo 1942(58) / Stereo70 (EPSG 3844) -> Geodetic
         let t = stereo70
             .project(Point::new(500119.70352012233, 500027.77896348457), true)
@@ -246,7 +248,8 @@ mod test {
             +proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy
             +towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 +units=m +no_defs
             ",
-        ).unwrap();
+        )
+        .unwrap();
         // OSGB36 (EPSG 27700) -> Geodetic
         let t = osgb36
             .project(Point::new(548295.39, 182498.46), true)
@@ -283,10 +286,9 @@ mod test {
     fn test_conversion_error() {
         // because step 1 isn't an inverse conversion, it's expecting lon lat input
         let nad83_m = Proj::new(
-            "
-            +proj=geos +lon_0=0.00 +lat_0=0.00 +a=6378169.00 +b=6356583.80 +h=35785831.0
-        ",
-        ).unwrap();
+            "+proj=geos +lon_0=0.00 +lat_0=0.00 +a=6378169.00 +b=6356583.80 +h=35785831.0"
+        )
+        .unwrap();
         let err = nad83_m
             .convert(Point::new(4760096.421921, 3744293.729449))
             .unwrap_err();
