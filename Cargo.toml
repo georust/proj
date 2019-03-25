@@ -1,8 +1,8 @@
 [package]
 name = "proj-sys"
-description = "Rust bindings for PROJ.4 v5.2.x"
+description = "Rust bindings for PROJ.4 v6.0.x"
 repository = "https://github.com/urschrei/proj-sys"
-version = "0.8.0"
+version = "0.9.0"
 readme = "README.md"
 authors = ["Stephan Hügel <urschrei@gmail.com>"]
 keywords = ["proj", "projection", "osgeo", "geo", "geospatial"]
@@ -11,4 +11,4 @@ license = "MIT/Apache-2.0"
 [dependencies]
 
 [build-dependencies]
-bindgen = "0.33.1"
+bindgen = "0.48.1"
