@@ -1,4 +1,4 @@
-# 0.8.0
+# 0.9.0
 - Bumped minimum PROJ.4 version to 6.0.0
 
 # 0.8.0
