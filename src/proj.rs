@@ -13,6 +13,32 @@ use std::ffi::CStr;
 use std::ffi::CString;
 use std::str;
 
+/// The bounding box of an area of use
+///
+/// In the case of an area of use crossing the antimeridian (longitude +/- 180 degrees),
+/// `west` must be greater than `east`.
+pub struct Area {
+    north: f64,
+    south: f64,
+    east: f64,
+    west: f64,
+}
+
+impl Area {
+    /// Create a new Area
+    ///
+    /// **Note**: In the case of an area of use crossing the antimeridian (longitude +/- 180 degrees),
+    /// `west` must be greater than `east`.
+    pub fn new(west: f64, south: f64, east: f64, north: f64) -> Self {
+        Area {
+            west,
+            south,
+            east,
+            north,
+        }
+    }
+}
+
 /// Easily get a String from the external library
 fn _string(raw_ptr: *const c_char) -> String {
     let c_str = unsafe { CStr::from_ptr(raw_ptr) };
@@ -25,7 +51,7 @@ fn error_message(code: c_int) -> String {
     _string(rv)
 }
 
-/// A `proj.4` instance
+/// A `PROJ.4` instance
 pub struct Proj {
     c_proj: *mut PJconsts,
     area: Option<*mut PJ_AREA>,
@@ -69,20 +95,22 @@ impl Proj {
     /// - the name of a CRS as found in the PROJ database, e.g “WGS84”, “NAD27”, etc.
     /// - more generally, any string accepted by `new()`
     ///
-    /// If you wish to specify a particular area of use, you may set it using `area_set_bbox()`
-    pub fn new_known_crs(from: &str, to: &str) -> Option<Proj> {
+    /// If you wish to alter the particular area of use, you may do so using `area_set_bbox()`
+    pub fn new_known_crs(&mut self, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
         let from_c = CString::new(from.as_bytes()).unwrap();
         let to_c = CString::new(to.as_bytes()).unwrap();
         let ctx = unsafe { proj_context_create() };
-        let area = unsafe { proj_area_create() };
-        let new_c_proj =
-            unsafe { proj_create_crs_to_crs(ctx, from_c.as_ptr(), to_c.as_ptr(), area) };
+        let new_c_proj = unsafe {
+            proj_create_crs_to_crs(ctx, from_c.as_ptr(), to_c.as_ptr(), self.area.unwrap())
+        };
         if new_c_proj.is_null() {
             None
         } else {
+            // success, we can set up the proj area object
+            self.area_set_bbox(area);
             Some(Proj {
                 c_proj: new_c_proj,
-                area: Some(area),
+                area: self.area,
             })
         }
     }
@@ -92,10 +120,23 @@ impl Proj {
     /// Such an area of use will be used to specify the area of use
     /// for the choice of relevant coordinate operations.
     /// In the case of an area of use crossing the antimeridian (longitude +/- 180 degrees),
-    /// west_lon_degree will be greater than east_lon_degree.
-    pub fn area_set_bbox(&self, west: f64, south: f64, east: f64, north: f64) {
-        if let Some(area) = self.area {
-            unsafe { proj_area_set_bbox(area, west, south, east, north) }
+    /// `west` must be greater than `east`.
+    pub fn area_set_bbox(&mut self, new_area: Option<Area>) {
+        unsafe {
+            // if the proj area object hasn't been set up before, do it
+            if self.area.is_none() {
+                self.area = Some(proj_area_create());
+            };
+            // if a bounding box has been passed, modify the proj area object
+            if let Some(narea) = new_area {
+                proj_area_set_bbox(
+                    self.area.unwrap(),
+                    narea.west,
+                    narea.south,
+                    narea.east,
+                    narea.north,
+                );
+            }
         }
     }
 
