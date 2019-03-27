@@ -51,6 +51,16 @@ fn error_message(code: c_int) -> String {
     _string(rv)
 }
 
+/// Set the bounding box of the area of use
+fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
+    // if a bounding box has been passed, modify the proj area object
+    if let Some(narea) = new_area {
+        unsafe {
+            proj_area_set_bbox(parea, narea.west, narea.south, narea.east, narea.north);
+        }
+    }
+}
+
 /// A `PROJ.4` instance
 pub struct Proj {
     c_proj: *mut PJconsts,
@@ -105,7 +115,7 @@ impl Proj {
     ///
     /// extern crate geo_types;
     /// use geo_types::Point;
-    /// 
+    ///
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
     /// let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
@@ -275,16 +285,6 @@ impl Proj {
                 "The conversion failed with the following error: {}",
                 error_message(err)
             ))
-        }
-    }
-}
-
-/// Set the bounding box of the area of use
-fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
-    // if a bounding box has been passed, modify the proj area object
-    if let Some(narea) = new_area {
-        unsafe {
-            proj_area_set_bbox(parea, narea.west, narea.south, narea.east, narea.north);
         }
     }
 }
