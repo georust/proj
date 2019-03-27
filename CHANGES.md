@@ -1,4 +1,8 @@
 # Changes
+## 0.9.0
+* Update proj-sys to v0.9.0
+    * This requires a minimum PROJ.4 version of 6.0.0
+* Add support for `proj_create_crs_to_crs` for creating a transformation object that is a pipeline between two known coordinate reference systems.
 
 ## 0.7.0
 * Update proj-sys to v0.8.0
