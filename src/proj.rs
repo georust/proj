@@ -90,27 +90,42 @@ impl Proj {
     /// Create a transformation object that is a pipeline between two known coordinate reference systems.
     /// `from` and `to` can be:
     ///
-    /// - an “AUTHORITY:CODE”, like EPSG:25832. When using that syntax for a source CRS, the created pipeline will expect that the values passed to `project()` or `convert()` respect the axis order and axis unit of the official definition ( so for example, for EPSG:4326, with latitude first and longitude next, in degrees). Similarly, when using that syntax for a target CRS, output values will be emitted according to the official definition of this CRS.
-    /// - a PROJ string, like “+proj=longlat +datum=WGS84”. When using that syntax, the axis order and unit for geographic CRS will be longitude, latitude, and the unit degrees.
-    /// - the name of a CRS as found in the PROJ database, e.g “WGS84”, “NAD27”, etc.
-    /// - more generally, any string accepted by `new()`
+    /// - an “AUTHORITY:CODE”, like `"EPSG:25832"`. When using that syntax for a source CRS, the created pipeline will expect that the values passed to [`project()`](struct.Proj.html#method.project) or [`convert()`](struct.Proj.html#method.convert) respect the axis order and axis unit of the official definition ( so for example, for EPSG:4326, with latitude first and longitude next, in degrees). Similarly, when using that syntax for a target CRS, output values will be emitted according to the official definition of this CRS.
+    /// - a PROJ string, like `"+proj=longlat +datum=WGS84"`. When using that syntax, the axis order and unit for geographic CRS will be longitude, latitude, and the unit degrees.
+    /// - the name of a CRS as found in the PROJ database, e.g `"WGS84"`, `"NAD27"`, etc.
+    /// - more generally, any string accepted by [`new()`](struct.Proj.html#method.new)
     ///
-    /// If you wish to alter the particular area of use, you may do so using `area_set_bbox()`
-    pub fn new_known_crs(&mut self, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
+    /// If you wish to alter the particular area of use, you may do so using [`area_set_bbox()`](struct.Proj.html#method.area_set_bbox)
+    ///```rust,ignore
+    /// extern crate proj;
+    /// use proj::Proj;
+    ///
+    /// extern crate geo_types;
+    /// use geo_types::Point;
+    /// 
+    /// let from = "EPSG:2230";
+    /// let to = "EPSG:26946";
+    /// let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+    /// let result = proj
+    ///     .convert(Point::new(4760096.421921, 3744293.729449))
+    ///     .unwrap();
+    /// assert_almost_eq(result.x(), 1450880.29);
+    /// assert_almost_eq(result.y(), 1141263.01);
+    ///```
+    pub fn new_known_crs(from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
         let from_c = CString::new(from.as_bytes()).unwrap();
         let to_c = CString::new(to.as_bytes()).unwrap();
         let ctx = unsafe { proj_context_create() };
-        let new_c_proj = unsafe {
-            proj_create_crs_to_crs(ctx, from_c.as_ptr(), to_c.as_ptr(), self.area.unwrap())
-        };
+        let proj_area = unsafe { proj_area_create() };
+        area_set_bbox(proj_area, area);
+        let new_c_proj =
+            unsafe { proj_create_crs_to_crs(ctx, from_c.as_ptr(), to_c.as_ptr(), proj_area) };
         if new_c_proj.is_null() {
             None
         } else {
-            // success, we can set up the proj area object
-            self.area_set_bbox(area);
             Some(Proj {
                 c_proj: new_c_proj,
-                area: self.area,
+                area: Some(proj_area),
             })
         }
     }
@@ -121,20 +136,16 @@ impl Proj {
     /// for the choice of relevant coordinate operations.
     /// In the case of an area of use crossing the antimeridian (longitude +/- 180 degrees),
     /// `west` must be greater than `east`.
+    // calling this on a non-CRS-to-CRS instance of Proj will be harmless, because self.area will be None
     pub fn area_set_bbox(&mut self, new_area: Option<Area>) {
-        unsafe {
-            // if the proj area object hasn't been set up before, do it
-            if self.area.is_none() {
-                self.area = Some(proj_area_create());
-            };
-            // if a bounding box has been passed, modify the proj area object
-            if let Some(narea) = new_area {
+        if let (Some(proj_area), Some(new_bbox)) = (self.area, new_area) {
+            unsafe {
                 proj_area_set_bbox(
-                    self.area.unwrap(),
-                    narea.west,
-                    narea.south,
-                    narea.east,
-                    narea.north,
+                    proj_area,
+                    new_bbox.west,
+                    new_bbox.south,
+                    new_bbox.east,
+                    new_bbox.north,
                 );
             }
         }
@@ -250,6 +261,16 @@ impl Proj {
     }
 }
 
+/// Set the bounding box of the area of use
+fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
+    // if a bounding box has been passed, modify the proj area object
+    if let Some(narea) = new_area {
+        unsafe {
+            proj_area_set_bbox(parea, narea.west, narea.south, narea.east, narea.north);
+        }
+    }
+}
+
 impl Drop for Proj {
     fn drop(&mut self) {
         unsafe {
@@ -279,6 +300,17 @@ mod test {
             proj.def(),
             "proj=longlat datum=WGS84 no_defs ellps=WGS84 towgs84=0,0,0"
         );
+    }
+    #[test]
+    fn test_from_crs() {
+        let from = "EPSG:2230";
+        let to = "EPSG:26946";
+        let proj = Proj::new_known_crs(&from, &to, None).unwrap();
+        let t = proj
+            .convert(Point::new(4760096.421921, 3744293.729449))
+            .unwrap();
+        assert_almost_eq(t.x(), 1450880.29);
+        assert_almost_eq(t.y(), 1141263.01);
     }
     #[test]
     // Carry out a projection from geodetic coordinates

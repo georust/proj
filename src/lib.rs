@@ -1,9 +1,9 @@
-//! `proj` provides bindings to the [proj.4](http://proj4.org), v5.0.x API
+//! `proj` provides bindings to the [PROJ.4](http://proj4.org), v6.0.x API
 //!
 //! Two coordinate operations are currently provided: projection (and inverse projection)
 //! and conversion. Projection is intended for transforming between geodetic and projected coordinates,
 //! and vice versa (inverse projection), while conversion is intended for transforming between projected
-//! coordinate systems. The proj.4 [documentation](http://proj4.org/operations/index.html)
+//! coordinate systems. The PROJ.4 [documentation](http://proj4.org/operations/index.html)
 //! explains the distinction between these operations.
 
 #[macro_use]
@@ -16,3 +16,4 @@ extern crate proj_sys;
 mod proj;
 
 pub use crate::proj::Proj;
+pub use crate::proj::Area;
