@@ -66,6 +66,9 @@ impl Proj {
     ///
     /// For conversion operations, `definition` defines input, output, and
     /// any intermediate steps that are required. See the `convert` example for more details.
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
 
     // In contrast to proj.4 v4.x, the type of transformation
     // is signalled by the choice of enum used as input to the PJ_COORD union
@@ -112,6 +115,9 @@ impl Proj {
     /// assert_almost_eq(result.x(), 1450880.29);
     /// assert_almost_eq(result.y(), 1141263.01);
     ///```
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
     pub fn new_known_crs(from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
         let from_c = CString::new(from.as_bytes()).unwrap();
         let to_c = CString::new(to.as_bytes()).unwrap();
@@ -136,6 +142,9 @@ impl Proj {
     /// for the choice of relevant coordinate operations.
     /// In the case of an area of use crossing the antimeridian (longitude +/- 180 degrees),
     /// `west` must be greater than `east`.
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
     // calling this on a non-CRS-to-CRS instance of Proj will be harmless, because self.area will be None
     pub fn area_set_bbox(&mut self, new_area: Option<Area>) {
         if let (Some(proj_area), Some(new_bbox)) = (self.area, new_area) {
@@ -152,6 +161,9 @@ impl Proj {
     }
 
     /// Get the current definition from `PROJ.4`
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
     pub fn def(&self) -> String {
         let rv = unsafe { proj_pj_info(self.c_proj) };
         _string(rv.definition)
@@ -160,6 +172,9 @@ impl Proj {
     ///
     /// **Note:** specifying `inverse` as `true` carries out an inverse projection *to* geodetic coordinates
     /// (in radians) from the projection specified by `definition`.
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
     pub fn project<T>(&self, point: Point<T>, inverse: bool) -> Result<Point<T>, Error>
     where
         T: Float,
@@ -234,6 +249,9 @@ impl Proj {
     /// assert_eq!(result.y(), 1141263.01);
     ///
     /// ```
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
     pub fn convert<T>(&self, point: Point<T>) -> Result<Point<T>, Error>
     where
         T: Float,
