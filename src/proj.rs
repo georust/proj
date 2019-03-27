@@ -148,10 +148,10 @@ impl Proj {
 
     /// Set the bounding box of the area of use
     ///
-    /// Such an area of use will be used to specify the area of use
+    /// This bounding box will be used to specify the area of use
     /// for the choice of relevant coordinate operations.
     /// In the case of an area of use crossing the antimeridian (longitude +/- 180 degrees),
-    /// `west` must be greater than `east`.
+    /// `west` **must** be greater than `east`.
     ///
     /// # Safety
     /// This method contains unsafe code.
