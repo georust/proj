@@ -103,7 +103,7 @@ impl Proj {
     /// Create a transformation object that is a pipeline between two known coordinate reference systems.
     /// `from` and `to` can be:
     ///
-    /// - an “AUTHORITY:CODE”, like `"EPSG:25832"`. When using that syntax for a source CRS, the created pipeline will expect that the values passed to [`project()`](struct.Proj.html#method.project) or [`convert()`](struct.Proj.html#method.convert) respect the axis order and axis unit of the official definition ( so for example, for EPSG:4326, with latitude first and longitude next, in degrees). Similarly, when using that syntax for a target CRS, output values will be emitted according to the official definition of this CRS.
+    /// - an `"AUTHORITY:CODE"`, like `"EPSG:25832"`. When using that syntax for a source CRS, the created pipeline will expect that the values passed to [`project()`](struct.Proj.html#method.project) or [`convert()`](struct.Proj.html#method.convert) respect the axis order and axis unit of the official definition ( so for example, for EPSG:4326, with latitude first and longitude next, in degrees). Similarly, when using that syntax for a target CRS, output values will be emitted according to the official definition of this CRS.
     /// - a PROJ string, like `"+proj=longlat +datum=WGS84"`. When using that syntax, the axis order and unit for geographic CRS will be longitude, latitude, and the unit degrees.
     /// - the name of a CRS as found in the PROJ database, e.g `"WGS84"`, `"NAD27"`, etc.
     /// - more generally, any string accepted by [`new()`](struct.Proj.html#method.new)
