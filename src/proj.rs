@@ -5,13 +5,39 @@ use libc::{c_char, c_double};
 use num_traits::Float;
 use proj_sys::proj_errno;
 use proj_sys::{
-    proj_errno_string, proj_context_create, proj_create, proj_create_crs_to_crs, proj_destroy,
-    proj_pj_info, proj_trans, PJconsts, PJ_AREA, PJ_COORD, PJ_DIRECTION_PJ_FWD,
-    PJ_DIRECTION_PJ_INV, PJ_LP, PJ_XY,
+    proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_context_create, proj_create,
+    proj_create_crs_to_crs, proj_destroy, proj_errno_string, proj_pj_info, proj_trans, PJconsts,
+    PJ_AREA, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_LP, PJ_XY,
 };
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::str;
+
+/// The bounding box of an area of use
+///
+/// In the case of an area of use crossing the antimeridian (longitude +/- 180 degrees),
+/// `west` must be greater than `east`.
+pub struct Area {
+    north: f64,
+    south: f64,
+    east: f64,
+    west: f64,
+}
+
+impl Area {
+    /// Create a new Area
+    ///
+    /// **Note**: In the case of an area of use crossing the antimeridian (longitude +/- 180 degrees),
+    /// `west` must be greater than `east`.
+    pub fn new(west: f64, south: f64, east: f64, north: f64) -> Self {
+        Area {
+            west,
+            south,
+            east,
+            north,
+        }
+    }
+}
 
 /// Easily get a String from the external library
 fn _string(raw_ptr: *const c_char) -> String {
@@ -25,9 +51,20 @@ fn error_message(code: c_int) -> String {
     _string(rv)
 }
 
-/// A `proj.4` instance
+/// Set the bounding box of the area of use
+fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
+    // if a bounding box has been passed, modify the proj area object
+    if let Some(narea) = new_area {
+        unsafe {
+            proj_area_set_bbox(parea, narea.west, narea.south, narea.east, narea.north);
+        }
+    }
+}
+
+/// A `PROJ.4` instance
 pub struct Proj {
     c_proj: *mut PJconsts,
+    area: Option<*mut PJ_AREA>,
 }
 
 impl Proj {
@@ -39,6 +76,9 @@ impl Proj {
     ///
     /// For conversion operations, `definition` defines input, output, and
     /// any intermediate steps that are required. See the `convert` example for more details.
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
 
     // In contrast to proj.4 v4.x, the type of transformation
     // is signalled by the choice of enum used as input to the PJ_COORD union
@@ -48,32 +88,92 @@ impl Proj {
         let c_definition = CString::new(definition.as_bytes()).unwrap();
         let ctx = unsafe { proj_context_create() };
         let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
+        // check for unexpected returned object type
+        // let return_code: i32 = unsafe { proj_get_type(new_c_proj) };
         if new_c_proj.is_null() {
             None
         } else {
-            Some(Proj { c_proj: new_c_proj })
+            Some(Proj {
+                c_proj: new_c_proj,
+                area: None,
+            })
         }
     }
 
-    // FIXME: we can't implement this yet because PJ_AREA isn't implemented
-    // /// Create a transformation object from two known EPSG CRS codes
-    // pub fn new_known_crs(from: &str, to: &str) -> Option<Proj> {
-    //     let from_c = CString::new(from.as_bytes()).unwrap();
-    //     let to_c = CString::new(to.as_bytes()).unwrap();
-    //     let ctx = unsafe { proj_context_create() };
-    //     // not implemented yet, see http://proj4.org/development/reference/datatypes.html#c.PJ_AREA
-    //     let mut area = PJ_AREA { area: 0 };
-    //     let raw_area = &mut area as *mut PJ_AREA;
-    //     let new_c_proj =
-    //         unsafe { proj_create_crs_to_crs(ctx, from_c.as_ptr(), to_c.as_ptr(), raw_area) };
-    //     if new_c_proj.is_null() {
-    //         None
-    //     } else {
-    //         Some(Proj { c_proj: new_c_proj })
-    //     }
-    // }
+    /// Create a transformation object that is a pipeline between two known coordinate reference systems.
+    /// `from` and `to` can be:
+    ///
+    /// - an `"AUTHORITY:CODE"`, like `"EPSG:25832"`. When using that syntax for a source CRS, the created pipeline will expect that the values passed to [`project()`](struct.Proj.html#method.project) or [`convert()`](struct.Proj.html#method.convert) respect the axis order and axis unit of the official definition ( so for example, for EPSG:4326, with latitude first and longitude next, in degrees). Similarly, when using that syntax for a target CRS, output values will be emitted according to the official definition of this CRS.
+    /// - a PROJ string, like `"+proj=longlat +datum=WGS84"`. When using that syntax, the axis order and unit for geographic CRS will be longitude, latitude, and the unit degrees.
+    /// - the name of a CRS as found in the PROJ database, e.g `"WGS84"`, `"NAD27"`, etc.
+    /// - more generally, any string accepted by [`new()`](struct.Proj.html#method.new)
+    ///
+    /// If you wish to alter the particular area of use, you may do so using [`area_set_bbox()`](struct.Proj.html#method.area_set_bbox)
+    ///```rust,ignore
+    /// extern crate proj;
+    /// use proj::Proj;
+    ///
+    /// extern crate geo_types;
+    /// use geo_types::Point;
+    ///
+    /// let from = "EPSG:2230";
+    /// let to = "EPSG:26946";
+    /// let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+    /// let result = proj
+    ///     .convert(Point::new(4760096.421921, 3744293.729449))
+    ///     .unwrap();
+    /// assert_almost_eq(result.x(), 1450880.29);
+    /// assert_almost_eq(result.y(), 1141263.01);
+    ///```
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn new_known_crs(from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
+        let from_c = CString::new(from.as_bytes()).unwrap();
+        let to_c = CString::new(to.as_bytes()).unwrap();
+        let ctx = unsafe { proj_context_create() };
+        let proj_area = unsafe { proj_area_create() };
+        area_set_bbox(proj_area, area);
+        let new_c_proj =
+            unsafe { proj_create_crs_to_crs(ctx, from_c.as_ptr(), to_c.as_ptr(), proj_area) };
+        if new_c_proj.is_null() {
+            None
+        } else {
+            Some(Proj {
+                c_proj: new_c_proj,
+                area: Some(proj_area),
+            })
+        }
+    }
+
+    /// Set the bounding box of the area of use
+    ///
+    /// This bounding box will be used to specify the area of use
+    /// for the choice of relevant coordinate operations.
+    /// In the case of an area of use crossing the antimeridian (longitude +/- 180 degrees),
+    /// `west` **must** be greater than `east`.
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    // calling this on a non-CRS-to-CRS instance of Proj will be harmless, because self.area will be None
+    pub fn area_set_bbox(&mut self, new_area: Option<Area>) {
+        if let (Some(proj_area), Some(new_bbox)) = (self.area, new_area) {
+            unsafe {
+                proj_area_set_bbox(
+                    proj_area,
+                    new_bbox.west,
+                    new_bbox.south,
+                    new_bbox.east,
+                    new_bbox.north,
+                );
+            }
+        }
+    }
 
     /// Get the current definition from `PROJ.4`
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
     pub fn def(&self) -> String {
         let rv = unsafe { proj_pj_info(self.c_proj) };
         _string(rv.definition)
@@ -82,6 +182,9 @@ impl Proj {
     ///
     /// **Note:** specifying `inverse` as `true` carries out an inverse projection *to* geodetic coordinates
     /// (in radians) from the projection specified by `definition`.
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
     pub fn project<T>(&self, point: Point<T>, inverse: bool) -> Result<Point<T>, Error>
     where
         T: Float,
@@ -156,6 +259,9 @@ impl Proj {
     /// assert_eq!(result.y(), 1141263.01);
     ///
     /// ```
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
     pub fn convert<T>(&self, point: Point<T>) -> Result<Point<T>, Error>
     where
         T: Float,
@@ -187,6 +293,9 @@ impl Drop for Proj {
     fn drop(&mut self) {
         unsafe {
             proj_destroy(self.c_proj);
+            if let Some(area) = self.area {
+                proj_area_destroy(area)
+            }
         }
     }
 }
@@ -211,12 +320,24 @@ mod test {
         );
     }
     #[test]
+    fn test_from_crs() {
+        let from = "EPSG:2230";
+        let to = "EPSG:26946";
+        let proj = Proj::new_known_crs(&from, &to, None).unwrap();
+        let t = proj
+            .convert(Point::new(4760096.421921, 3744293.729449))
+            .unwrap();
+        assert_almost_eq(t.x(), 1450880.29);
+        assert_almost_eq(t.y(), 1141263.01);
+    }
+    #[test]
     // Carry out a projection from geodetic coordinates
     fn test_projection() {
         let stereo70 = Proj::new(
             "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
             +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs",
-        ).unwrap();
+        )
+        .unwrap();
         // Geodetic -> Pulkovo 1942(58) / Stereo70 (EPSG 3844)
         let t = stereo70
             .project(Point::new(0.436332, 0.802851), false)
@@ -230,7 +351,8 @@ mod test {
         let stereo70 = Proj::new(
             "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
             +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs",
-        ).unwrap();
+        )
+        .unwrap();
         // Pulkovo 1942(58) / Stereo70 (EPSG 3844) -> Geodetic
         let t = stereo70
             .project(Point::new(500119.70352012233, 500027.77896348457), true)
@@ -246,7 +368,8 @@ mod test {
             +proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy
             +towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 +units=m +no_defs
             ",
-        ).unwrap();
+        )
+        .unwrap();
         // OSGB36 (EPSG 27700) -> Geodetic
         let t = osgb36
             .project(Point::new(548295.39, 182498.46), true)
@@ -277,16 +400,15 @@ mod test {
     #[test]
     // Test that instantiation fails wth bad proj string input
     fn test_init_error() {
-        assert!(Proj::new("ugh").is_none());
+        assert!(Proj::new("🦀").is_none());
     }
     #[test]
     fn test_conversion_error() {
         // because step 1 isn't an inverse conversion, it's expecting lon lat input
         let nad83_m = Proj::new(
-            "
-            +proj=geos +lon_0=0.00 +lat_0=0.00 +a=6378169.00 +b=6356583.80 +h=35785831.0
-        ",
-        ).unwrap();
+            "+proj=geos +lon_0=0.00 +lat_0=0.00 +a=6378169.00 +b=6356583.80 +h=35785831.0",
+        )
+        .unwrap();
         let err = nad83_m
             .convert(Point::new(4760096.421921, 3744293.729449))
             .unwrap_err();
