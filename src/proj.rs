@@ -3,12 +3,12 @@ use geo_types::Point;
 use libc::c_int;
 use libc::{c_char, c_double};
 use num_traits::Float;
-use proj_sys::proj_errno;
 use proj_sys::{
     proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_context_create, proj_create,
     proj_create_crs_to_crs, proj_destroy, proj_errno_string, proj_pj_info, proj_trans, PJconsts,
     PJ_AREA, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_LP, PJ_XY,
 };
+use proj_sys::{proj_errno, proj_errno_reset};
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::str;
@@ -205,6 +205,7 @@ impl Proj {
         // PJ_XY {x: , y: }
         let coords = PJ_LP { lam: c_x, phi: c_y };
         unsafe {
+            proj_errno_reset(self.c_proj);
             // PJ_DIRECTION_* determines a forward or inverse projection
             let trans = proj_trans(self.c_proj, inv, PJ_COORD { lp: coords });
             // output of coordinates uses the PJ_XY struct
@@ -273,6 +274,7 @@ impl Proj {
         let err;
         let coords = PJ_XY { x: c_x, y: c_y };
         unsafe {
+            proj_errno_reset(self.c_proj);
             let trans = proj_trans(self.c_proj, PJ_DIRECTION_PJ_FWD, PJ_COORD { xy: coords });
             new_x = trans.xy.x;
             new_y = trans.xy.y;
@@ -416,5 +418,27 @@ mod test {
             "The conversion failed with the following error: latitude or longitude exceeded limits",
             err.find_root_cause().to_string()
         );
+    }
+
+    #[test]
+    fn test_error_recovery() {
+        let nad83_m = Proj::new(
+            "+proj=geos +lon_0=0.00 +lat_0=0.00 +a=6378169.00 +b=6356583.80 +h=35785831.0",
+        )
+        .unwrap();
+
+        // we expect this first conversion to fail (copied from above test case)
+        assert!(nad83_m
+            .convert(Point::new(4760096.421921, 3744293.729449))
+            .is_err());
+
+        // but a subsequent valid conversion should still be successful
+        assert!(nad83_m.convert(Point::new(0.0, 0.0)).is_ok());
+
+        // also test with project() function
+        assert!(nad83_m
+            .project(Point::new(99999.0, 99999.0), false)
+            .is_err());
+        assert!(nad83_m.project(Point::new(0.0, 0.0), false).is_ok());
     }
 }
