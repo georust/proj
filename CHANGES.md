@@ -1,4 +1,8 @@
 # Changes
+
+## 0.9.2
+* Ensure that errors are reset before projection / conversion calls
+
 ## 0.9.0
 * Update proj-sys to v0.9.0
     * This requires a minimum PROJ.4 version of 6.0.0
