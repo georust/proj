@@ -1,5 +1,8 @@
 # Changes
 
+## 0.9.3
+* Destroy threading context before dropping Proj (#15)
+
 ## 0.9.2
 * Ensure that errors are reset before projection / conversion calls
 
