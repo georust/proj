@@ -4,9 +4,10 @@ use libc::c_int;
 use libc::{c_char, c_double};
 use num_traits::Float;
 use proj_sys::{
-    proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_context_create, proj_create,
-    proj_create_crs_to_crs, proj_destroy, proj_errno_string, proj_pj_info, proj_trans, PJconsts,
-    PJ_AREA, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_LP, PJ_XY,
+    proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_context_create,
+    proj_context_destroy, proj_create, proj_create_crs_to_crs, proj_destroy, proj_errno_string,
+    proj_pj_info, proj_trans, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD,
+    PJ_DIRECTION_PJ_INV, PJ_LP, PJ_XY,
 };
 use proj_sys::{proj_errno, proj_errno_reset};
 use std::ffi::CStr;
@@ -64,6 +65,7 @@ fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
 /// A `PROJ.4` instance
 pub struct Proj {
     c_proj: *mut PJconsts,
+    ctx: *mut PJ_CONTEXT,
     area: Option<*mut PJ_AREA>,
 }
 
@@ -95,6 +97,7 @@ impl Proj {
         } else {
             Some(Proj {
                 c_proj: new_c_proj,
+                ctx,
                 area: None,
             })
         }
@@ -141,6 +144,7 @@ impl Proj {
         } else {
             Some(Proj {
                 c_proj: new_c_proj,
+                ctx,
                 area: Some(proj_area),
             })
         }
@@ -295,6 +299,7 @@ impl Drop for Proj {
     fn drop(&mut self) {
         unsafe {
             proj_destroy(self.c_proj);
+            proj_context_destroy(self.ctx);
             if let Some(area) = self.area {
                 proj_area_destroy(area)
             }
