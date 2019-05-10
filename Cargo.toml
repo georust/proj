@@ -19,3 +19,6 @@ geo-types ="0.4.1"
 libc = "0.2.50"
 num-traits = "0.2.6"
 failure = "0.1.3"
+
+[dev-dependencies]
+assert_approx_eq = "1.1.0"
