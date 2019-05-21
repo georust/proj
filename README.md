@@ -7,7 +7,7 @@ A guide to the functions can be found here: http://proj4.org/development/referen
 
 # Requirements
 This crate tracks stable releases of `PROJ.4`.  
-PROJ.4 v6.1.x` must be present on your system.
+PROJ.4 `v6.1.x` must be present on your system.
 
 ## License
 
