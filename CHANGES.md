@@ -1,4 +1,6 @@
 # Changes
+## 0.9.5
+* Fix doctests
 
 ## 0.9.3
 * Destroy threading context before dropping Proj (#15)
