@@ -112,7 +112,8 @@ impl Proj {
     /// - more generally, any string accepted by [`new()`](struct.Proj.html#method.new)
     ///
     /// If you wish to alter the particular area of use, you may do so using [`area_set_bbox()`](struct.Proj.html#method.area_set_bbox)
-    ///```rust,ignore
+    ///```rust
+    /// # use assert_approx_eq::assert_approx_eq;
     /// extern crate proj;
     /// use proj::Proj;
     ///
@@ -122,11 +123,11 @@ impl Proj {
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
     /// let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
-    /// let result = proj
-    ///     .convert(Point::new(4760096.421921, 3744293.729449))
+    /// let result = nad_ft_to_m
+    ///     .convert(Point::new(4760096.421921f64, 3744293.729449f64))
     ///     .unwrap();
-    /// assert_almost_eq(result.x(), 1450880.29);
-    /// assert_almost_eq(result.y(), 1141263.01);
+    /// assert_approx_eq!(result.x(), 1450880.29f64, 1.0e-2);
+    /// assert_approx_eq!(result.y(), 1141263.01f64, 1.0e-2);
     ///```
     ///
     /// # Safety
@@ -242,7 +243,8 @@ impl Proj {
     /// - define `step` 1 as an `inv`erse transform, yielding geodetic coordinates
     /// - define `step` 2 as a forward transform to projected coordinates, yielding metres.
     ///
-    /// ```rust,ignore
+    /// ```rust
+    /// # use assert_approx_eq::assert_approx_eq;
     /// extern crate proj;
     /// use proj::Proj;
     ///
@@ -259,9 +261,9 @@ impl Proj {
     ///     +lon_0=-116.25 +x_0=2000000 +y_0=500000
     ///     +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs
     /// ").unwrap();
-    /// let result = nad_ft_to_m.convert(Point::new(4760096.421921, 3744293.729449)).unwrap();
-    /// assert_eq!(result.x(), 1450880.29);
-    /// assert_eq!(result.y(), 1141263.01);
+    /// let result = nad_ft_to_m.convert(Point::new(4760096.421921f64, 3744293.729449f64)).unwrap();
+    /// assert_approx_eq!(result.x(), 1450880.29f64, 1.0e-2);
+    /// assert_approx_eq!(result.y(), 1141263.01f64, 1.0e-2);
     ///
     /// ```
     ///
