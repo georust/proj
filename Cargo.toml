@@ -1,7 +1,7 @@
 [package]
 name = "proj"
 description = "Rust bindings for PROJ.4 v6.0.x"
-version = "0.9.5"
+version = "0.9.6"
 authors = [
   "Corey Farwell <coreyf@rwell.org>",
   "Alex Morega <alex@grep.ro>",

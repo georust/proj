@@ -1,4 +1,7 @@
 # Changes
+## 0.9.6
+* Fix README example
+
 ## 0.9.5
 * Fix doctests
 

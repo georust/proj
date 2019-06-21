@@ -14,8 +14,8 @@ use geo_types::Point;
 
 let from = "EPSG:2230";
 let to = "EPSG:26946";
-let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
-let result = proj
+let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+let result = ft_to_m
     .convert(Point::new(4760096.421921, 3744293.729449))
     .unwrap();
 assert_almost_eq(result.x(), 1450880.29);
@@ -36,7 +36,7 @@ use proj::Proj;
 extern crate geo_types;
 use geo_types::Point;
 
-let nad_ft_to_m = Proj::new("
+let ft_to_m = Proj::new("
     +proj=pipeline
     +step +inv +proj=lcc +lat_1=33.88333333333333
     +lat_2=32.78333333333333 +lat_0=32.16666666666666
@@ -47,7 +47,7 @@ let nad_ft_to_m = Proj::new("
     +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs
 ").unwrap();
 // The Presidio, approximately
-let result = nad_ft_to_m.convert(Point::new(4760096.421921, 3744293.729449)).unwrap();
+let result = ft_to_m.convert(Point::new(4760096.421921, 3744293.729449)).unwrap();
 assert_eq!(result.x(), 1450880.29);
 assert_eq!(result.y(), 1141263.01);
 ```
