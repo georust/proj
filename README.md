@@ -6,7 +6,6 @@ Rust bindings for [PROJ.4](https://github.com/OSGeo/proj.4), v6.1.x
 
 ## Convert from [NAD 83 US Survey Feet](https://epsg.io/2230) to [NAD 83 Meters](https://epsg.io/26946) Using EPSG Codes
 ```rust
-extern crate proj;
 use proj::Proj;
 
 extern crate geo_types;
@@ -30,7 +29,6 @@ Note that as of v5.0.0, PROJ.4 uses the [`pipeline`](http://proj4.org/operations
 
 ## Convert from [NAD 83 US Survey Feet](https://epsg.io/2230) to [NAD 83 Meters](https://epsg.io/26946) Using the `pipeline` Operator
 ```rust
-extern crate proj;
 use proj::Proj;
 
 extern crate geo_types;
@@ -54,7 +52,6 @@ assert_eq!(result.y(), 1141263.01);
 
 ## Inverse Projection from [Stereo70](https://epsg.io/3844) to Geodetic
 ```rust
-extern crate proj;
 use proj::Proj;
 
 extern crate geo_types;
