@@ -3,6 +3,10 @@ extern crate bindgen;
 use std::env;
 use std::path::PathBuf;
 
+#[cfg(feature = "docs-rs")]
+fn main() {} // Skip the build script on docs.rs
+
+#[cfg(not(feature = "docs-rs"))]
 fn main() {
     // Tell cargo to tell rustc to link the system proj
     // shared library.
