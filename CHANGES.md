@@ -1,4 +1,8 @@
 # Changes
+
+## 0.9.7
+* Update to PROJ v6.2.0
+
 ## 0.9.6
 * Fix README example
 

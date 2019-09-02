@@ -1,6 +1,6 @@
 # PROJ
 
-Rust bindings for [PROJ.4](https://github.com/OSGeo/proj.4), v6.1.x
+Rust bindings for [PROJ](https://github.com/OSGeo/proj.4), v6.2.x
 
 # Examples
 
@@ -21,7 +21,7 @@ assert_almost_eq(result.x(), 1450880.29);
 assert_almost_eq(result.y(), 1141263.01);
 ```
 
-Note that as of v5.0.0, PROJ.4 uses the [`pipeline`](http://proj4.org/operations/pipeline.html) operator, which allows an arbitrary number of steps in a conversion. The example below works as follows:
+Note that as of v5.0.0, PROJ uses the [`pipeline`](http://proj4.org/operations/pipeline.html) operator, which allows an arbitrary number of steps in a conversion. The example below works as follows:
 
 - define the operation as a `pipeline` operation
 - define `step` 1 as an `inv`erse transform, yielding geodetic coordinates
