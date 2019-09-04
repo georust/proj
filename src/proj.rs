@@ -346,13 +346,11 @@ impl Proj {
         if err == 0 && trans == 0 {
             unsafe {
                 // re-fill original slice with Points
-                points.copy_from_slice(
-                    &pj.into_iter()
-                        .map(|coord| {
-                            Point::new(T::from(coord.xy.x).unwrap(), T::from(coord.xy.y).unwrap())
-                        })
-                        .collect::<Vec<_>>(),
-                );
+                // feels a bit clunky, but we're guaranteed that pj and points have the same length
+                pj.iter().enumerate().for_each(|(i, coord)| {
+                    points[i] =
+                        Point::new(T::from(coord.xy.x).unwrap(), T::from(coord.xy.y).unwrap())
+                });
                 Ok(points)
             }
         } else {
