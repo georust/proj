@@ -4,7 +4,8 @@
 * add bulk conversion (#17)
 
 ## 0.9.7
-* Update to PROJ v6.2.0
+* Update to PROJ v6.2.
+    * This requires a minimum PROJ version of 6.2.0
 
 ## 0.9.6
 * Fix README example
