@@ -1,5 +1,8 @@
 # Changes
 
+## 0.10.9
+* add bulk conversion (#17)
+
 ## 0.9.7
 * Update to PROJ v6.2.0
 
