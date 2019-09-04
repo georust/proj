@@ -1,4 +1,4 @@
-//! `proj` provides bindings to the [PROJ.4](http://proj4.org), v6.0.x API
+//! `proj` provides bindings to the [PROJ](http://proj4.org), v6.2.x API
 //!
 //! Two coordinate operations are currently provided: projection (and inverse projection)
 //! and conversion. Projection is intended for transforming between geodetic and projected coordinates,

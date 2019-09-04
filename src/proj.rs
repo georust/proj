@@ -6,8 +6,8 @@ use num_traits::Float;
 use proj_sys::{
     proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_context_create,
     proj_context_destroy, proj_create, proj_create_crs_to_crs, proj_destroy, proj_errno_string,
-    proj_pj_info, proj_trans, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD,
-    PJ_DIRECTION_PJ_INV, PJ_LP, PJ_XY,
+    proj_pj_info, proj_trans, proj_trans_array, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD,
+    PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_LP, PJ_XY,
 };
 use proj_sys::{proj_errno, proj_errno_reset};
 use std::ffi::CStr;
@@ -62,7 +62,7 @@ fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
     }
 }
 
-/// A `PROJ.4` instance
+/// A `PROJ` instance
 pub struct Proj {
     c_proj: *mut PJconsts,
     ctx: *mut PJ_CONTEXT,
@@ -70,7 +70,7 @@ pub struct Proj {
 }
 
 impl Proj {
-    /// Try to instantiate a new `PROJ.4` instance
+    /// Try to instantiate a new `PROJ` instance
     ///
     /// **Note:** for projection operations, `definition` specifies
     /// the **output** projection; input coordinates
@@ -82,7 +82,7 @@ impl Proj {
     /// # Safety
     /// This method contains unsafe code.
 
-    // In contrast to proj.4 v4.x, the type of transformation
+    // In contrast to proj v4.x, the type of transformation
     // is signalled by the choice of enum used as input to the PJ_COORD union
     // PJ_LP signals projection of geodetic coordinates, with output being PJ_XY
     // and vice versa, or using PJ_XY for conversion operations
@@ -175,7 +175,7 @@ impl Proj {
         }
     }
 
-    /// Get the current definition from `PROJ.4`
+    /// Get the current definition from `PROJ`
     ///
     /// # Safety
     /// This method contains unsafe code.
@@ -228,7 +228,7 @@ impl Proj {
         }
     }
 
-    /// Convert `Point` coordinates using the PROJ.4 `pipeline` operator
+    /// Convert `Point` coordinates using the PROJ `pipeline` operator
     ///
     /// This method makes use of the [`pipeline`](http://proj4.org/operations/pipeline.html)
     /// functionality available since v5.0.0, which differs significantly from the v4.x series
@@ -288,6 +288,71 @@ impl Proj {
         }
         if err == 0 {
             Ok(Point::new(T::from(new_x).unwrap(), T::from(new_y).unwrap()))
+        } else {
+            Err(format_err!(
+                "The conversion failed with the following error: {}",
+                error_message(err)
+            ))
+        }
+    }
+
+    /// Convert a mutable slice (or anything that can deref into a mutable slice) of `Point` coordinates  
+    /// The following example converts from NAD83 US Survey Feet (EPSG 2230) to NAD83 Metres (EPSG 26946)
+    ///
+    /// ```rust
+    /// use proj::Proj;
+    /// extern crate geo_types;
+    /// use geo_types::Point;
+    /// # use assert_approx_eq::assert_approx_eq;
+    /// let from = "EPSG:2230";
+    /// let to = "EPSG:26946";
+    /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+    /// let mut v = vec![Point::new(4760096.421921, 3744293.729449), Point::new(4760197.421921, 3744394.729449)];
+    /// ft_to_m.convert_array(&mut v);
+    /// assert_approx_eq!(v[0].x(), 1450880.2910605003f64);
+    /// assert_approx_eq!(v[1].y(), 1141293.7960220212f64);
+    /// ```
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    // TODO: there may be a way of avoiding some allocations, but transmute won't work because
+    // PJ_COORD and Point<T> are different sizes
+    pub fn convert_array<'a, T>(
+        &self,
+        points: &'a mut [Point<T>],
+    ) -> Result<&'a mut [Point<T>], Error>
+    where
+        T: Float,
+    {
+        let err;
+        let trans;
+        // we need PJ_COORD to convert
+        let mut pj = points
+            .iter()
+            .map(|point| {
+                let c_x: c_double = point.x().to_f64().unwrap();
+                let c_y: c_double = point.y().to_f64().unwrap();
+                PJ_COORD {
+                    xy: PJ_XY { x: c_x, y: c_y },
+                }
+            })
+            .collect::<Vec<_>>();
+        pj.shrink_to_fit();
+        unsafe {
+            proj_errno_reset(self.c_proj);
+            trans = proj_trans_array(self.c_proj, PJ_DIRECTION_PJ_FWD, pj.len(), pj.as_mut_ptr());
+            err = proj_errno(self.c_proj);
+        }
+        if err == 0 && trans == 0 {
+            unsafe {
+                // re-fill original slice with Points
+                // feels a bit clunky, but we're guaranteed that pj and points have the same length
+                pj.iter().enumerate().for_each(|(i, coord)| {
+                    points[i] =
+                        Point::new(T::from(coord.xy.x).unwrap(), T::from(coord.xy.y).unwrap())
+                });
+                Ok(points)
+            }
         } else {
             Err(format_err!(
                 "The conversion failed with the following error: {}",
@@ -447,5 +512,19 @@ mod test {
             .project(Point::new(99999.0, 99999.0), false)
             .is_err());
         assert!(nad83_m.project(Point::new(0.0, 0.0), false).is_ok());
+    }
+
+    #[test]
+    fn test_array_convert() {
+        let from = "EPSG:2230";
+        let to = "EPSG:26946";
+        let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+        let mut v = vec![
+            Point::new(4760096.421921, 3744293.729449),
+            Point::new(4760197.421921, 3744394.729449),
+        ];
+        ft_to_m.convert_array(&mut v).unwrap();
+        assert_almost_eq(v[0].x(), 1450880.2910605003f64);
+        assert_almost_eq(v[1].y(), 1141293.7960220212f64);
     }
 }
