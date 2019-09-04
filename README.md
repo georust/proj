@@ -1,6 +1,6 @@
 # PROJ
 
-Rust bindings for [PROJ](https://github.com/OSGeo/proj.4), v6.2.x
+Rust bindings for [PROJ](https://github.com/OSGeo/proj), v6.2.x
 
 # Examples
 
