@@ -307,10 +307,10 @@ impl Proj {
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
     /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
-    /// let mut v = vec![Point::new(4760096.421921, 3744293.729449), Point::new(4760096.421921, 3744293.729449)];
+    /// let mut v = vec![Point::new(4760096.421921, 3744293.729449), Point::new(4760197.421921, 3744394.729449)];
     /// ft_to_m.convert_array(&mut v);
     /// assert_approx_eq!(v[0].x(), 1450880.2910605003f64);
-    /// assert_approx_eq!(v[1].y(), 1141263.0111604529f64);
+    /// assert_approx_eq!(v[1].y(), 1141293.7960220212f64);
     /// ```
     ///
     /// # Safety
@@ -521,10 +521,10 @@ mod test {
         let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
         let mut v = vec![
             Point::new(4760096.421921, 3744293.729449),
-            Point::new(4760096.421921, 3744293.729449),
+            Point::new(4760197.421921, 3744394.729449),
         ];
         ft_to_m.convert_array(&mut v).unwrap();
         assert_almost_eq(v[0].x(), 1450880.2910605003f64);
-        assert_almost_eq(v[1].y(), 1141263.0111604529f64);
+        assert_almost_eq(v[1].y(), 1141293.7960220212f64);
     }
 }
