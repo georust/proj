@@ -70,7 +70,13 @@ let rp = stereo70.project(
 assert_eq!(rp, Point::new(0.436332, 0.802851));
 ```
 
-## License
+## Bulk Transformations
+The `Proj::convert_array()` method is available for bulk conversions. It accepts a mutable slice (or anything that can `Deref` to a mutable slice) of `Point<T: Float>` elements.
+
+## Documentation
+Run `cargo doc` (optionally `--open`) for a full list of available functions and methods.
+
+# License
 
 Licensed under either of
 
