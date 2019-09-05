@@ -57,13 +57,16 @@ use proj::Proj;
 extern crate geo_types;
 use geo_types::Point;
 
-// Carry out an inverse projection from Pulkovo 1942(58) / Stereo70 (EPSG 3844) into geodetic lon and lat coordinates (in radians)
+// Carry out an inverse projection from Pulkovo 1942(58) / Stereo70 (EPSG 3844)
+// into geodetic lon and lat coordinates (in radians)
 let stereo70 = Proj::new("
     +proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
     +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84
     +units=m +no_defs
     ").unwrap();
-let rp = stereo70.project(Point::new(500119.70352012233, 500027.77896348457), true).unwrap();
+let rp = stereo70.project(
+    Point::new(500119.70352012233, 500027.77896348457), true
+).unwrap();
 assert_eq!(rp, Point::new(0.436332, 0.802851));
 ```
 
