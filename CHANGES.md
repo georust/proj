@@ -1,3 +1,6 @@
+# 0.11.1
+- Fixed link to function references
+
 # 0.11.0
 - Bumped minimum PROJ version to 6.2.0
 - Updated to 2018 edition
