@@ -21,7 +21,7 @@ assert_almost_eq(result.x(), 1450880.29);
 assert_almost_eq(result.y(), 1141263.01);
 ```
 
-Note that as of v5.0.0, PROJ uses the [`pipeline`](http://proj4.org/operations/pipeline.html) operator, which allows an arbitrary number of steps in a conversion. The example below works as follows:
+Note that as of v5.0.0, PROJ uses the [`pipeline`](http://proj.org/operations/pipeline.html) operator, which allows an arbitrary number of steps in a conversion. The example below works as follows:
 
 - define the operation as a `pipeline` operation
 - define `step` 1 as an `inv`erse transform, yielding geodetic coordinates
@@ -72,9 +72,6 @@ assert_eq!(rp, Point::new(0.436332, 0.802851));
 
 ## Bulk Transformations
 The `Proj::convert_array()` method is available for bulk conversions. It accepts a mutable slice (or anything that can `Deref` to a mutable slice) of `Point<T: Float>` elements.
-
-## Documentation
-Run `cargo doc` (optionally `--open`) for a full list of available functions and methods.
 
 # License
 
