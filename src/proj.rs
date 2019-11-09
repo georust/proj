@@ -1,4 +1,3 @@
-use failure::Error;
 use geo_types::Point;
 use libc::c_int;
 use libc::{c_char, c_double};
@@ -13,6 +12,16 @@ use proj_sys::{proj_errno, proj_errno_reset};
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::str;
+use thiserror::Error;
+
+/// Errors originating in PROJ which can occur during projection and conversion
+#[derive(Error, Debug)]
+pub enum ProjError {
+    #[error("The projection failed with the following error: {0}")]
+    Projection(String),
+    #[error("The conversion failed with the following error: {0}")]
+    Conversion(String),
+}
 
 /// The bounding box of an area of use
 ///
@@ -190,7 +199,7 @@ impl Proj {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn project<T>(&self, point: Point<T>, inverse: bool) -> Result<Point<T>, Error>
+    pub fn project<T>(&self, point: Point<T>, inverse: bool) -> Result<Point<T>, ProjError>
     where
         T: Float,
     {
@@ -221,10 +230,7 @@ impl Proj {
         if err == 0 {
             Ok(Point::new(T::from(new_x).unwrap(), T::from(new_y).unwrap()))
         } else {
-            Err(format_err!(
-                "The projection failed with the following error: {}",
-                error_message(err)
-            ))
+            Err(ProjError::Projection(error_message(err)))
         }
     }
 
@@ -269,7 +275,7 @@ impl Proj {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn convert<T>(&self, point: Point<T>) -> Result<Point<T>, Error>
+    pub fn convert<T>(&self, point: Point<T>) -> Result<Point<T>, ProjError>
     where
         T: Float,
     {
@@ -289,10 +295,7 @@ impl Proj {
         if err == 0 {
             Ok(Point::new(T::from(new_x).unwrap(), T::from(new_y).unwrap()))
         } else {
-            Err(format_err!(
-                "The conversion failed with the following error: {}",
-                error_message(err)
-            ))
+            Err(ProjError::Conversion(error_message(err)))
         }
     }
 
@@ -320,7 +323,7 @@ impl Proj {
     pub fn convert_array<'a, T>(
         &self,
         points: &'a mut [Point<T>],
-    ) -> Result<&'a mut [Point<T>], Error>
+    ) -> Result<&'a mut [Point<T>], ProjError>
     where
         T: Float,
     {
@@ -354,10 +357,7 @@ impl Proj {
                 Ok(points)
             }
         } else {
-            Err(format_err!(
-                "The conversion failed with the following error: {}",
-                error_message(err)
-            ))
+            Err(ProjError::Projection(error_message(err)))
         }
     }
 }
@@ -488,7 +488,7 @@ mod test {
             .unwrap_err();
         assert_eq!(
             "The conversion failed with the following error: latitude or longitude exceeded limits",
-            err.find_root_cause().to_string()
+            err.to_string()
         );
     }
 
