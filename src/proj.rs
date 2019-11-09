@@ -170,11 +170,11 @@ impl Proj {
     /// # Safety
     /// This method contains unsafe code.
     // calling this on a non-CRS-to-CRS instance of Proj will be harmless, because self.area will be None
-    pub fn area_set_bbox(&mut self, new_area: Option<Area>) {
-        if let (Some(proj_area), Some(new_bbox)) = (self.area, new_area) {
+    pub fn area_set_bbox(&mut self, new_bbox: Area) {
+        if let Some(new_area) = self.area {
             unsafe {
                 proj_area_set_bbox(
-                    proj_area,
+                    new_area,
                     new_bbox.west,
                     new_bbox.south,
                     new_bbox.east,
