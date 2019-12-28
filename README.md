@@ -71,7 +71,7 @@ assert_eq!(rp, Point::new(0.436332, 0.802851));
 ```
 
 ## Bulk Transformations
-The `Proj::convert_array()` method is available for bulk conversions. It accepts a mutable slice (or anything that can `Deref` to a mutable slice) of `Point<T: Float>` elements.
+The `Proj::convert_array()` method is available for bulk conversions. It accepts a mutable slice (or anything that can `Deref` to a mutable slice) of `Point<T: Float>` or `Into<Point<T: Float>` elements.
 
 # License
 

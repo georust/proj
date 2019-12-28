@@ -1,13 +1,14 @@
 [package]
 name = "proj"
 description = "Rust bindings for PROJ"
-version = "0.12.1"
+version = "0.12.2"
 authors = [
   "Corey Farwell <coreyf@rwell.org>",
   "Alex Morega <alex@grep.ro>",
   "Stephan Hügel <urschrei@gmail.com>"
 ]
 repository = "https://github.com/georust/proj"
+documentation = "https://docs.rs/proj/"
 keywords = ["proj", "projection", "osgeo", "geo"]
 license = "MIT/Apache-2.0"
 readme = "README.md"
