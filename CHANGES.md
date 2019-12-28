@@ -1,5 +1,9 @@
 # Changes
 
+## 0.12.1
+- `convert` and `project` operations now accept any type that has an `Into<Point<T>>`impl. This is a backward-compatible API change
+- New `Area` `bbox`es no longer need to be wrapped in an `Option`
+
 ## 0.10.9
 * add bulk conversion (#17)
 
