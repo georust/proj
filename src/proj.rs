@@ -199,17 +199,19 @@ impl Proj {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn project<T>(&self, point: Point<T>, inverse: bool) -> Result<Point<T>, ProjError>
+    pub fn project<T, U>(&self, point: T, inverse: bool) -> Result<Point<U>, ProjError>
     where
-        T: Float,
+        T: Into<Point<U>>,
+        U: Float,
     {
         let inv = if inverse {
             PJ_DIRECTION_PJ_INV
         } else {
             PJ_DIRECTION_PJ_FWD
         };
-        let c_x: c_double = point.x().to_f64().unwrap();
-        let c_y: c_double = point.y().to_f64().unwrap();
+        let _point: Point<U> = point.into();
+        let c_x: c_double = _point.x().to_f64().unwrap();
+        let c_y: c_double = _point.y().to_f64().unwrap();
         let new_x;
         let new_y;
         let err;
@@ -228,7 +230,7 @@ impl Proj {
             err = proj_errno(self.c_proj);
         }
         if err == 0 {
-            Ok(Point::new(T::from(new_x).unwrap(), T::from(new_y).unwrap()))
+            Ok(Point::new(U::from(new_x).unwrap(), U::from(new_y).unwrap()))
         } else {
             Err(ProjError::Projection(error_message(err)))
         }
@@ -275,12 +277,14 @@ impl Proj {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn convert<T>(&self, point: Point<T>) -> Result<Point<T>, ProjError>
+    pub fn convert<T, U>(&self, point: T) -> Result<Point<U>, ProjError>
     where
-        T: Float,
+        T: Into<Point<U>>,
+        U: Float,
     {
-        let c_x: c_double = point.x().to_f64().unwrap();
-        let c_y: c_double = point.y().to_f64().unwrap();
+        let _point: Point<U> = point.into();
+        let c_x: c_double = _point.x().to_f64().unwrap();
+        let c_y: c_double = _point.y().to_f64().unwrap();
         let new_x;
         let new_y;
         let err;
@@ -293,7 +297,7 @@ impl Proj {
             err = proj_errno(self.c_proj);
         }
         if err == 0 {
-            Ok(Point::new(T::from(new_x).unwrap(), T::from(new_y).unwrap()))
+            Ok(Point::new(U::from(new_x).unwrap(), U::from(new_y).unwrap()))
         } else {
             Err(ProjError::Conversion(error_message(err)))
         }
