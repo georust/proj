@@ -27,7 +27,7 @@
 //! let result = nad_ft_to_m
 //!     .convert(Point::new(4760096.421921f64, 3744293.729449f64))
 //!     .unwrap();
-//! assert_approx_eq!(result.x(), 150880.29f64, 1.0e-2);
+//! assert_approx_eq!(result.x(), 1450880.29f64, 1.0e-2);
 //! assert_approx_eq!(result.y(), 1141263.01f64, 1.0e-2);
 //!```
 
