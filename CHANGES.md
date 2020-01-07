@@ -1,5 +1,8 @@
 # Changes
 
+## 0.13.0
+* Updated to proj-sys 0.12.0 (PROJ 6.3)
+
 ## 0.12.1
 - `convert` and `project` operations now accept any type that has an `Into<Point<T>>`impl. This is a backward-compatible API change
 - New `Area` `bbox`es no longer need to be wrapped in an `Option`

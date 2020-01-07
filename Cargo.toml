@@ -1,7 +1,7 @@
 [package]
 name = "proj"
-description = "Rust bindings for PROJ"
-version = "0.12.2"
+description = "High-level Rust bindings for the latest stable version of PROJ"
+version = "0.13.0"
 authors = [
   "Corey Farwell <coreyf@rwell.org>",
   "Alex Morega <alex@grep.ro>",
@@ -15,7 +15,7 @@ readme = "README.md"
 edition = "2018"
 
 [dependencies]
-proj-sys = "0.11.2"
+proj-sys = "0.12.0"
 geo-types ="0.4.3"
 libc = "0.2.62"
 num-traits = "0.2.8"
