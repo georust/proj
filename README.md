@@ -1,6 +1,6 @@
 # PROJ
 
-Rust bindings for [PROJ](https://github.com/OSGeo/proj), v6.2.x
+High-level Rust bindings for the latest stable version of [PROJ](https://github.com/OSGeo/proj) (6.3.x), compatible with the [Georust](https://crates.io/geo) ecosystem.
 
 # Examples
 
@@ -21,7 +21,7 @@ assert_almost_eq(result.x(), 1450880.29);
 assert_almost_eq(result.y(), 1141263.01);
 ```
 
-Note that as of v5.0.0, PROJ uses the [`pipeline`](http://proj.org/operations/pipeline.html) operator, which allows an arbitrary number of steps in a conversion. The example below works as follows:
+Note that as of v5.0.0, PROJ uses the [`pipeline`](https://proj.org/operations/pipeline.html) operator, which allows an arbitrary number of steps in a conversion. The example below works as follows:
 
 - define the operation as a `pipeline` operation
 - define `step` 1 as an `inv`erse transform, yielding geodetic coordinates
