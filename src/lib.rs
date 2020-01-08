@@ -1,15 +1,17 @@
-//! `proj` provides bindings to the [PROJ](http://proj.org) v6.2.x API
+#![doc(html_logo_url = "https://raw.githubusercontent.com/georust/meta/master/logo/logo.png")]
+//! `proj` provides bindings to the [PROJ](https://proj.org) v6.3.x API
 //!
 //! Two coordinate operations are currently provided: [projection](struct.Proj.html#method.project)
 //! (and inverse projection)
 //! and [conversion](struct.Proj.html#method.convert).
-//! Projection is intended for transforming between geodetic and projected coordinates,
-//! and vice versa (inverse projection), while conversion is intended for transforming between projected
-//! coordinate systems. The PROJ [documentation](http://proj.org/operations/index.html)
+//! Projection is intended for transformations between geodetic and projected coordinates,
+//! and vice versa (inverse projection), while conversion is intended for transformations between projected
+//! coordinate systems. The PROJ [documentation](https://proj.org/operations/index.html)
 //! explains the distinction between these operations.
 //!
 //! Anything that can be converted into a [`geo-types`](https://docs.rs/geo-types) `Point` via the `Into`
-//! trait can be used as input for the conversion or transformation function.
+//! trait can be used as input for the conversion or transformation function, and conversion of a slice of
+//! `Point`s between known CRS is also supported.
 //!
 //! # Example
 //!
