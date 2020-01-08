@@ -1,5 +1,8 @@
 # Changes
 
+## 0.14.0
+* Normalise input and output coordinate order to Lat, Lon / Easting, Northing for conversions between known CRS (#21)
+
 ## 0.13.0
 * Updated to proj-sys 0.12.0 (PROJ 6.3)
 
