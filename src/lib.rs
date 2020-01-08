@@ -4,3 +4,6 @@
 
 #[cfg(not(feature = "nobuild"))]
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+
+#[cfg(feature = "nobuild")]
+include!("bindings_docs-rs.rs");
