@@ -5,8 +5,8 @@ use num_traits::Float;
 use proj_sys::{
     proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_context_create,
     proj_context_destroy, proj_create, proj_create_crs_to_crs, proj_destroy, proj_errno_string,
-    proj_pj_info, proj_trans, proj_trans_array, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD,
-    PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_LP, PJ_XY,
+    proj_normalize_for_visualization, proj_pj_info, proj_trans, proj_trans_array, PJconsts,
+    PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_LP, PJ_XY,
 };
 use proj_sys::{proj_errno, proj_errno_reset};
 use std::ffi::CStr;
@@ -121,6 +121,15 @@ impl Proj {
     /// - more generally, any string accepted by [`new()`](struct.Proj.html#method.new)
     ///
     /// If you wish to alter the particular area of use, you may do so using [`area_set_bbox()`](struct.Proj.html#method.area_set_bbox)
+    /// ## A Note on Coordinate Order
+    /// The required input **and** output coordinate order is **normalised** to `Longitude, Latitude` / `Easting, Northing`.
+    ///
+    /// This overrides the expected order of a given CRS if necessary. See the [PROJ API](https://proj.org/development/reference/functions.html#c.proj_normalize_for_visualization)
+    ///
+    /// For example: per its definition, EPSG:4326 has an axis order of Latitude, Longitude. Without
+    /// normalisation, crate users would have to remember to reverse the coordinates of `Point` or `Coordinate` structs
+    /// in order for a conversion operation to return correct results.
+    ///
     ///```rust
     /// # use assert_approx_eq::assert_approx_eq;
     /// extern crate proj;
@@ -152,8 +161,11 @@ impl Proj {
         if new_c_proj.is_null() {
             None
         } else {
+            // Normalise input and output order to Lon, Lat / Easting Northing by inserting
+            // An axis swap operation if necessary
+            let normalised = unsafe { proj_normalize_for_visualization(ctx, new_c_proj) };
             Some(Proj {
-                c_proj: new_c_proj,
+                c_proj: normalised,
                 ctx,
                 area: Some(proj_area),
             })
@@ -306,6 +318,15 @@ impl Proj {
     /// Convert a mutable slice (or anything that can deref into a mutable slice) of coordinates  
     /// The following example converts from NAD83 US Survey Feet (EPSG 2230) to NAD83 Metres (EPSG 26946)
     ///
+    /// ## A Note on Coordinate Order
+    /// The required input **and** output coordinate order is **normalised** to `Longitude, Latitude` / `Easting, Northing`.
+    ///
+    /// This overrides the expected order of a given CRS if necessary. See the [PROJ API](https://proj.org/development/reference/functions.html#c.proj_normalize_for_visualization)
+    ///
+    /// For example: per its definition, EPSG:4326 has an axis order of Latitude, Longitude. Without
+    /// normalisation, crate users would have to remember to reverse the coordinates of `Point` or `Coordinate` structs
+    /// in order for a conversion operation to return correct results.
+    ///
     /// ```rust
     /// use proj::Proj;
     /// extern crate geo_types;
@@ -314,7 +335,10 @@ impl Proj {
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
     /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
-    /// let mut v = vec![Point::new(4760096.421921, 3744293.729449), Point::new(4760197.421921, 3744394.729449)];
+    /// let mut v = vec![
+    ///     Point::new(4760096.421921, 3744293.729449),
+    ///     Point::new(4760197.421921, 3744394.729449)
+    /// ];
     /// ft_to_m.convert_array(&mut v);
     /// assert_approx_eq!(v[0].x(), 1450880.2910605003f64);
     /// assert_approx_eq!(v[1].y(), 1141293.7960220212f64);
@@ -530,5 +554,19 @@ mod test {
         ft_to_m.convert_array(&mut v).unwrap();
         assert_almost_eq(v[0].x(), 1450880.2910605003f64);
         assert_almost_eq(v[1].y(), 1141293.7960220212f64);
+    }
+
+    #[test]
+    // Ensure that input and output order are normalised to Lon, Lat / Easting Northing
+    // Without normalisation this test would fail, as EPSG:4326 expects Lat, Lon input order.
+    fn test_input_order() {
+        let from = "EPSG:4326";
+        let to = "EPSG:2230";
+        let to_feet = Proj::new_known_crs(&from, &to, None).unwrap();
+        // 👽
+        let usa_m = Point::new(-115.797615, 37.2647978);
+        let usa_ft = to_feet.convert(usa_m).unwrap();
+        assert_eq!(6693625.67217475, usa_ft.x());
+        assert_eq!(3497301.5918027186, usa_ft.y());
     }
 }
