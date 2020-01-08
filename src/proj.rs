@@ -115,8 +115,8 @@ impl Proj {
     /// Create a transformation object that is a pipeline between two known coordinate reference systems.
     /// `from` and `to` can be:
     ///
-    /// - an `"AUTHORITY:CODE"`, like `"EPSG:25832"`. When using that syntax for a source CRS, the created pipeline will expect that the values passed to [`project()`](struct.Proj.html#method.project) or [`convert()`](struct.Proj.html#method.convert) respect the axis order and axis unit of the official definition ( so for example, for EPSG:4326, with latitude first and longitude next, in degrees). Similarly, when using that syntax for a target CRS, output values will be emitted according to the official definition of this CRS.
-    /// - a PROJ string, like `"+proj=longlat +datum=WGS84"`. When using that syntax, the axis order and unit for geographic CRS will be longitude, latitude, and the unit degrees.
+    /// - an `"AUTHORITY:CODE"`, like `"EPSG:25832"`.
+    /// - a PROJ string, like `"+proj=longlat +datum=WGS84"`. When using that syntax, the unit is expected to be degrees.
     /// - the name of a CRS as found in the PROJ database, e.g `"WGS84"`, `"NAD27"`, etc.
     /// - more generally, any string accepted by [`new()`](struct.Proj.html#method.new)
     ///
@@ -124,11 +124,14 @@ impl Proj {
     /// ## A Note on Coordinate Order
     /// The required input **and** output coordinate order is **normalised** to `Longitude, Latitude` / `Easting, Northing`.
     ///
-    /// This overrides the expected order of a given CRS if necessary. See the [PROJ API](https://proj.org/development/reference/functions.html#c.proj_normalize_for_visualization)
+    /// This overrides the expected order of the specified input and / or output CRS if necessary.
+    /// See the [PROJ API](https://proj.org/development/reference/functions.html#c.proj_normalize_for_visualization)
     ///
     /// For example: per its definition, EPSG:4326 has an axis order of Latitude, Longitude. Without
-    /// normalisation, crate users would have to remember to reverse the coordinates of `Point` or `Coordinate` structs
-    /// in order for a conversion operation to return correct results.
+    /// normalisation, crate users would have to
+    /// [remember](https://proj.org/development/reference/functions.html#c.proj_create_crs_to_crs)
+    /// to reverse the coordinates of `Point` or `Coordinate` structs in order for a conversion operation to
+    /// return correct results.
     ///
     ///```rust
     /// # use assert_approx_eq::assert_approx_eq;
