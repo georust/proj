@@ -10,8 +10,8 @@
 //! explains the distinction between these operations.
 //!
 //! Anything that can be converted into a [`geo-types`](https://docs.rs/geo-types) `Point` via the `Into`
-//! trait can be used as input for the conversion or transformation function, and conversion of a slice of
-//! `Point`s between known CRS is also supported.
+//! trait can be used as input for the conversion or transformation functions, and conversion of a slice of
+//! `Point`s [is also supported](struct.Proj.html#method.convert_array).
 //!
 //! # Example
 //!

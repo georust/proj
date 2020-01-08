@@ -248,13 +248,21 @@ impl Proj {
         }
     }
 
-    /// Convert coordinates using the PROJ `pipeline` operator
+    /// Convert projected coordinates between coordinate reference systems.
     ///
-    /// This method makes use of the [`pipeline`](http://proj4.org/operations/pipeline.html)
-    /// functionality available since v5.0.0, which differs significantly from the v4.x series
+    /// Input and output CRS may be specified in two ways:
+    /// 1. Using the PROJ `pipeline` operator. This method makes use of the [`pipeline`](http://proj4.org/operations/pipeline.html)
+    /// functionality available since `PROJ` 5. 
+    /// This has the advantage of being able to chain an arbitrary combination of projection, conversion,
+    /// and transformation steps, allowing for extremely complex operations ([`new`](#method.new))
+    /// 2. Using EPSG codes or `PROJ` strings to define input and output CRS ([`new_known_crs`](#method.new_known_crs))
     ///
-    /// It has the advantage of being able to chain an arbitrary combination of projection, conversion,
-    /// and transformation steps, allowing for extremely complex operations.
+    /// ## A Note on Coordinate Order
+    /// Depending on the method used to instantiate the `Proj` object, coordinate input and output order may vary:
+    /// - If you have used [`new`](#method.new), it is assumed that you've specified the order using the input string,
+    /// or that you are aware of the required input order and expected output order.
+    /// - If you have used [`new_known_crs`](#method.new_known_crs), input and output order are **normalised**
+    /// to Longitude, Latitude / Easting, Northing.
     ///
     /// The following example converts from NAD83 US Survey Feet (EPSG 2230) to NAD83 Metres (EPSG 26946)
     /// Note the steps:
@@ -315,7 +323,8 @@ impl Proj {
         }
     }
 
-    /// Convert a mutable slice (or anything that can deref into a mutable slice) of coordinates  
+    /// Convert a mutable slice (or anything that can deref into a mutable slice) of `Point`s
+    ///
     /// The following example converts from NAD83 US Survey Feet (EPSG 2230) to NAD83 Metres (EPSG 26946)
     ///
     /// ## A Note on Coordinate Order
