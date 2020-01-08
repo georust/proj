@@ -331,13 +331,11 @@ impl Proj {
     /// The following example converts from NAD83 US Survey Feet (EPSG 2230) to NAD83 Metres (EPSG 26946)
     ///
     /// ## A Note on Coordinate Order
-    /// The required input **and** output coordinate order is **normalised** to `Longitude, Latitude` / `Easting, Northing`.
-    ///
-    /// This overrides the expected order of a given CRS if necessary. See the [PROJ API](https://proj.org/development/reference/functions.html#c.proj_normalize_for_visualization)
-    ///
-    /// For example: per its definition, EPSG:4326 has an axis order of Latitude, Longitude. Without
-    /// normalisation, crate users would have to remember to reverse the coordinates of `Point` or `Coordinate` structs
-    /// in order for a conversion operation to return correct results.
+    /// Depending on the method used to instantiate the `Proj` object, coordinate input and output order may vary:
+    /// - If you have used [`new`](#method.new), it is assumed that you've specified the order using the input string,
+    /// or that you are aware of the required input order and expected output order.
+    /// - If you have used [`new_known_crs`](#method.new_known_crs), input and output order are **normalised**
+    /// to Longitude, Latitude / Easting, Northing.
     ///
     /// ```rust
     /// use proj::Proj;
