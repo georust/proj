@@ -166,7 +166,12 @@ impl Proj {
         } else {
             // Normalise input and output order to Lon, Lat / Easting Northing by inserting
             // An axis swap operation if necessary
-            let normalised = unsafe { proj_normalize_for_visualization(ctx, new_c_proj) };
+            let normalised = unsafe {
+                let normalised = proj_normalize_for_visualization(ctx, new_c_proj);
+                // deallocate stale PJ pointer
+                proj_destroy(new_c_proj);
+                normalised
+            };
             Some(Proj {
                 c_proj: normalised,
                 ctx,
@@ -255,7 +260,7 @@ impl Proj {
     ///
     /// Input and output CRS may be specified in two ways:
     /// 1. Using the PROJ `pipeline` operator. This method makes use of the [`pipeline`](http://proj4.org/operations/pipeline.html)
-    /// functionality available since `PROJ` 5. 
+    /// functionality available since `PROJ` 5.
     /// This has the advantage of being able to chain an arbitrary combination of projection, conversion,
     /// and transformation steps, allowing for extremely complex operations ([`new`](#method.new))
     /// 2. Using EPSG codes or `PROJ` strings to define input and output CRS ([`new_known_crs`](#method.new_known_crs))
@@ -331,13 +336,11 @@ impl Proj {
     /// The following example converts from NAD83 US Survey Feet (EPSG 2230) to NAD83 Metres (EPSG 26946)
     ///
     /// ## A Note on Coordinate Order
-    /// The required input **and** output coordinate order is **normalised** to `Longitude, Latitude` / `Easting, Northing`.
-    ///
-    /// This overrides the expected order of a given CRS if necessary. See the [PROJ API](https://proj.org/development/reference/functions.html#c.proj_normalize_for_visualization)
-    ///
-    /// For example: per its definition, EPSG:4326 has an axis order of Latitude, Longitude. Without
-    /// normalisation, crate users would have to remember to reverse the coordinates of `Point` or `Coordinate` structs
-    /// in order for a conversion operation to return correct results.
+    /// Depending on the method used to instantiate the `Proj` object, coordinate input and output order may vary:
+    /// - If you have used [`new`](#method.new), it is assumed that you've specified the order using the input string,
+    /// or that you are aware of the required input order and expected output order.
+    /// - If you have used [`new_known_crs`](#method.new_known_crs), input and output order are **normalised**
+    /// to Longitude, Latitude / Easting, Northing.
     ///
     /// ```rust
     /// use proj::Proj;
@@ -384,6 +387,81 @@ impl Proj {
         unsafe {
             proj_errno_reset(self.c_proj);
             trans = proj_trans_array(self.c_proj, PJ_DIRECTION_PJ_FWD, pj.len(), pj.as_mut_ptr());
+            err = proj_errno(self.c_proj);
+        }
+        if err == 0 && trans == 0 {
+            unsafe {
+                // re-fill original slice with Points
+                // feels a bit clunky, but we're guaranteed that pj and points have the same length
+                pj.iter().enumerate().for_each(|(i, coord)| {
+                    points[i] =
+                        Point::new(T::from(coord.xy.x).unwrap(), T::from(coord.xy.y).unwrap())
+                });
+                Ok(points)
+            }
+        } else {
+            Err(ProjError::Projection(error_message(err)))
+        }
+    }
+
+    /// Project an array of geodetic coordinates (in radians) into the projection specified by `definition`
+    ///
+    /// **Note:** specifying `inverse` as `true` carries out an inverse projection *to* geodetic coordinates
+    /// (in radians) from the projection specified by `definition`.
+    ///
+    /// ```rust
+    /// use proj::Proj;
+    /// extern crate geo_types;
+    /// use geo_types::Point;
+    /// # use assert_approx_eq::assert_approx_eq;
+    /// let stereo70 = Proj::new(
+    ///     "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
+    ///     +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs",
+    /// )
+    /// .unwrap();
+    /// // Geodetic -> Pulkovo 1942(58) / Stereo70 (EPSG 3844)
+    /// let mut v = vec![Point::new(0.436332, 0.802851)];
+    /// let t = stereo70
+    ///     .project_array(&mut v, false)
+    ///     .unwrap();
+    /// assert_approx_eq!(v[0].x(), 500119.7035366755f64);
+    /// assert_approx_eq!(v[0].y(), 500027.77901023754f64);
+    /// ```
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    // TODO: there may be a way of avoiding some allocations, but transmute won't work because
+    // PJ_COORD and Point<T> are different sizes
+    pub fn project_array<'a, T>(
+        &self,
+        points: &'a mut [Point<T>],
+        inverse: bool,
+    ) -> Result<&'a mut [Point<T>], ProjError>
+    where
+        T: Float,
+    {
+        let err;
+        let trans;
+        let inv = if inverse {
+            PJ_DIRECTION_PJ_INV
+        } else {
+            PJ_DIRECTION_PJ_FWD
+        };
+        // we need PJ_COORD to convert
+        let mut pj = points
+            .iter()
+            .map(|point| {
+                let c_x: c_double = point.x().to_f64().unwrap();
+                let c_y: c_double = point.y().to_f64().unwrap();
+                PJ_COORD {
+                    xy: PJ_XY { x: c_x, y: c_y },
+                }
+            })
+            .collect::<Vec<_>>();
+        pj.shrink_to_fit();
+        unsafe {
+            proj_errno_reset(self.c_proj);
+            trans = proj_trans_array(self.c_proj, inv, pj.len(), pj.as_mut_ptr());
             err = proj_errno(self.c_proj);
         }
         if err == 0 && trans == 0 {
@@ -456,8 +534,8 @@ mod test {
         let t = stereo70
             .project(Point::new(0.436332, 0.802851), false)
             .unwrap();
-        assert_almost_eq(t.x(), 500119.70352012233);
-        assert_almost_eq(t.y(), 500027.77896348457);
+        assert_almost_eq(t.x(), 500119.7035366755);
+        assert_almost_eq(t.y(), 500027.77901023754);
     }
     #[test]
     // Carry out an inverse projection to geodetic coordinates

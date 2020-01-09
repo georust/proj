@@ -1,4 +1,7 @@
 # Changes
+## 0.14.4
+* Add array projection method
+* Fix potential leak of PJ object in `new_known_crs`
 
 ## 0.14.0
 * Normalise input and output coordinate order to Lat, Lon / Easting, Northing for conversions between known CRS (#21)
