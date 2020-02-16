@@ -149,7 +149,7 @@ impl Proj {
     ///     .unwrap();
     /// assert_approx_eq!(result.x(), 1450880.29f64, 1.0e-2);
     /// assert_approx_eq!(result.y(), 1141263.01f64, 1.0e-2);
-    ///```
+    /// ```
     ///
     /// # Safety
     /// This method contains unsafe code.
@@ -287,7 +287,8 @@ impl Proj {
     /// extern crate geo_types;
     /// use geo_types::Point;
     ///
-    /// let nad_ft_to_m = Proj::new("
+    /// let nad_ft_to_m = Proj::new(
+    ///     "
     ///     +proj=pipeline
     ///     +step +inv +proj=lcc +lat_1=33.88333333333333
     ///     +lat_2=32.78333333333333 +lat_0=32.16666666666666
@@ -296,11 +297,14 @@ impl Proj {
     ///     +step +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666
     ///     +lon_0=-116.25 +x_0=2000000 +y_0=500000
     ///     +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs
-    /// ").unwrap();
-    /// let result = nad_ft_to_m.convert(Point::new(4760096.421921f64, 3744293.729449f64)).unwrap();
+    /// ",
+    /// )
+    /// .unwrap();
+    /// let result = nad_ft_to_m
+    ///     .convert(Point::new(4760096.421921f64, 3744293.729449f64))
+    ///     .unwrap();
     /// assert_approx_eq!(result.x(), 1450880.29f64, 1.0e-2);
     /// assert_approx_eq!(result.y(), 1141263.01f64, 1.0e-2);
-    ///
     /// ```
     ///
     /// # Safety
@@ -352,7 +356,7 @@ impl Proj {
     /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
     /// let mut v = vec![
     ///     Point::new(4760096.421921, 3744293.729449),
-    ///     Point::new(4760197.421921, 3744394.729449)
+    ///     Point::new(4760197.421921, 3744394.729449),
     /// ];
     /// ft_to_m.convert_array(&mut v);
     /// assert_approx_eq!(v[0].x(), 1450880.2910605003f64);
@@ -421,9 +425,7 @@ impl Proj {
     /// .unwrap();
     /// // Geodetic -> Pulkovo 1942(58) / Stereo70 (EPSG 3844)
     /// let mut v = vec![Point::new(0.436332, 0.802851)];
-    /// let t = stereo70
-    ///     .project_array(&mut v, false)
-    ///     .unwrap();
+    /// let t = stereo70.project_array(&mut v, false).unwrap();
     /// assert_approx_eq!(v[0].x(), 500119.7035366755f64);
     /// assert_approx_eq!(v[0].y(), 500027.77901023754f64);
     /// ```
