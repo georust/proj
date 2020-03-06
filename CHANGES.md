@@ -1,3 +1,6 @@
+# 0.12.0
+- Update to PROJ 7.0.0
+
 # 0.11.1
 - Fixed link to function references
 
