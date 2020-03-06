@@ -1,6 +1,6 @@
 # PROJ
 
-High-level Rust bindings for the latest stable version of [PROJ](https://github.com/OSGeo/proj) (6.3.x), compatible with the [Georust](https://crates.io/geo) ecosystem.
+High-level Rust bindings for the latest stable version of [PROJ](https://github.com/OSGeo/proj) (7.0.x), compatible with the [Georust](https://crates.io/geo) ecosystem.
 
 # Examples
 

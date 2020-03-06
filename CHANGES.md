@@ -1,4 +1,8 @@
 # Changes
+## 0.15.0
+* Update to proj-sys v0.13.0
+* Update to use PROJ v7.0.0
+
 ## 0.14.4
 * Add array projection method
 * Fix potential leak of PJ object in `new_known_crs`
