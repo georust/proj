@@ -1,5 +1,5 @@
 #![doc(html_logo_url = "https://raw.githubusercontent.com/georust/meta/master/logo/logo.png")]
-//! `proj` provides bindings to the [PROJ](https://proj.org) v6.3.x API
+//! `proj` provides bindings to the [PROJ](https://proj.org) v7.0.x API
 //!
 //! Two coordinate operations are currently provided: [projection](struct.Proj.html#method.project)
 //! (and inverse projection)
