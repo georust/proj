@@ -5,9 +5,17 @@
 
 A guide to the functions can be found here: https://proj.org/development/reference/functions.html. Run `cargo doc (optionally --open)` to generate the crate documentation.
 
-# Requirements
-This crate tracks the **latest stable release** of `PROJ`.  
-PROJ `v7.0.x` must be present on your system. While this crate may be backwards-compatible with older PROJ 6 versions, this is neither tested or supported.
+## Requirements
+
+Sqlite3 must be present on your system.
+
+By default, this crate depends on a pre-built library, so PROJ `v7.0.x` must be present on your system. While this crate may be backwards-compatible with older PROJ 6 versions, this is neither tested or supported.
+
+## Using the Bundled PROJ
+
+This crate can internally build and depend on a bundled PROJ `v7.0.0` library, which can be enabled via the "bundled_proj" feature. This might make it easier to compile the crate, but it is not thoroughly tested yet so it might not work on some platforms.
+
+Currently this feature only supports Linux.
 
 ## License
 
@@ -17,4 +25,3 @@ Licensed under either of
  * MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
 
 at your option.
-
