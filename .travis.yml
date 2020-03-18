@@ -5,6 +5,6 @@ rust:
   - nightly
 before_install:
   - sudo apt-get update
-  - wget https://download.osgeo.org/proj/proj-7.0.0.tar.gz
+  - wget https://github.com/OSGeo/PROJ/releases/download/7.0.0/proj-7.0.0.tar.gz
   - tar -xzvf proj-7.0.0.tar.gz
   - pushd proj-7.0.0 && ./configure --prefix=/usr && make && sudo make install && popd

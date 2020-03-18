@@ -13,9 +13,7 @@ By default, this crate depends on a pre-built library, so PROJ `v7.0.x` must be 
 
 ## Using the Bundled PROJ
 
-This crate can internally build and depend on a bundled PROJ `v7.0.0` library, which can be enabled via the "bundled_proj" feature. This might make it easier to compile the crate, but it is not thoroughly tested yet so it might not work on some platforms.
-
-Currently this feature only supports Linux.
+This crate can internally build and depend on a bundled PROJ `v7.0.0` library, by enabling the `bundled_proj` feature. This may make it easier to compile the crate, but is not yet thoroughly tested, and **currently only supports Linux**.
 
 ## License
 

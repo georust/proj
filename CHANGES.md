@@ -1,3 +1,6 @@
+# 0.13.0
+- Add bundled Linux build option
+
 # 0.12.0
 - Update to PROJ 7.0.0
 
