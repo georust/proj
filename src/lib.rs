@@ -14,6 +14,18 @@
 //! for [conversion](struct.Proj.html#method.convert_array) and [projection](struct.Proj.html#method.project_array)
 //! of slices of `Point`s are available.
 //!
+//! # Requirements
+//!
+//! Sqlite3 must be present on your system.
+//!
+//! By default, this crate depends on a pre-built library, so PROJ v7.0.x must be present on your
+//! system. While this crate may be backwards-compatible with older PROJ 6 versions, this is neither
+//! tested nor supported.
+//!
+//! You can also choose to link against a PROJ included with (and built from source by) the
+//! `proj-sys` crate, upon which this crate is built. To do so, enable the `bundled_proj` Cargo
+//! feature. Currently this feature only supports Linux.
+//!
 //! # Example
 //!
 //! ```

@@ -1,6 +1,11 @@
 # Changes
 
 ## 0.16.0
+* Update to proj-sys v0.14.0
+* Re-export the bundled_proj feature introduced in proj-sys v0.14.0
+
+
+## 0.16.0
 * Update to geo-types v0.5.0
 
 ## 0.15.0

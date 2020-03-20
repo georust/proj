@@ -21,6 +21,9 @@ libc = "0.2.62"
 num-traits = "0.2.8"
 thiserror = "1.0.4"
 
+[features]
+bundled_proj = [ "proj-sys/bundled_proj" ]
+
 [dev-dependencies]
 assert_approx_eq = "1.1.0"
 
