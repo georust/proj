@@ -2,6 +2,14 @@
 
 High-level Rust bindings for the latest stable version of [PROJ](https://github.com/OSGeo/proj) (7.0.x), compatible with the [Georust](https://crates.io/geo) ecosystem.
 
+# Requirements
+
+Sqlite3 must be present on your system.
+
+By default, this crate depends on a pre-built library, so PROJ v7.0.x must be present on your system. While this crate may be backwards-compatible with older PROJ 6 versions, this is neither tested nor supported.
+
+You can also choose to link against a PROJ included with (and built from source by) the `proj-sys` crate, upon which this crate is built. To do so, enable the `bundled_proj` Cargo feature. Currently this feature only supports Linux.
+
 # Examples
 
 ## Convert from [NAD 83 US Survey Feet](https://epsg.io/2230) to [NAD 83 Meters](https://epsg.io/26946) Using EPSG Codes

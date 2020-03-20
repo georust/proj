@@ -1,4 +1,9 @@
 # Changes
+
+## 0.16.0
+* Update to proj-sys v0.14.0
+* Re-export the bundled_proj feature introduced in proj-sys v0.14.0
+
 ## 0.15.0
 * Update to proj-sys v0.13.0
 * Update to use PROJ v7.0.0
