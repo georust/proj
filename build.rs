@@ -1,12 +1,12 @@
-extern crate bindgen;
-
+use bindgen;
+use cmake;
 use std::env;
 use std::path::PathBuf;
 
 #[cfg(feature = "nobuild")]
 fn main() {} // Skip the build script on docs.rs
 
-#[cfg(not(feature = "nobuild"))]
+#[cfg(all(not(feature = "nobuild"), not(feature = "bundled_proj")))]
 fn main() {
     // Tell cargo to tell rustc to link the system proj
     // shared library.
@@ -29,6 +29,34 @@ fn main() {
     // Write the bindings to the $OUT_DIR/bindings.rs file.
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     bindings
+        .write_to_file(out_path.join("bindings.rs"))
+        .expect("Couldn't write bindings!");
+}
+
+#[cfg(all(not(feature = "nobuild"), feature = "bundled_proj"))]
+fn main() {
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+    if &target_os != "linux" {
+        panic!("Currently the bundled_proj feature only supports Linux. Your target platform: {}", target_os);
+    }
+
+    // Build PROJ from the included submodule.
+    // NOTE: The PROJ build expects Sqlite3 to be present on the system.
+    let mut config = cmake::Config::new("PROJ");
+    let proj = config.build();
+
+    // Tell cargo to tell rustc where to look for PROJ.
+    println!("cargo:rustc-link-search=native={}", proj.join("lib").display());
+    // Tell cargo to tell rustc to link PROJ.
+    println!("cargo:rustc-link-lib=dylib=proj");
+
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+    bindgen::builder()
+        .header(proj.join("include").join("proj.h").to_str().unwrap())
+        .trust_clang_mangling(false)
+        .blacklist_type("max_align_t")
+        .generate()
+        .expect("Unable to generate bindings")
         .write_to_file(out_path.join("bindings.rs"))
         .expect("Couldn't write bindings!");
 }

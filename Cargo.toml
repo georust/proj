@@ -1,21 +1,24 @@
 [package]
 name = "proj-sys"
 description = "Rust bindings for PROJ v7.0.x"
-repository = "https://github.com/urschrei/proj-sys"
+repository = "https://github.com/georust/proj-sys"
 version = "0.13.0"
 readme = "README.md"
 authors = ["Stephan Hügel <urschrei@gmail.com>"]
 keywords = ["proj", "projection", "osgeo", "geo", "geospatial"]
 license = "MIT/Apache-2.0"
 edition = "2018"
+links = "proj"
 
 [dependencies]
 
 [build-dependencies]
 bindgen = "0.52.0"
+cmake = "0.1"
 
 [features]
 nobuild = []
+bundled_proj = []
 
 [package.metadata.docs.rs]
 features = [ "nobuild" ] # This feature will be enabled during the docs.rs build
