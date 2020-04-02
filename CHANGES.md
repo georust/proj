@@ -1,4 +1,8 @@
 # Changes
+
+## 0.16.0
+* Update to geo-types v0.5.0
+
 ## 0.15.0
 * Update to proj-sys v0.13.0
 * Update to use PROJ v7.0.0
