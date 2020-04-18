@@ -1,3 +1,6 @@
+# 0.15.0
+- Add pkgconfig to macOS build script for more robust PROJ library resolution
+
 # 0.13.0
 - Add bundled Linux build option
 
