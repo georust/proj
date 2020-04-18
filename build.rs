@@ -1,8 +1,16 @@
 use bindgen;
-#[cfg(all(target_os="macos", not(feature = "bundled_proj"), not(feature = "nobuild")))]
-use pkg_config;
-#[cfg(all(not(target_os="macos"), feature = "bundled_proj", not(feature = "nobuild")))]
+#[cfg(all(
+    not(target_os = "macos"),
+    feature = "bundled_proj",
+    not(feature = "nobuild")
+))]
 use cmake;
+#[cfg(all(
+    target_os = "macos",
+    not(feature = "bundled_proj"),
+    not(feature = "nobuild")
+))]
+use pkg_config;
 use std::env;
 use std::path::PathBuf;
 
@@ -11,9 +19,12 @@ const MINIMUM_PROJ_VERSION: &str = "7.0.0";
 #[cfg(feature = "nobuild")]
 fn main() {} // Skip the build script on docs.rs
 
-
 // on macOS, we sometimes need additional search paths, which we get using pkg-config
-#[cfg(all(target_os="macos", not(feature = "nobuild"), not(feature = "bundled_proj")))]
+#[cfg(all(
+    target_os = "macos",
+    not(feature = "nobuild"),
+    not(feature = "bundled_proj")
+))]
 fn main() {
     let pk = pkg_config::Config::new()
         .atleast_version(MINIMUM_PROJ_VERSION)
@@ -48,7 +59,11 @@ fn main() {
 }
 
 // non-macOS, not using bundled PROJ
-#[cfg(all(not(target_os="macos"), not(feature = "nobuild"), not(feature = "bundled_proj")))]
+#[cfg(all(
+    not(target_os = "macos"),
+    not(feature = "nobuild"),
+    not(feature = "bundled_proj")
+))]
 fn main() {
     println!("cargo:rustc-link-lib=proj");
 
