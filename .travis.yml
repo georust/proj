@@ -1,10 +1,43 @@
 language: rust
+
 rust:
   - stable
   - beta
   - nightly
+
+os:
+  - linux
+  - osx
+
+env:
+  global:
+    - PROJ_FEATURES=""
+
+jobs:
+  include:
+    - os: linux
+      dist: xenial
+      env:
+        - PROJ_FEATURES="--features bundled_proj"
+
 before_install:
-  - sudo apt-get update
-  - wget https://github.com/OSGeo/PROJ/releases/download/7.0.0/proj-7.0.0.tar.gz
-  - tar -xzvf proj-7.0.0.tar.gz
-  - pushd proj-7.0.0 && ./configure --prefix=/usr && make && sudo make install && popd
+  - echo $TRAVIS_OS_NAME
+  - echo $PROJ_FEATURES
+  - |
+    if [ "$TRAVIS_OS_NAME" = "linux" ] && [ "$PROJ_FEATURES" = "" ]; then
+      sudo apt-get update
+      wget https://download.osgeo.org/proj/proj-7.0.0.tar.gz
+      tar -xzvf proj-7.0.0.tar.gz
+      pushd proj-7.0.0 && ./configure --prefix=/usr && make && sudo make install && popd
+    fi
+  - |
+    if [ "$TRAVIS_OS_NAME" = "osx" ]; then
+      brew update
+      brew install pkg-config
+      brew upgrade proj
+    fi
+
+script:
+  - cargo test $PROJ_FEATURES
+
+cache: cargo

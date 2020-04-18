@@ -7,13 +7,15 @@ A guide to the functions can be found here: https://proj.org/development/referen
 
 ## Requirements
 
-Sqlite3 must be present on your system.
-
 By default, this crate depends on a pre-built library, so PROJ `v7.0.x` must be present on your system. While this crate may be backwards-compatible with older PROJ 6 versions, this is neither tested or supported.
 
-## Using the Bundled PROJ
+### Linux: Using the Bundled PROJ library
 
-This crate can internally build and depend on a bundled PROJ `v7.0.0` library, by enabling the `bundled_proj` feature. This may make it easier to compile the crate, but is not yet thoroughly tested, and **currently only supports Linux**.
+This crate can internally build and depend on a bundled PROJ `v7.0.0` library, by enabling the `bundled_proj` feature. This may make it easier to compile the crate, but is not yet thoroughly tested, and **currently only supports Linux**. Note that SQLite3 must be present on your system if you wish to use this feature.
+
+### macOS
+
+The macOS build script uses `pkgconfig` to add search paths, so you must have it installed (it's available on Homebrew and Macports)
 
 ## License
 
