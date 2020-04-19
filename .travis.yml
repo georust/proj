@@ -19,7 +19,7 @@ jobs:
       dist: xenial
       env:
         - PROJ_FEATURES="--features bundled_proj"
-        - PROJ_FEATURES="--features pkg-config"
+        - PROJ_FEATURES="--features pkg_config"
     - os: osx
       env:
         - PROJ_FEATURES="--features pkg-config"

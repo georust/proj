@@ -1,12 +1,13 @@
 use bindgen;
 #[cfg(all(
     not(target_os = "macos"),
+    not(feature = "pkg_config"),
     feature = "bundled_proj",
     not(feature = "nobuild")
 ))]
 use cmake;
 #[cfg(all(
-    target_os = "macos",
+    feature = "pkg_config",
     not(feature = "bundled_proj"),
     not(feature = "nobuild")
 ))]
@@ -14,6 +15,11 @@ use pkg_config;
 use std::env;
 use std::path::PathBuf;
 
+#[cfg(all(
+    feature = "pkg_config",
+    not(feature = "bundled_proj"),
+    not(feature = "nobuild")
+))]
 const MINIMUM_PROJ_VERSION: &str = "7.0.0";
 
 #[cfg(feature = "nobuild")]
@@ -21,7 +27,7 @@ fn main() {} // Skip the build script on docs.rs
 
 // We sometimes need additional search paths, which we get using pkg-config
 #[cfg(all(
-    feature = "pkg-config",
+    feature = "pkg_config",
     not(feature = "nobuild"),
     not(feature = "bundled_proj")
 ))]
@@ -60,7 +66,7 @@ fn main() {
 
 // Vanilla
 #[cfg(all(
-    not(feature = "pkg-config"),
+    not(feature = "pkg_config"),
     not(feature = "nobuild"),
     not(feature = "bundled_proj")
 ))]
