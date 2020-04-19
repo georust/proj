@@ -32,7 +32,7 @@ before_install:
       sudo apt-get -y install pkg-config
       wget https://download.osgeo.org/proj/proj-7.0.0.tar.gz
       tar -xzvf proj-7.0.0.tar.gz
-      sed -i 's/includedir/fields\ndatarootdir=${prefix}/share/' proj-7.0.0/proj.pc.in
+      sed -i "" "s|includedir=|includedir=@includedir@\ndatarootdir=${prefix}/share/|" proj-7.0.0/proj.pc.in
       pushd proj-7.0.0 && ./configure --prefix=/usr && make && sudo make install && popd
     fi
   - |
