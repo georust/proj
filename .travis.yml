@@ -1,5 +1,7 @@
 language: rust
 
+dist: xenial
+
 rust:
   - stable
   - beta
@@ -8,21 +10,20 @@ rust:
 os:
   - linux
   - osx
-
+# by default, test vanilla setup on all three channels
 env:
   global:
     - PROJ_FEATURES=""
 
+# test both features on Linux stable, but only pkg_config on macOS stable
 jobs:
   include:
     - os: linux
-      dist: xenial
-      env:
-        - PROJ_FEATURES="--features bundled_proj"
-        - PROJ_FEATURES="--features pkg_config"
+      env: PROJ_FEATURES="--features bundled_proj"
+    - os: linux
+      env: PROJ_FEATURES="--features pkg_config"
     - os: osx
-      env:
-        - PROJ_FEATURES="--features pkg-config"
+      env: PROJ_FEATURES="--features pkg_config"
 
 before_install:
   - |
