@@ -1,3 +1,7 @@
+# 0.16.0 (unreleased)
+- Enable `pkg_config` option for Linux targets
+- `pkg_config` is now optional on macOS
+
 # 0.15.0
 - Add pkgconfig to macOS build script for more robust PROJ library resolution
 

@@ -18,9 +18,9 @@ Enable these in your `Cargo.toml` like so:
 Note that these features are **mutually exclusive**.
 
 1. `pkg_config` (Linux and macOS targets)
-    - uses [`pkgconfig`](https://en.wikipedia.org/wiki/Pkg-config) to add search paths to the build script, so you must have it installed (it's available on Homebrew, Macports, apt etc.)
+    - uses [`pkg-config`](https://en.wikipedia.org/wiki/Pkg-config) to add search paths to the build script. Requires `pkg-config` to be installed (available on Homebrew, Macports, apt etc.)
 2. `bundled_proj` (Linux targets **only**):
-    - This crate can internally build and depend on a bundled PROJ library, by enabling the `bundled_proj` feature. This may make it easier to compile the crate, but is not yet thoroughly tested. Note that SQLite3 must be present on your system if you wish to use this feature.
+    - allow the crate to internally build and depend on a bundled PROJ library. This may make it easier to compile the crate, but is not yet thoroughly tested. Note that SQLite3 must be present on your system if you wish to use this feature.
 
 ## License
 
