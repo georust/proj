@@ -19,13 +19,16 @@ jobs:
       dist: xenial
       env:
         - PROJ_FEATURES="--features bundled_proj"
+        - PROJ_FEATURES="--features pkg-config"
+    - os: osx
+      env:
+        - PROJ_FEATURES="--features pkg-config"
 
 before_install:
-  - echo $TRAVIS_OS_NAME
-  - echo $PROJ_FEATURES
   - |
-    if [ "$TRAVIS_OS_NAME" = "linux" ] && [ "$PROJ_FEATURES" = "" ]; then
+    if [ "$TRAVIS_OS_NAME" = "linux" ] && [ "$PROJ_FEATURES" != "bundled_proj" ]; then
       sudo apt-get update
+      sudo apt-get -y install pkg-config
       wget https://download.osgeo.org/proj/proj-7.0.0.tar.gz
       tar -xzvf proj-7.0.0.tar.gz
       pushd proj-7.0.0 && ./configure --prefix=/usr && make && sudo make install && popd
@@ -33,7 +36,7 @@ before_install:
   - |
     if [ "$TRAVIS_OS_NAME" = "osx" ]; then
       brew update
-      brew install pkg-config
+      brew upgrade pkg-config
       brew upgrade proj
     fi
 

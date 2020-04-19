@@ -19,6 +19,7 @@ cmake = "0.1"
 
 [features]
 nobuild = []
+pkg-config = []
 bundled_proj = []
 
 [package.metadata.docs.rs]
