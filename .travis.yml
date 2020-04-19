@@ -1,5 +1,7 @@
 language: rust
 
+dist: xenial
+
 rust:
   - stable
   - beta
@@ -8,32 +10,35 @@ rust:
 os:
   - linux
   - osx
-
+# by default, test vanilla setup on all three channels
 env:
   global:
     - PROJ_FEATURES=""
 
+# test both features on Linux stable, but only pkg_config on macOS stable
 jobs:
   include:
     - os: linux
-      dist: xenial
-      env:
-        - PROJ_FEATURES="--features bundled_proj"
+      env: PROJ_FEATURES="--features bundled_proj"
+    - os: linux
+      env: PROJ_FEATURES="--features pkg_config"
+    - os: osx
+      env: PROJ_FEATURES="--features pkg_config"
 
 before_install:
-  - echo $TRAVIS_OS_NAME
-  - echo $PROJ_FEATURES
   - |
-    if [ "$TRAVIS_OS_NAME" = "linux" ] && [ "$PROJ_FEATURES" = "" ]; then
+    if [ "$TRAVIS_OS_NAME" = "linux" ] && [ "$PROJ_FEATURES" != "bundled_proj" ]; then
       sudo apt-get update
+      sudo apt-get -y install pkg-config
       wget https://download.osgeo.org/proj/proj-7.0.0.tar.gz
       tar -xzvf proj-7.0.0.tar.gz
+      sed -i "s|includedir=|includedir=@includedir@\ndatarootdir=${prefix}/share/|" proj-7.0.0/proj.pc.in
       pushd proj-7.0.0 && ./configure --prefix=/usr && make && sudo make install && popd
     fi
   - |
     if [ "$TRAVIS_OS_NAME" = "osx" ]; then
       brew update
-      brew install pkg-config
+      brew upgrade pkg-config
       brew upgrade proj
     fi
 

@@ -1,12 +1,13 @@
 use bindgen;
 #[cfg(all(
     not(target_os = "macos"),
+    not(feature = "pkg_config"),
     feature = "bundled_proj",
     not(feature = "nobuild")
 ))]
 use cmake;
 #[cfg(all(
-    target_os = "macos",
+    feature = "pkg_config",
     not(feature = "bundled_proj"),
     not(feature = "nobuild")
 ))]
@@ -14,14 +15,19 @@ use pkg_config;
 use std::env;
 use std::path::PathBuf;
 
+#[cfg(all(
+    feature = "pkg_config",
+    not(feature = "bundled_proj"),
+    not(feature = "nobuild")
+))]
 const MINIMUM_PROJ_VERSION: &str = "7.0.0";
 
 #[cfg(feature = "nobuild")]
 fn main() {} // Skip the build script on docs.rs
 
-// on macOS, we sometimes need additional search paths, which we get using pkg-config
+// We sometimes need additional search paths, which we get using pkg-config
 #[cfg(all(
-    target_os = "macos",
+    feature = "pkg_config",
     not(feature = "nobuild"),
     not(feature = "bundled_proj")
 ))]
@@ -58,9 +64,9 @@ fn main() {
         .expect("Couldn't write bindings!");
 }
 
-// non-macOS, not using bundled PROJ
+// Vanilla
 #[cfg(all(
-    not(target_os = "macos"),
+    not(feature = "pkg_config"),
     not(feature = "nobuild"),
     not(feature = "bundled_proj")
 ))]
@@ -88,7 +94,11 @@ fn main() {
         .expect("Couldn't write bindings!");
 }
 
-#[cfg(all(not(feature = "nobuild"), feature = "bundled_proj"))]
+#[cfg(all(
+    not(feature = "pkg-config"),
+    not(feature = "nobuild"),
+    feature = "bundled_proj"
+))]
 fn main() {
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
     if &target_os != "linux" {
