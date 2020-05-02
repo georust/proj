@@ -9,12 +9,13 @@ matrix:
   include:
     - env: PROJ_FEATURES=""
     - env: PROJ_FEATURES="--features bundled_proj"
+    - env: PROJ_FEATURES="--features pkg_config"
 
 before_install:
   - sudo apt-get update
-  - wget https://download.osgeo.org/proj/proj-7.0.0.tar.gz
-  - tar -xzvf proj-7.0.0.tar.gz
-  - pushd proj-7.0.0 && ./configure --prefix=/usr && make && sudo make install && popd
+  - wget https://download.osgeo.org/proj/proj-7.0.1.tar.gz
+  - tar -xzvf proj-7.0.1.tar.gz
+  - pushd proj-7.0.1 && ./configure --prefix=/usr && make && sudo make install && popd
 
 script:
   - (cargo build --release $PROJ_FEATURES && cargo test --release $PROJ_FEATURES)
