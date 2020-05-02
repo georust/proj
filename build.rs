@@ -35,7 +35,7 @@ fn main() {
     let pk = pkg_config::Config::new()
         .atleast_version(MINIMUM_PROJ_VERSION)
         .probe("proj")
-        .expect("Your PROJ version may be too old. You need at least {:?}", MINIMUM_PROJ_VERSION);
+        .expect(&format!("Your PROJ version may be too old. You need at least version {}", MINIMUM_PROJ_VERSION));
     // Tell cargo to tell rustc to link the system proj
     // shared library.
     println!("cargo:rustc-link-search=native={:?}", pk.link_paths[0]);
