@@ -15,7 +15,7 @@ readme = "README.md"
 edition = "2018"
 
 [dependencies]
-proj-sys = "0.16.1"
+proj-sys = "0.16.2"
 geo-types ="0.5.0"
 libc = "0.2.62"
 num-traits = "0.2.8"
