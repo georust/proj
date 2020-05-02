@@ -4,7 +4,7 @@
 
 pub const PROJ_VERSION_MAJOR: u32 = 7;
 pub const PROJ_VERSION_MINOR: u32 = 0;
-pub const PROJ_VERSION_PATCH: u32 = 0;
+pub const PROJ_VERSION_PATCH: u32 = 1;
 pub const PJ_DEFAULT_CTX: u32 = 0;
 pub type wchar_t = ::std::os::raw::c_int;
 extern "C" {

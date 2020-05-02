@@ -30,10 +30,9 @@ before_install:
     if [ "$TRAVIS_OS_NAME" = "linux" ] && [ "$PROJ_FEATURES" != "bundled_proj" ]; then
       sudo apt-get update
       sudo apt-get -y install pkg-config
-      wget https://download.osgeo.org/proj/proj-7.0.0.tar.gz
-      tar -xzvf proj-7.0.0.tar.gz
-      sed -i "s|includedir=|includedir=@includedir@\ndatarootdir=${prefix}/share/|" proj-7.0.0/proj.pc.in
-      pushd proj-7.0.0 && ./configure --prefix=/usr && make && sudo make install && popd
+      wget https://download.osgeo.org/proj/proj-7.0.1.tar.gz
+      tar -xzvf proj-7.0.1.tar.gz
+      pushd proj-7.0.1 && ./configure --prefix=/usr && make && sudo make install && popd
     fi
   - |
     if [ "$TRAVIS_OS_NAME" = "osx" ]; then

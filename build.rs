@@ -20,7 +20,7 @@ use std::path::PathBuf;
     not(feature = "bundled_proj"),
     not(feature = "nobuild")
 ))]
-const MINIMUM_PROJ_VERSION: &str = "7.0.0";
+const MINIMUM_PROJ_VERSION: &str = "7.0.1";
 
 #[cfg(feature = "nobuild")]
 fn main() {} // Skip the build script on docs.rs
@@ -35,7 +35,7 @@ fn main() {
     let pk = pkg_config::Config::new()
         .atleast_version(MINIMUM_PROJ_VERSION)
         .probe("proj")
-        .unwrap();
+        .expect(&format!("Your PROJ version may be too old. You need at least version {}", MINIMUM_PROJ_VERSION));
     // Tell cargo to tell rustc to link the system proj
     // shared library.
     println!("cargo:rustc-link-search=native={:?}", pk.link_paths[0]);
