@@ -2,7 +2,7 @@
 name = "proj-sys"
 description = "Rust bindings for PROJ v7.0.x"
 repository = "https://github.com/georust/proj-sys"
-version = "0.16.1"
+version = "0.16.3"
 readme = "README.md"
 authors = ["Stephan Hügel <urschrei@gmail.com>"]
 keywords = ["proj", "projection", "osgeo", "geo", "geospatial"]
@@ -16,6 +16,8 @@ links = "proj"
 bindgen = "0.52.0"
 pkg-config = "0.3.17"
 cmake = "0.1"
+flate2 = "1.0.14"
+tar = "0.4.26"
 
 [features]
 nobuild = []
