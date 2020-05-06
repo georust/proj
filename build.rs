@@ -1,11 +1,23 @@
 use bindgen;
 #[cfg(all(
-    not(target_os = "macos"),
     not(feature = "pkg_config"),
     feature = "bundled_proj",
     not(feature = "nobuild")
 ))]
 use cmake;
+#[cfg(all(
+    not(feature = "pkg_config"),
+    feature = "bundled_proj",
+    not(feature = "nobuild")
+))]
+use flate2::read::GzDecoder;
+#[cfg(all(
+    not(feature = "pkg_config"),
+    feature = "bundled_proj",
+    not(feature = "nobuild")
+))]
+use std::fs::File;
+
 #[cfg(all(
     feature = "pkg_config",
     not(feature = "bundled_proj"),
@@ -14,6 +26,12 @@ use cmake;
 use pkg_config;
 use std::env;
 use std::path::PathBuf;
+#[cfg(all(
+    not(feature = "pkg_config"),
+    feature = "bundled_proj",
+    not(feature = "nobuild")
+))]
+use tar::Archive;
 
 #[cfg(all(
     feature = "pkg_config",
@@ -35,7 +53,10 @@ fn main() {
     let pk = pkg_config::Config::new()
         .atleast_version(MINIMUM_PROJ_VERSION)
         .probe("proj")
-        .expect(&format!("Your PROJ version may be too old. You need at least version {}", MINIMUM_PROJ_VERSION));
+        .expect(&format!(
+            "Your PROJ version may be too old. You need at least version {}",
+            MINIMUM_PROJ_VERSION
+        ));
     // Tell cargo to tell rustc to link the system proj
     // shared library.
     println!("cargo:rustc-link-search=native={:?}", pk.link_paths[0]);
@@ -103,14 +124,19 @@ fn main() {
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
     if &target_os != "linux" {
         panic!(
-            "Currently the bundled_proj feature only supports Linux. Your target platform: {}",
+            "The bundled_proj feature currently only supports Linux, but Your target platform is {}",
             target_os
         );
     }
-
-    // Build PROJ from the included submodule.
+    //
+    // Build PROJ from the included tar
     // NOTE: The PROJ build expects Sqlite3 to be present on the system.
-    let mut config = cmake::Config::new("PROJ");
+    let path = "PROJSRC/proj-7.0.1.tar.gz";
+    let tar_gz = File::open(path).expect("Couldn't open PROJ source tar");
+    let tar = GzDecoder::new(tar_gz);
+    let mut archive = Archive::new(tar);
+    archive.unpack("PROJSRC/proj").expect("Couldn't unpack tar");
+    let mut config = cmake::Config::new("PROJSRC/proj/proj-7.0.1");
     let proj = config.build();
 
     // Tell cargo to tell rustc where to look for PROJ.
