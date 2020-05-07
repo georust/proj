@@ -1,4 +1,7 @@
-# 0.16.0 (unreleased)
+# 0.16.4
+- Enabled bundled PROJ for macOS target
+
+# 0.16.0
 - Enable `pkg_config` option for Linux targets
 - `pkg_config` is now optional on macOS
 

@@ -24,6 +24,8 @@ jobs:
       env: PROJ_FEATURES="--features pkg_config"
     - os: osx
       env: PROJ_FEATURES="--features pkg_config"
+    - os: osx
+      env: PROJ_FEATURES="--features bundled_proj"
 
 before_install:
   - |
