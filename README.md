@@ -7,7 +7,7 @@ A guide to the functions can be found here: https://proj.org/development/referen
 
 ## Requirements
 
-By default, this crate depends on a pre-built library, so PROJ `v7.0.x` must be present on your system. While this crate may be backwards-compatible with older PROJ 6 versions, this is neither tested or supported.
+By default, this crate depends on a pre-built library, so `libproj` (via `PROJ v7.0.x`) must be present on your system. While this crate may be backwards-compatible with older PROJ 6 versions, this is neither tested or supported.
 
 ## Optional Features
 Enable these in your `Cargo.toml` like so:
@@ -19,7 +19,7 @@ Note that these features are **mutually exclusive**.
 
 1. `pkg_config` (Linux and macOS targets)
     - uses [`pkg-config`](https://en.wikipedia.org/wiki/Pkg-config) to add search paths to the build script. Requires `pkg-config` to be installed (available on Homebrew, Macports, apt etc.)
-2. `bundled_proj` (Linux targets **only**):
+2. `bundled_proj` (Linux and macOS targets):
     - allow the crate to internally build and depend on a bundled PROJ library. This may make it easier to compile the crate, but is not yet thoroughly tested. Note that SQLite3 must be present on your system if you wish to use this feature.
 
 ## License
