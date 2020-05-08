@@ -121,14 +121,6 @@ fn main() {
     feature = "bundled_proj"
 ))]
 fn main() {
-    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
-    if &target_os != "linux" {
-        panic!(
-            "The bundled_proj feature currently only supports Linux, but Your target platform is {}",
-            target_os
-        );
-    }
-    //
     // Build PROJ from the included tar
     // NOTE: The PROJ build expects Sqlite3 to be present on the system.
     let path = "PROJSRC/proj-7.0.1.tar.gz";
