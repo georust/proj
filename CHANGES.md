@@ -1,5 +1,8 @@
 # Changes
 
+## 0.16.2
+* Enable bundled_proj for macOS target
+
 ## 0.16.1
 * Update to proj-sys v0.16.3 (PROJ 7.0.1)
 * Re-export the bundled_proj feature introduced in proj-sys v0.15.0
