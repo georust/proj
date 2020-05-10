@@ -25,7 +25,7 @@
 //! 
 //! The `pkg_config` feature enables the use of `pkg-config` when linking against `libproj` – note that `pkg-config` must be available on your system.
 //! 
-//! The `bundled_proj` feature allows you to link against a PROJ included with (and built from source by) the `proj-sys` crate, upon which this crate is built. To do so, enable the `bundled_proj` Cargo feature. Currently this feature only supports Linux. Note that this feature requires sqlite3 to be available on your system.
+//! The `bundled_proj` feature allows you to link against a PROJ included with (and built from source by) the `proj-sys` crate, upon which this crate is built. To do so, enable the `bundled_proj` Cargo feature. Note that this feature requires sqlite3 to be available on your system.
 //!
 //! # Example
 //!
