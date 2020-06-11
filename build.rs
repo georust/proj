@@ -128,7 +128,11 @@ fn main() {
     let tar = GzDecoder::new(tar_gz);
     let mut archive = Archive::new(tar);
     archive.unpack("PROJSRC/proj").expect("Couldn't unpack tar");
-    let mut config = cmake::Config::new("PROJSRC/proj/proj-7.1.0");
+    let mut config = cmake::Config::new("PROJSRC/proj/proj-7.0.1");
+    config.define("BUILD_SHARED_LIBS", "OFF");
+    config.define("BUILD_PROJSYNC", "OFF");
+    config.define("ENABLE_CURL", "OFF");
+    config.define("ENABLE_TIFF", "OFF");
     let proj = config.build();
 
     // Tell cargo to tell rustc where to look for PROJ.
@@ -137,7 +141,16 @@ fn main() {
         proj.join("lib").display()
     );
     // Tell cargo to tell rustc to link PROJ.
-    println!("cargo:rustc-link-lib=dylib=proj");
+    println!("cargo:rustc-link-lib=static=proj");
+    // The PROJ library needs SQLite and the C++ standard library.
+    println!("cargo:rustc-link-lib=dylib=sqlite3");
+    if cfg!(target_os = "linux") {
+        println!("cargo:rustc-link-lib=dylib=stdc++");
+    } else if cfg!(target_os = "macos") {
+        println!("cargo:rustc-link-lib=dylib=c++");
+    } else {
+        println!("cargo:warning=proj-sys: Not configuring an explicit C++ standard library on this target.");
+    }
 
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     bindgen::builder()
