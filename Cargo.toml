@@ -1,11 +1,9 @@
 [package]
 name = "proj"
 description = "High-level Rust bindings for the latest stable version of PROJ"
-version = "0.19.0"
+version = "0.20.0"
 authors = [
-  "Corey Farwell <coreyf@rwell.org>",
-  "Alex Morega <alex@grep.ro>",
-  "Stephan Hügel <urschrei@gmail.com>"
+    "The Georust Developers <mods@georust.org>"
 ]
 repository = "https://github.com/georust/proj"
 documentation = "https://docs.rs/proj/"
@@ -20,6 +18,7 @@ geo-types ="0.6.0"
 libc = "0.2.62"
 num-traits = "0.2.8"
 thiserror = "1.0.4"
+reqwest = { version = "0.10.6", features = ["blocking"] }
 
 [features]
 bundled_proj = [ "proj-sys/bundled_proj" ]

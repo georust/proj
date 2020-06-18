@@ -14,6 +14,14 @@
 //! for [conversion](struct.Proj.html#method.convert_array) and [projection](struct.Proj.html#method.project_array)
 //! of slices of `Point`s are available.
 //!
+//! ## Other Features
+//!
+//! `proj` supports [network grid download](https://proj.org/usage/network.html) functionality.
+//! Modifying the download CDN endpoint is **not** currently supported. Network access is **disabled** by default, and
+//! can be activated by passing a `true` `bool` to [`Proj::new()`](struct.Proj.html#method.new) or
+//! [`Proj::new_known_crs()`](struct.Proj.html#method.new_known_crs). Network functionality status can be queried with
+//! `Proj::network_enabled`.
+//!
 //! # Requirements
 //!
 //! By default, this requires `libproj` 7.0.x to be present on your system. While this crate may be backwards-compatible with older PROJ 6 versions, this is neither tested nor supported.
@@ -39,7 +47,7 @@
 //!
 //! let from = "EPSG:2230";
 //! let to = "EPSG:26946";
-//! let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+//! let nad_ft_to_m = Proj::new_known_crs(&from, &to, None, false).unwrap();
 //! let result = nad_ft_to_m
 //!     .convert(Point::new(4760096.421921f64, 3744293.729449f64))
 //!     .unwrap();
@@ -47,6 +55,7 @@
 //! assert_approx_eq!(result.y(), 1141263.01f64, 1.0e-2);
 //! ```
 
+mod network;
 mod proj;
 
 pub use crate::proj::Area;

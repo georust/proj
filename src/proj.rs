@@ -4,12 +4,16 @@ use libc::{c_char, c_double};
 use num_traits::Float;
 use proj_sys::{
     proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_context_create,
-    proj_context_destroy, proj_context_set_search_paths, proj_create, proj_create_crs_to_crs,
-    proj_destroy, proj_errno_string, proj_info, proj_normalize_for_visualization, proj_pj_info,
-    proj_trans, proj_trans_array, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD,
-    PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LP, PJ_XY,
+    proj_context_destroy, proj_context_is_network_enabled, proj_context_set_enable_network,
+    proj_context_set_search_paths, proj_create, proj_create_crs_to_crs, proj_destroy,
+    proj_errno_string, proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization,
+    proj_pj_info, proj_trans, proj_trans_array, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD,
+    PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LP, PJ_XY,
 };
+
+use crate::network::set_network_callbacks;
 use proj_sys::{proj_errno, proj_errno_reset};
+
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::str;
@@ -35,6 +39,22 @@ pub enum ProjError {
     Utf8Error(#[from] std::str::Utf8Error),
     #[error("Couldn't convert number to f64")]
     FloatConversion,
+    #[error("Network download functionality could not be enabled")]
+    Network,
+    #[error("Could not set remote grid download callbacks")]
+    RemoteCallbacks,
+    #[error("Couldn't build request")]
+    BuilderError(#[from] reqwest::Error),
+    #[error("Couldn't clone request")]
+    RequestCloneError,
+    #[error("Could not retrieve content length")]
+    ContentLength,
+    #[error("Couldn't retrieve header for key {0}")]
+    HeaderError(String),
+    #[error("Couldn't convert header value to str")]
+    HeaderConversion(#[from] reqwest::header::ToStrError),
+    #[error("A {0} error occurred for url {1} after {2} retries")]
+    DownloadError(String, String, u8),
 }
 
 /// The bounding box of an area of use
@@ -65,7 +85,7 @@ impl Area {
 }
 
 /// Easily get a String from the external library
-fn _string(raw_ptr: *const c_char) -> Result<String, ProjError> {
+pub fn _string(raw_ptr: *const c_char) -> Result<String, ProjError> {
     let c_str = unsafe { CStr::from_ptr(raw_ptr) };
     Ok(str::from_utf8(c_str.to_bytes())?.to_string())
 }
@@ -86,11 +106,23 @@ fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
     }
 }
 
-/// A `PROJ` instance
-pub struct Proj {
-    c_proj: *mut PJconsts,
-    ctx: *mut PJ_CONTEXT,
-    area: Option<*mut PJ_AREA>,
+/// Enable or disable network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for).
+///
+/// This will configure network access for the current and all **subsequent** `Proj` instances, but will **not** affect pre-existing instances.
+/// # Safety
+/// This method contains unsafe code.
+fn enable_network(ctx: *mut PJ_CONTEXT, enable: bool) -> Result<(), ProjError> {
+    if enable {
+        let _ = match set_network_callbacks(ctx) {
+            1 => Ok(1),
+            _ => Err(ProjError::Network),
+        }?;
+    }
+    let enable = if enable { 1 } else { 0 };
+    let dctx: *mut PJ_CONTEXT = ptr::null_mut();
+    unsafe { proj_context_set_enable_network(ctx, enable) };
+    unsafe { proj_context_set_enable_network(dctx, enable) };
+    Ok(())
 }
 
 enum Transformation {
@@ -107,6 +139,13 @@ pub struct Projinfo {
     pub release: String,
     pub version: String,
     pub searchpath: String,
+}
+
+/// A `PROJ` instance
+pub struct Proj {
+    c_proj: *mut PJconsts,
+    ctx: *mut PJ_CONTEXT,
+    area: Option<*mut PJ_AREA>,
 }
 
 impl Proj {
@@ -126,12 +165,11 @@ impl Proj {
     // is signalled by the choice of enum used as input to the PJ_COORD union
     // PJ_LP signals projection of geodetic coordinates, with output being PJ_XY
     // and vice versa, or using PJ_XY for conversion operations
-    pub fn new(definition: &str) -> Option<Proj> {
+    pub fn new(definition: &str, network: bool) -> Option<Proj> {
         let c_definition = CString::new(definition.as_bytes()).ok()?;
         let ctx = unsafe { proj_context_create() };
+        enable_network(ctx, network).ok()?;
         let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
-        // check for unexpected returned object type
-        // let return_code: i32 = unsafe { proj_get_type(new_c_proj) };
         if new_c_proj.is_null() {
             None
         } else {
@@ -141,50 +179,6 @@ impl Proj {
                 area: None,
             })
         }
-    }
-
-    /// Return [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about the current PROJ context
-    ///
-    /// # Safety
-    /// This method contains unsafe code.
-    pub fn info(&self) -> Result<Projinfo, ProjError> {
-        let pinfo: PJ_INFO = unsafe { proj_info() };
-        Ok(Projinfo {
-            major: pinfo.major,
-            minor: pinfo.minor,
-            patch: pinfo.patch,
-            release: _string(pinfo.release)?,
-            version: _string(pinfo.version)?,
-            searchpath: _string(pinfo.searchpath)?,
-        })
-    }
-
-    /// Add a [resource file search path](https://proj.org/resource_files.html), maintaining existing entries.
-    ///
-    /// Changes to the search path [_should be_](https://github.com/OSGeo/PROJ/issues/2266) reflected in all existing and subsequently-created `Proj` instances
-    ///
-    /// # Safety
-    /// This method contains unsafe code.
-    pub fn set_search_paths<P: AsRef<Path>>(&self, newpath: P) -> Result<(), ProjError> {
-        let existing = self.info()?.searchpath;
-        let pathsep = if cfg!(windows) { ";" } else { ":" };
-        let mut individual: Vec<&str> = existing.split(pathsep).collect();
-        let np = Path::new(newpath.as_ref());
-        individual.push(np.to_str().ok_or(ProjError::Path)?);
-        let newlength = individual.len() as i32;
-        // convert path entries to CString
-        let paths_c = individual
-            .iter()
-            .map(|str| CString::new(*str))
-            .collect::<Result<Vec<_>, std::ffi::NulError>>()?;
-        // …then to raw pointers
-        let paths_p: Vec<_> = paths_c.iter().map(|cstr| cstr.as_ptr()).collect();
-        // …then pass the slice of raw pointers as a raw pointer (const char* const*)
-        // We pass a null pointer as the context, as we want the search path to be
-        // available to all contexts
-        let dctx: *mut PJ_CONTEXT = ptr::null_mut();
-        unsafe { proj_context_set_search_paths(dctx, newlength, paths_p.as_ptr()) }
-        Ok(())
     }
 
     /// Create a transformation object that is a pipeline between two known coordinate reference systems.
@@ -218,7 +212,7 @@ impl Proj {
     ///
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
-    /// let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+    /// let nad_ft_to_m = Proj::new_known_crs(&from, &to, None, false).unwrap();
     /// let result = nad_ft_to_m
     ///     .convert(Point::new(4760096.421921f64, 3744293.729449f64))
     ///     .unwrap();
@@ -228,10 +222,11 @@ impl Proj {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn new_known_crs(from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
+    pub fn new_known_crs(from: &str, to: &str, area: Option<Area>, network: bool) -> Option<Proj> {
         let from_c = CString::new(from.as_bytes()).ok()?;
         let to_c = CString::new(to.as_bytes()).ok()?;
         let ctx = unsafe { proj_context_create() };
+        enable_network(ctx, network).ok()?;
         let proj_area = unsafe { proj_area_create() };
         area_set_bbox(proj_area, area);
         let new_c_proj =
@@ -253,6 +248,52 @@ impl Proj {
                 area: Some(proj_area),
             })
         }
+    }
+
+    /// Return [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about the current PROJ context
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn info(&self) -> Result<Projinfo, ProjError> {
+        let pinfo: PJ_INFO = unsafe { proj_info() };
+        Ok(Projinfo {
+            major: pinfo.major,
+            minor: pinfo.minor,
+            patch: pinfo.patch,
+            release: _string(pinfo.release)?,
+            version: _string(pinfo.version)?,
+            searchpath: _string(pinfo.searchpath)?,
+        })
+    }
+
+    /// Add a [resource file search path](https://proj.org/resource_files.html), maintaining existing entries.
+    ///
+    /// Changes to the search path [_should be_](https://github.com/OSGeo/PROJ/issues/2266) reflected in this
+    /// and **all** subsequently-created `Proj` instances, but **not** in other concurrently-existing instances.
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn set_search_paths<P: AsRef<Path>>(&self, newpath: P) -> Result<(), ProjError> {
+        let existing = self.info()?.searchpath;
+        let pathsep = if cfg!(windows) { ";" } else { ":" };
+        let mut individual: Vec<&str> = existing.split(pathsep).collect();
+        let np = Path::new(newpath.as_ref());
+        individual.push(np.to_str().ok_or(ProjError::Path)?);
+        let newlength = individual.len() as i32;
+        // convert path entries to CString
+        let paths_c = individual
+            .iter()
+            .map(|str| CString::new(*str))
+            .collect::<Result<Vec<_>, std::ffi::NulError>>()?;
+        // …then to raw pointers
+        let paths_p: Vec<_> = paths_c.iter().map(|cstr| cstr.as_ptr()).collect();
+        // …then pass the slice of raw pointers as a raw pointer (const char* const*)
+        // We pass a null pointer as the context, as we want the search path to be
+        // available to all contexts
+        let dctx: *mut PJ_CONTEXT = ptr::null_mut();
+        unsafe { proj_context_set_search_paths(self.ctx, newlength, paths_p.as_ptr()) }
+        unsafe { proj_context_set_search_paths(dctx, newlength, paths_p.as_ptr()) }
+        Ok(())
     }
 
     /// Set the bounding box of the area of use
@@ -287,6 +328,36 @@ impl Proj {
         let rv = unsafe { proj_pj_info(self.c_proj) };
         _string(rv.definition)
     }
+
+    /// Check whether network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for) is currently enabled or disabled.
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn network_enabled(&self) -> bool {
+        let res = unsafe { proj_context_is_network_enabled(self.ctx) };
+        match res {
+            1 => true,
+            _ => false,
+        }
+    }
+
+    /// Enable or disable the local cache of grid chunks for this and all subsequent PROJ instances
+    ///
+    /// To avoid repeated network access, a local cache of downloaded chunks of grids is
+    /// implemented as SQLite3 database, cache.db, stored in the PROJ user writable directory.
+    /// This local caching is **enabled** by default.
+    /// The default maximum size of the cache is 300 MB, which is more than half of the total size
+    /// of grids available, at time of writing.
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn grid_cache_set_enable(&self, enable: bool) {
+        let enable = if enable { 1 } else { 0 };
+        let dctx: *mut PJ_CONTEXT = ptr::null_mut();
+        let _ = unsafe { proj_grid_cache_set_enable(self.ctx, enable) };
+        let _ = unsafe { proj_grid_cache_set_enable(dctx, enable) };
+    }
+
     /// Project geodetic coordinates (in radians) into the projection specified by `definition`
     ///
     /// **Note:** specifying `inverse` as `true` carries out an inverse projection *to* geodetic coordinates
@@ -362,7 +433,7 @@ impl Proj {
     ///
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
-    /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+    /// let ft_to_m = Proj::new_known_crs(&from, &to, None, false).unwrap();
     /// let result = ft_to_m
     ///     .convert(Point::new(4760096.421921, 3744293.729449))
     ///     .unwrap();
@@ -419,7 +490,7 @@ impl Proj {
     /// # use assert_approx_eq::assert_approx_eq;
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
-    /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+    /// let ft_to_m = Proj::new_known_crs(&from, &to, None, false).unwrap();
     /// let mut v = vec![
     ///     Point::new(4760096.421921, 3744293.729449),
     ///     Point::new(4760197.421921, 3744394.729449),
@@ -455,7 +526,7 @@ impl Proj {
     /// # use assert_approx_eq::assert_approx_eq;
     /// let stereo70 = Proj::new(
     ///     "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
-    ///     +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs",
+    ///     +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs", false
     /// )
     /// .unwrap();
     /// // Geodetic -> Pulkovo 1942(58) / Stereo70 (EPSG 3844)
@@ -568,7 +639,7 @@ mod test {
     #[test]
     fn test_definition() {
         let wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
-        let proj = Proj::new(wgs84).unwrap();
+        let proj = Proj::new(wgs84, false).unwrap();
         assert_eq!(
             proj.def().unwrap(),
             "proj=longlat datum=WGS84 no_defs ellps=WGS84 towgs84=0,0,0"
@@ -577,7 +648,7 @@ mod test {
     #[test]
     fn test_searchpath() {
         let wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
-        let proj = Proj::new(wgs84).unwrap();
+        let proj = Proj::new(wgs84, false).unwrap();
         proj.set_search_paths(&"/foo").unwrap();
         let ipath = proj.info().unwrap().searchpath;
         let pathsep = if cfg!(windows) { ";" } else { ":" };
@@ -588,7 +659,7 @@ mod test {
     fn test_from_crs() {
         let from = "EPSG:2230";
         let to = "EPSG:26946";
-        let proj = Proj::new_known_crs(&from, &to, None).unwrap();
+        let proj = Proj::new_known_crs(&from, &to, None, false).unwrap();
         let t = proj
             .convert(Point::new(4760096.421921, 3744293.729449))
             .unwrap();
@@ -596,11 +667,32 @@ mod test {
         assert_almost_eq(t.y(), 1141263.01);
     }
     #[test]
+    fn test_network() {
+        // NAD83 to NAD83(HARN) in West-Virginia. Using wvhpgn.tif
+        let from = "EPSG:4269";
+        let to = "EPSG:4152";
+
+        let from2 = "EPSG:4326";
+        let to2 = "EPSG:4326+3855";
+
+        let proj = Proj::new_known_crs(&from, &to, None, false).unwrap();
+        // off by default
+        assert_eq!(proj.network_enabled(), false);
+        // switch it on and disable cache for subsequent calls
+        proj.grid_cache_set_enable(false);
+        let proj2 = Proj::new_known_crs(&from2, &to2, None, true).unwrap();
+        assert_eq!(proj2.network_enabled(), true);
+        let t = proj2.convert(Point::new(40.0, -80.0)).unwrap();
+        assert_almost_eq(t.x(), 39.99999839);
+        assert_almost_eq(t.y(), -79.99999807);
+    }
+    #[test]
     // Carry out a projection from geodetic coordinates
     fn test_projection() {
         let stereo70 = Proj::new(
             "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
             +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs",
+            false,
         )
         .unwrap();
         // Geodetic -> Pulkovo 1942(58) / Stereo70 (EPSG 3844)
@@ -616,6 +708,7 @@ mod test {
         let stereo70 = Proj::new(
             "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
             +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs",
+            false,
         )
         .unwrap();
         // Pulkovo 1942(58) / Stereo70 (EPSG 3844) -> Geodetic
@@ -633,6 +726,7 @@ mod test {
             +proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy
             +towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 +units=m +no_defs
             ",
+            false,
         )
         .unwrap();
         // OSGB36 (EPSG 27700) -> Geodetic
@@ -654,7 +748,7 @@ mod test {
             +step +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666
             +lon_0=-116.25 +x_0=2000000 +y_0=500000
             +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs
-        ").unwrap();
+        ", false).unwrap();
         // Presidio, San Francisco
         let t = nad83_m
             .convert(Point::new(4760096.421921, 3744293.729449))
@@ -665,13 +759,14 @@ mod test {
     #[test]
     // Test that instantiation fails wth bad proj string input
     fn test_init_error() {
-        assert!(Proj::new("🦀").is_none());
+        assert!(Proj::new("🦀", false).is_none());
     }
     #[test]
     fn test_conversion_error() {
         // because step 1 isn't an inverse conversion, it's expecting lon lat input
         let nad83_m = Proj::new(
             "+proj=geos +lon_0=0.00 +lat_0=0.00 +a=6378169.00 +b=6356583.80 +h=35785831.0",
+            false,
         )
         .unwrap();
         let err = nad83_m
@@ -687,6 +782,7 @@ mod test {
     fn test_error_recovery() {
         let nad83_m = Proj::new(
             "+proj=geos +lon_0=0.00 +lat_0=0.00 +a=6378169.00 +b=6356583.80 +h=35785831.0",
+            false,
         )
         .unwrap();
 
@@ -709,7 +805,7 @@ mod test {
     fn test_array_convert() {
         let from = "EPSG:2230";
         let to = "EPSG:26946";
-        let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+        let ft_to_m = Proj::new_known_crs(&from, &to, None, false).unwrap();
         let mut v = vec![
             Point::new(4760096.421921, 3744293.729449),
             Point::new(4760197.421921, 3744394.729449),
@@ -725,7 +821,7 @@ mod test {
     fn test_input_order() {
         let from = "EPSG:4326";
         let to = "EPSG:2230";
-        let to_feet = Proj::new_known_crs(&from, &to, None).unwrap();
+        let to_feet = Proj::new_known_crs(&from, &to, None, false).unwrap();
         // 👽
         let usa_m = Point::new(-115.797615, 37.2647978);
         let usa_ft = to_feet.convert(usa_m).unwrap();

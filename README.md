@@ -1,6 +1,6 @@
 # PROJ
 
-High-level Rust bindings for the latest stable version of [PROJ](https://github.com/OSGeo/proj) (7.1.x), compatible with the [Georust](https://crates.io/geo) ecosystem.
+High-level Rust bindings for the latest stable version of [PROJ](https://github.com/OSGeo/proj) (7.1.x), compatible with the [Georust](https://crates.io/geo) ecosystem. Includes network grid download functionality.
 
 # Requirements
 
@@ -26,7 +26,7 @@ use geo_types::Point;
 
 let from = "EPSG:2230";
 let to = "EPSG:26946";
-let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+let ft_to_m = Proj::new_known_crs(&from, &to, None, false).unwrap();
 let result = ft_to_m
     .convert(Point::new(4760096.421921, 3744293.729449))
     .unwrap();
@@ -56,7 +56,7 @@ let ft_to_m = Proj::new("
     +step +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666
     +lon_0=-116.25 +x_0=2000000 +y_0=500000
     +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs
-").unwrap();
+", false).unwrap();
 // The Presidio, approximately
 let result = ft_to_m.convert(Point::new(4760096.421921, 3744293.729449)).unwrap();
 assert_eq!(result.x(), 1450880.29);
@@ -76,7 +76,7 @@ let stereo70 = Proj::new("
     +proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
     +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84
     +units=m +no_defs
-    ").unwrap();
+    ", false).unwrap();
 let rp = stereo70.project(
     Point::new(500119.70352012233, 500027.77896348457), true
 ).unwrap();
