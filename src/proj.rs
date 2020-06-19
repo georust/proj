@@ -19,12 +19,16 @@ use thiserror::Error;
 /// Errors originating in PROJ which can occur during projection and conversion
 #[derive(Error, Debug)]
 pub enum ProjError {
+    /// A projection error
     #[error("The projection failed with the following error: {0}")]
     Projection(String),
+    /// A conversion error
     #[error("The conversion failed with the following error: {0}")]
     Conversion(String),
+    /// An error that occurs when a path string originating in PROJ can't be converted to a CString
     #[error("Couldn't create a raw pointer from the string")]
     Creation(#[from] std::ffi::NulError),
+    /// An error that occurs if a user-supplied path can't be converted into a string slice
     #[error("Couldn't convert path to slice")]
     Path,
     #[error("Couldn't convert bytes from PROJ to UTF-8")]

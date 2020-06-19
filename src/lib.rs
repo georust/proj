@@ -51,3 +51,4 @@ mod proj;
 
 pub use crate::proj::Area;
 pub use crate::proj::Proj;
+pub use crate::proj::ProjError;
