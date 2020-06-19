@@ -1,5 +1,8 @@
 # Changes
 
+## 0.16.3
+* add info() and set_search_paths methods (#30)
+
 ## 0.16.2
 * Enable bundled_proj for macOS target
 
