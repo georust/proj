@@ -4,14 +4,16 @@ use libc::{c_char, c_double};
 use num_traits::Float;
 use proj_sys::{
     proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_context_create,
-    proj_context_destroy, proj_create, proj_create_crs_to_crs, proj_destroy, proj_errno_string,
-    proj_normalize_for_visualization, proj_pj_info, proj_trans, proj_trans_array, PJconsts,
-    PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_LP, PJ_XY,
+    proj_context_destroy, proj_context_set_search_paths, proj_create, proj_create_crs_to_crs,
+    proj_destroy, proj_errno_string, proj_info, proj_normalize_for_visualization, proj_pj_info,
+    proj_trans, proj_trans_array, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD,
+    PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LP, PJ_XY,
 };
 use proj_sys::{proj_errno, proj_errno_reset};
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::str;
+use std::{path::Path, ptr};
 use thiserror::Error;
 
 /// Errors originating in PROJ which can occur during projection and conversion
@@ -21,12 +23,17 @@ pub enum ProjError {
     Projection(String),
     #[error("The conversion failed with the following error: {0}")]
     Conversion(String),
+    #[error("Couldn't create a raw pointer from the string")]
+    Creation(#[from] std::ffi::NulError),
+    #[error("Couldn't convert path to slice")]
+    Path,
 }
 
 /// The bounding box of an area of use
 ///
 /// In the case of an area of use crossing the antimeridian (longitude +/- 180 degrees),
 /// `west` must be greater than `east`.
+#[derive(Copy, Clone, Debug)]
 pub struct Area {
     north: f64,
     south: f64,
@@ -78,6 +85,17 @@ pub struct Proj {
     area: Option<*mut PJ_AREA>,
 }
 
+/// [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about the current PROJ context
+#[derive(Clone, Debug)]
+pub struct Projinfo {
+    pub major: i32,
+    pub minor: i32,
+    pub patch: i32,
+    pub release: String,
+    pub version: String,
+    pub searchpath: String,
+}
+
 impl Proj {
     /// Try to instantiate a new `PROJ` instance
     ///
@@ -110,6 +128,50 @@ impl Proj {
                 area: None,
             })
         }
+    }
+
+    /// Return [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about the current PROJ context
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn info(&self) -> Projinfo {
+        let pinfo: PJ_INFO = unsafe { proj_info() };
+        Projinfo {
+            major: pinfo.major,
+            minor: pinfo.minor,
+            patch: pinfo.patch,
+            release: _string(pinfo.release),
+            version: _string(pinfo.version),
+            searchpath: _string(pinfo.searchpath),
+        }
+    }
+
+    /// Add a [resource file search path](https://proj.org/resource_files.html), maintaining existing entries.
+    ///
+    /// Changes to the search path [_should be_](https://github.com/OSGeo/PROJ/issues/2266) reflected in all existing and subsequently-created `Proj` instances
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn set_search_paths<P: AsRef<Path>>(&self, newpath: P) -> Result<(), ProjError> {
+        let existing = self.info().searchpath;
+        let pathsep = if cfg!(windows) { ";" } else { ":" };
+        let mut individual: Vec<&str> = existing.split(pathsep).collect();
+        let np = Path::new(newpath.as_ref());
+        individual.push(np.to_str().ok_or(ProjError::Path)?);
+        let newlength = individual.len() as i32;
+        // convert path entries to CString
+        let paths_c = individual
+            .iter()
+            .map(|str| CString::new(*str))
+            .collect::<Result<Vec<_>, std::ffi::NulError>>()?;
+        // …then to raw pointers
+        let paths_p: Vec<_> = paths_c.iter().map(|cstr| cstr.as_ptr()).collect();
+        // …then pass the slice of raw pointers as a raw pointer (const char* const*)
+        // We pass a null pointer as the context, as we want the search path to be
+        // available to all contexts
+        let dctx: *mut PJ_CONTEXT = ptr::null_mut();
+        unsafe { proj_context_set_search_paths(dctx, newlength, paths_p.as_ptr()) }
+        Ok(())
     }
 
     /// Create a transformation object that is a pipeline between two known coordinate reference systems.
@@ -512,6 +574,16 @@ mod test {
             proj.def(),
             "proj=longlat datum=WGS84 no_defs ellps=WGS84 towgs84=0,0,0"
         );
+    }
+    #[test]
+    fn test_searchpath() {
+        let wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
+        let proj = Proj::new(wgs84).unwrap();
+        proj.set_search_paths(&"/foo").unwrap();
+        let ipath = proj.info().searchpath;
+        let pathsep = if cfg!(windows) { ";" } else { ":" };
+        let individual: Vec<&str> = ipath.split(pathsep).collect();
+        assert_eq!(&individual.last().unwrap(), &&"/foo")
     }
     #[test]
     fn test_from_crs() {
