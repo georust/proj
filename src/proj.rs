@@ -13,8 +13,8 @@ use proj_sys::{proj_errno, proj_errno_reset};
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::str;
-use thiserror::Error;
 use std::{path::Path, ptr};
+use thiserror::Error;
 
 /// Errors originating in PROJ which can occur during projection and conversion
 #[derive(Error, Debug)]
@@ -26,7 +26,7 @@ pub enum ProjError {
     #[error("Couldn't create a raw pointer from the string")]
     Creation(#[from] std::ffi::NulError),
     #[error("Couldn't convert path to slice")]
-    Path
+    Path,
 }
 
 /// The bounding box of an area of use
@@ -147,7 +147,7 @@ impl Proj {
     }
 
     /// Add a [resource file search path](https://proj.org/resource_files.html), maintaining existing entries.
-    /// 
+    ///
     /// Changes to the search path [_should be_](https://github.com/OSGeo/PROJ/issues/2266) reflected in all existing and subsequently-created `Proj` instances
     ///
     /// # Safety
