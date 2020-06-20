@@ -19,14 +19,22 @@ use thiserror::Error;
 /// Errors originating in PROJ which can occur during projection and conversion
 #[derive(Error, Debug)]
 pub enum ProjError {
+    /// A projection error
     #[error("The projection failed with the following error: {0}")]
     Projection(String),
+    /// A conversion error
     #[error("The conversion failed with the following error: {0}")]
     Conversion(String),
+    /// An error that occurs when a path string originating in PROJ can't be converted to a CString
     #[error("Couldn't create a raw pointer from the string")]
     Creation(#[from] std::ffi::NulError),
+    /// An error that occurs if a user-supplied path can't be converted into a string slice
     #[error("Couldn't convert path to slice")]
     Path,
+    #[error("Couldn't convert bytes from PROJ to UTF-8")]
+    Utf8Error(#[from] std::str::Utf8Error),
+    #[error("Couldn't convert number to f64")]
+    FloatConversion,
 }
 
 /// The bounding box of an area of use
@@ -57,13 +65,13 @@ impl Area {
 }
 
 /// Easily get a String from the external library
-fn _string(raw_ptr: *const c_char) -> String {
+fn _string(raw_ptr: *const c_char) -> Result<String, ProjError> {
     let c_str = unsafe { CStr::from_ptr(raw_ptr) };
-    str::from_utf8(c_str.to_bytes()).unwrap().to_string()
+    Ok(str::from_utf8(c_str.to_bytes())?.to_string())
 }
 
 /// Look up an error message using the error code
-fn error_message(code: c_int) -> String {
+fn error_message(code: c_int) -> Result<String, ProjError> {
     let rv = unsafe { proj_errno_string(code) };
     _string(rv)
 }
@@ -114,7 +122,7 @@ impl Proj {
     // PJ_LP signals projection of geodetic coordinates, with output being PJ_XY
     // and vice versa, or using PJ_XY for conversion operations
     pub fn new(definition: &str) -> Option<Proj> {
-        let c_definition = CString::new(definition.as_bytes()).unwrap();
+        let c_definition = CString::new(definition.as_bytes()).ok()?;
         let ctx = unsafe { proj_context_create() };
         let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
         // check for unexpected returned object type
@@ -134,16 +142,16 @@ impl Proj {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn info(&self) -> Projinfo {
+    pub fn info(&self) -> Result<Projinfo, ProjError> {
         let pinfo: PJ_INFO = unsafe { proj_info() };
-        Projinfo {
+        Ok(Projinfo {
             major: pinfo.major,
             minor: pinfo.minor,
             patch: pinfo.patch,
-            release: _string(pinfo.release),
-            version: _string(pinfo.version),
-            searchpath: _string(pinfo.searchpath),
-        }
+            release: _string(pinfo.release)?,
+            version: _string(pinfo.version)?,
+            searchpath: _string(pinfo.searchpath)?,
+        })
     }
 
     /// Add a [resource file search path](https://proj.org/resource_files.html), maintaining existing entries.
@@ -153,7 +161,7 @@ impl Proj {
     /// # Safety
     /// This method contains unsafe code.
     pub fn set_search_paths<P: AsRef<Path>>(&self, newpath: P) -> Result<(), ProjError> {
-        let existing = self.info().searchpath;
+        let existing = self.info()?.searchpath;
         let pathsep = if cfg!(windows) { ";" } else { ":" };
         let mut individual: Vec<&str> = existing.split(pathsep).collect();
         let np = Path::new(newpath.as_ref());
@@ -216,8 +224,8 @@ impl Proj {
     /// # Safety
     /// This method contains unsafe code.
     pub fn new_known_crs(from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
-        let from_c = CString::new(from.as_bytes()).unwrap();
-        let to_c = CString::new(to.as_bytes()).unwrap();
+        let from_c = CString::new(from.as_bytes()).ok()?;
+        let to_c = CString::new(to.as_bytes()).ok()?;
         let ctx = unsafe { proj_context_create() };
         let proj_area = unsafe { proj_area_create() };
         area_set_bbox(proj_area, area);
@@ -270,7 +278,7 @@ impl Proj {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn def(&self) -> String {
+    pub fn def(&self) -> Result<String, ProjError> {
         let rv = unsafe { proj_pj_info(self.c_proj) };
         _string(rv.definition)
     }
@@ -292,8 +300,8 @@ impl Proj {
             PJ_DIRECTION_PJ_FWD
         };
         let _point: Point<U> = point.into();
-        let c_x: c_double = _point.x().to_f64().unwrap();
-        let c_y: c_double = _point.y().to_f64().unwrap();
+        let c_x: c_double = _point.x().to_f64().ok_or(ProjError::FloatConversion)?;
+        let c_y: c_double = _point.y().to_f64().ok_or(ProjError::FloatConversion)?;
         let new_x;
         let new_y;
         let err;
@@ -312,9 +320,12 @@ impl Proj {
             err = proj_errno(self.c_proj);
         }
         if err == 0 {
-            Ok(Point::new(U::from(new_x).unwrap(), U::from(new_y).unwrap()))
+            Ok(Point::new(
+                U::from(new_x).ok_or(ProjError::FloatConversion)?,
+                U::from(new_y).ok_or(ProjError::FloatConversion)?,
+            ))
         } else {
-            Err(ProjError::Projection(error_message(err)))
+            Err(ProjError::Projection(error_message(err)?))
         }
     }
 
@@ -349,24 +360,14 @@ impl Proj {
     /// extern crate geo_types;
     /// use geo_types::Point;
     ///
-    /// let nad_ft_to_m = Proj::new(
-    ///     "
-    ///     +proj=pipeline
-    ///     +step +inv +proj=lcc +lat_1=33.88333333333333
-    ///     +lat_2=32.78333333333333 +lat_0=32.16666666666666
-    ///     +lon_0=-116.25 +x_0=2000000.0001016 +y_0=500000.0001016001 +ellps=GRS80
-    ///     +towgs84=0,0,0,0,0,0,0 +units=us-ft +no_defs
-    ///     +step +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666
-    ///     +lon_0=-116.25 +x_0=2000000 +y_0=500000
-    ///     +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs
-    /// ",
-    /// )
-    /// .unwrap();
-    /// let result = nad_ft_to_m
-    ///     .convert(Point::new(4760096.421921f64, 3744293.729449f64))
+    /// let from = "EPSG:2230";
+    /// let to = "EPSG:26946";
+    /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+    /// let result = ft_to_m
+    ///     .convert(Point::new(4760096.421921, 3744293.729449))
     ///     .unwrap();
-    /// assert_approx_eq!(result.x(), 1450880.29f64, 1.0e-2);
-    /// assert_approx_eq!(result.y(), 1141263.01f64, 1.0e-2);
+    /// assert_approx_eq!(result.x() as f64, 1450880.2910605003);
+    /// assert_approx_eq!(result.y() as f64, 1141263.0111604529);
     /// ```
     ///
     /// # Safety
@@ -377,8 +378,8 @@ impl Proj {
         U: Float,
     {
         let _point: Point<U> = point.into();
-        let c_x: c_double = _point.x().to_f64().unwrap();
-        let c_y: c_double = _point.y().to_f64().unwrap();
+        let c_x: c_double = _point.x().to_f64().ok_or(ProjError::FloatConversion)?;
+        let c_y: c_double = _point.y().to_f64().ok_or(ProjError::FloatConversion)?;
         let new_x;
         let new_y;
         let err;
@@ -391,9 +392,12 @@ impl Proj {
             err = proj_errno(self.c_proj);
         }
         if err == 0 {
-            Ok(Point::new(U::from(new_x).unwrap(), U::from(new_y).unwrap()))
+            Ok(Point::new(
+                U::from(new_x).ok_or(ProjError::FloatConversion)?,
+                U::from(new_y).ok_or(ProjError::FloatConversion)?,
+            ))
         } else {
-            Err(ProjError::Conversion(error_message(err)))
+            Err(ProjError::Conversion(error_message(err)?))
         }
     }
 
@@ -442,13 +446,13 @@ impl Proj {
         let mut pj = points
             .iter()
             .map(|point| {
-                let c_x: c_double = point.x().to_f64().unwrap();
-                let c_y: c_double = point.y().to_f64().unwrap();
-                PJ_COORD {
+                let c_x: c_double = point.x().to_f64().ok_or(ProjError::FloatConversion)?;
+                let c_y: c_double = point.y().to_f64().ok_or(ProjError::FloatConversion)?;
+                Ok(PJ_COORD {
                     xy: PJ_XY { x: c_x, y: c_y },
-                }
+                })
             })
-            .collect::<Vec<_>>();
+            .collect::<Result<Vec<_>, ProjError>>()?;
         pj.shrink_to_fit();
         unsafe {
             proj_errno_reset(self.c_proj);
@@ -456,17 +460,19 @@ impl Proj {
             err = proj_errno(self.c_proj);
         }
         if err == 0 && trans == 0 {
+            // re-fill original slice with Points
+            // feels a bit clunky, but we're guaranteed that pj and points have the same length
             unsafe {
-                // re-fill original slice with Points
-                // feels a bit clunky, but we're guaranteed that pj and points have the same length
-                pj.iter().enumerate().for_each(|(i, coord)| {
-                    points[i] =
-                        Point::new(T::from(coord.xy.x).unwrap(), T::from(coord.xy.y).unwrap())
-                });
+                for (i, coord) in pj.iter().enumerate() {
+                    points[i] = Point::new(
+                        T::from(coord.xy.x).ok_or(ProjError::FloatConversion)?,
+                        T::from(coord.xy.y).ok_or(ProjError::FloatConversion)?,
+                    )
+                }
                 Ok(points)
             }
         } else {
-            Err(ProjError::Projection(error_message(err)))
+            Err(ProjError::Projection(error_message(err)?))
         }
     }
 
@@ -515,13 +521,13 @@ impl Proj {
         let mut pj = points
             .iter()
             .map(|point| {
-                let c_x: c_double = point.x().to_f64().unwrap();
-                let c_y: c_double = point.y().to_f64().unwrap();
-                PJ_COORD {
+                let c_x: c_double = point.x().to_f64().ok_or(ProjError::FloatConversion)?;
+                let c_y: c_double = point.y().to_f64().ok_or(ProjError::FloatConversion)?;
+                Ok(PJ_COORD {
                     xy: PJ_XY { x: c_x, y: c_y },
-                }
+                })
             })
-            .collect::<Vec<_>>();
+            .collect::<Result<Vec<_>, ProjError>>()?;
         pj.shrink_to_fit();
         unsafe {
             proj_errno_reset(self.c_proj);
@@ -529,17 +535,19 @@ impl Proj {
             err = proj_errno(self.c_proj);
         }
         if err == 0 && trans == 0 {
+            // re-fill original slice with Points
+            // feels a bit clunky, but we're guaranteed that pj and points have the same length
             unsafe {
-                // re-fill original slice with Points
-                // feels a bit clunky, but we're guaranteed that pj and points have the same length
-                pj.iter().enumerate().for_each(|(i, coord)| {
-                    points[i] =
-                        Point::new(T::from(coord.xy.x).unwrap(), T::from(coord.xy.y).unwrap())
-                });
+                for (i, coord) in pj.iter().enumerate() {
+                    points[i] = Point::new(
+                        T::from(coord.xy.x).ok_or(ProjError::FloatConversion)?,
+                        T::from(coord.xy.y).ok_or(ProjError::FloatConversion)?,
+                    )
+                }
                 Ok(points)
             }
         } else {
-            Err(ProjError::Projection(error_message(err)))
+            Err(ProjError::Projection(error_message(err)?))
         }
     }
 }
@@ -571,7 +579,7 @@ mod test {
         let wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
         let proj = Proj::new(wgs84).unwrap();
         assert_eq!(
-            proj.def(),
+            proj.def().unwrap(),
             "proj=longlat datum=WGS84 no_defs ellps=WGS84 towgs84=0,0,0"
         );
     }
@@ -580,7 +588,7 @@ mod test {
         let wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
         let proj = Proj::new(wgs84).unwrap();
         proj.set_search_paths(&"/foo").unwrap();
-        let ipath = proj.info().searchpath;
+        let ipath = proj.info().unwrap().searchpath;
         let pathsep = if cfg!(windows) { ";" } else { ":" };
         let individual: Vec<&str> = ipath.split(pathsep).collect();
         assert_eq!(&individual.last().unwrap(), &&"/foo")

@@ -1,5 +1,9 @@
 # Changes
 
+## 0.17.0
+* More extensive error-handling
+* Error enum is now public
+
 ## 0.16.3
 * add info() and set_search_paths methods (#30)
 
