@@ -1,5 +1,10 @@
 # Changes
 
+## 0.17.1
+* Fix docs
+* Make Projinfo struct public
+* Generalise array ops
+
 ## 0.17.0
 * More extensive error-handling
 * Error enum is now public
