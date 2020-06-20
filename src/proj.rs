@@ -346,11 +346,6 @@ impl Proj {
     /// to Longitude, Latitude / Easting, Northing.
     ///
     /// The following example converts from NAD83 US Survey Feet (EPSG 2230) to NAD83 Metres (EPSG 26946)
-    /// Note the steps:
-    ///
-    /// - define the operation as a `pipeline` operation
-    /// - define `step` 1 as an `inv`erse transform, yielding geodetic coordinates
-    /// - define `step` 2 as a forward transform to projected coordinates, yielding metres.
     ///
     /// ```rust
     /// # use assert_approx_eq::assert_approx_eq;
