@@ -93,6 +93,11 @@ pub struct Proj {
     area: Option<*mut PJ_AREA>,
 }
 
+enum Transformation {
+    Projection,
+    Conversion,
+}
+
 /// [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about the current PROJ context
 #[derive(Clone, Debug)]
 pub struct Projinfo {
@@ -435,40 +440,7 @@ impl Proj {
     where
         T: Float,
     {
-        let err;
-        let trans;
-        // we need PJ_COORD to convert
-        let mut pj = points
-            .iter()
-            .map(|point| {
-                let c_x: c_double = point.x().to_f64().ok_or(ProjError::FloatConversion)?;
-                let c_y: c_double = point.y().to_f64().ok_or(ProjError::FloatConversion)?;
-                Ok(PJ_COORD {
-                    xy: PJ_XY { x: c_x, y: c_y },
-                })
-            })
-            .collect::<Result<Vec<_>, ProjError>>()?;
-        pj.shrink_to_fit();
-        unsafe {
-            proj_errno_reset(self.c_proj);
-            trans = proj_trans_array(self.c_proj, PJ_DIRECTION_PJ_FWD, pj.len(), pj.as_mut_ptr());
-            err = proj_errno(self.c_proj);
-        }
-        if err == 0 && trans == 0 {
-            // re-fill original slice with Points
-            // feels a bit clunky, but we're guaranteed that pj and points have the same length
-            unsafe {
-                for (i, coord) in pj.iter().enumerate() {
-                    points[i] = Point::new(
-                        T::from(coord.xy.x).ok_or(ProjError::FloatConversion)?,
-                        T::from(coord.xy.y).ok_or(ProjError::FloatConversion)?,
-                    )
-                }
-                Ok(points)
-            }
-        } else {
-            Err(ProjError::Projection(error_message(err)?))
-        }
+        self.array_general(points, Transformation::Conversion, false)
     }
 
     /// Project an array of geodetic coordinates (in radians) into the projection specified by `definition`
@@ -505,6 +477,21 @@ impl Proj {
     where
         T: Float,
     {
+        self.array_general(points, Transformation::Projection, inverse)
+    }
+
+    // array conversion and projection logic is almost identical;
+    // transform points in input array into PJ_COORD, transform them, error-check, then re-fill
+    // input slice with points. Only the actual transformation ops vary slightly.
+    fn array_general<'a, T>(
+        &self,
+        points: &'a mut [Point<T>],
+        op: Transformation,
+        inverse: bool,
+    ) -> Result<&'a mut [Point<T>], ProjError>
+    where
+        T: Float,
+    {
         let err;
         let trans;
         let inv = if inverse {
@@ -524,10 +511,19 @@ impl Proj {
             })
             .collect::<Result<Vec<_>, ProjError>>()?;
         pj.shrink_to_fit();
-        unsafe {
-            proj_errno_reset(self.c_proj);
-            trans = proj_trans_array(self.c_proj, inv, pj.len(), pj.as_mut_ptr());
-            err = proj_errno(self.c_proj);
+        // Transformation operations are slightly different
+        match op {
+            Transformation::Conversion => unsafe {
+                proj_errno_reset(self.c_proj);
+                trans =
+                    proj_trans_array(self.c_proj, PJ_DIRECTION_PJ_FWD, pj.len(), pj.as_mut_ptr());
+                err = proj_errno(self.c_proj);
+            },
+            Transformation::Projection => unsafe {
+                proj_errno_reset(self.c_proj);
+                trans = proj_trans_array(self.c_proj, inv, pj.len(), pj.as_mut_ptr());
+                err = proj_errno(self.c_proj);
+            },
         }
         if err == 0 && trans == 0 {
             // re-fill original slice with Points
@@ -539,8 +535,8 @@ impl Proj {
                         T::from(coord.xy.y).ok_or(ProjError::FloatConversion)?,
                     )
                 }
-                Ok(points)
             }
+            Ok(points)
         } else {
             Err(ProjError::Projection(error_message(err)?))
         }
