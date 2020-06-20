@@ -30,8 +30,8 @@ let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
 let result = ft_to_m
     .convert(Point::new(4760096.421921, 3744293.729449))
     .unwrap();
-assert_almost_eq(result.x(), 1450880.29);
-assert_almost_eq(result.y(), 1141263.01);
+assert_approx_eq!(result.x() as f64, 1450880.2910605003);
+assert_approx_eq!(result.y() as f64, 1141263.0111604529);
 ```
 
 Note that as of v5.0.0, PROJ uses the [`pipeline`](https://proj.org/operations/pipeline.html) operator, which allows an arbitrary number of steps in a conversion. The example below works as follows:

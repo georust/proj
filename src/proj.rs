@@ -360,24 +360,14 @@ impl Proj {
     /// extern crate geo_types;
     /// use geo_types::Point;
     ///
-    /// let nad_ft_to_m = Proj::new(
-    ///     "
-    ///     +proj=pipeline
-    ///     +step +inv +proj=lcc +lat_1=33.88333333333333
-    ///     +lat_2=32.78333333333333 +lat_0=32.16666666666666
-    ///     +lon_0=-116.25 +x_0=2000000.0001016 +y_0=500000.0001016001 +ellps=GRS80
-    ///     +towgs84=0,0,0,0,0,0,0 +units=us-ft +no_defs
-    ///     +step +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666
-    ///     +lon_0=-116.25 +x_0=2000000 +y_0=500000
-    ///     +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs
-    /// ",
-    /// )
-    /// .unwrap();
-    /// let result = nad_ft_to_m
-    ///     .convert(Point::new(4760096.421921f64, 3744293.729449f64))
+    /// let from = "EPSG:2230";
+    /// let to = "EPSG:26946";
+    /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+    /// let result = ft_to_m
+    ///     .convert(Point::new(4760096.421921, 3744293.729449))
     ///     .unwrap();
-    /// assert_approx_eq!(result.x(), 1450880.29f64, 1.0e-2);
-    /// assert_approx_eq!(result.y(), 1141263.01f64, 1.0e-2);
+    /// assert_approx_eq!(result.x() as f64, 1450880.2910605003);
+    /// assert_approx_eq!(result.y() as f64, 1141263.0111604529);
     /// ```
     ///
     /// # Safety
