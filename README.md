@@ -4,7 +4,7 @@ High-level Rust bindings for the latest stable version of [PROJ](https://github.
 
 # Requirements
 
-By default, this crate depends on a pre-built library, so PROJ v7.0.x must be present on your system. While this crate may be backwards-compatible with older PROJ 6 versions, this is neither tested nor supported.
+By default, this crate depends on a pre-built `libproj`, so PROJ v7.0.x must be present on your system. While this crate may be backwards-compatible with older PROJ 6 versions, this is neither tested nor supported.
 
 Two features are available:
 
@@ -13,7 +13,7 @@ Two features are available:
 
 The `pkg_config` feature enables the use of `pkg-config` when linking against `libproj` – note that `pkg-config` must be available on your system.
 
-The `bundled_proj` feature allows you to link against a PROJ included with (and built from source by) the `proj-sys` crate, upon which this crate is built. To do so, enable the `bundled_proj` Cargo feature. This feature requires sqlite3 to be present on your system.
+The `bundled_proj` feature allows you to link against a `libproj` included with (and built from source by) the `proj-sys` crate, upon which this crate is built. To do so, enable the `bundled_proj` Cargo feature. This feature requires sqlite3 to be present on your system.
 
 # Examples
 
