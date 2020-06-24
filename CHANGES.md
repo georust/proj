@@ -1,5 +1,18 @@
 # Changes
 
+<<<<<<< Updated upstream
+||||||| merged common ancestors
+## 0.17.2
+* add network control functionality
+
+=======
+## 0.18.0
+* Bump geo-types
+
+## 0.17.2
+* add network control functionality
+
+>>>>>>> Stashed changes
 ## 0.17.1
 * Fix docs
 * Make Projinfo struct public
