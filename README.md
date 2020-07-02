@@ -1,19 +1,19 @@
 [![Build Status](https://travis-ci.org/georust/proj-sys.svg?branch=master)](https://travis-ci.org/georust/proj-sys)
 
-# Low-level bindings for PROJ v7.0.x
+# Low-level bindings for PROJ v7.1.x
 **This is a [`*-sys`](https://doc.rust-lang.org/cargo/reference/build-scripts.html#a-sys-packages) crate; you shouldn't use its API directly.** The [`proj`](https://github.com/georust/proj) crate is designed for general use.
 
 A guide to the functions can be found here: https://proj.org/development/reference/functions.html. Run `cargo doc (optionally --open)` to generate the crate documentation.
 
 ## Requirements
 
-By default, this crate depends on a pre-built library, so `libproj` (via `PROJ v7.0.x`) must be present on your system. While this crate may be backwards-compatible with older PROJ 6 versions, this is neither tested or supported.
+By default, this crate depends on a pre-built library, so `libproj` (via `PROJ v7.1.x`) must be present on your system. While this crate may be backwards-compatible with older PROJ 7 and PROJ 6 versions, this is neither tested or supported.
 
 ## Optional Features
 Enable these in your `Cargo.toml` like so:
 
-`proj-sys = { version = "0.16", features = ["pkg_config"] }`  
-`proj-sys = { version = "0.16", features = ["bundled_proj"] }`  
+`proj-sys = { version = "0.17", features = ["pkg_config"] }`  
+`proj-sys = { version = "0.17", features = ["bundled_proj"] }`  
 
 Note that these features are **mutually exclusive**.
 

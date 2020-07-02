@@ -38,7 +38,7 @@ use tar::Archive;
     not(feature = "bundled_proj"),
     not(feature = "nobuild")
 ))]
-const MINIMUM_PROJ_VERSION: &str = "7.0.1";
+const MINIMUM_PROJ_VERSION: &str = "7.1.0";
 
 #[cfg(feature = "nobuild")]
 fn main() {} // Skip the build script on docs.rs
@@ -123,12 +123,12 @@ fn main() {
 fn main() {
     // Build PROJ from the included tar
     // NOTE: The PROJ build expects Sqlite3 to be present on the system.
-    let path = "PROJSRC/proj-7.0.1.tar.gz";
+    let path = "PROJSRC/proj-7.1.0.tar.gz";
     let tar_gz = File::open(path).expect("Couldn't open PROJ source tar");
     let tar = GzDecoder::new(tar_gz);
     let mut archive = Archive::new(tar);
     archive.unpack("PROJSRC/proj").expect("Couldn't unpack tar");
-    let mut config = cmake::Config::new("PROJSRC/proj/proj-7.0.1");
+    let mut config = cmake::Config::new("PROJSRC/proj/proj-7.1.0");
     let proj = config.build();
 
     // Tell cargo to tell rustc where to look for PROJ.
