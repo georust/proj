@@ -1,15 +1,15 @@
 # PROJ
 
-High-level Rust bindings for the latest stable version of [PROJ](https://github.com/OSGeo/proj) (7.0.x), compatible with the [Georust](https://crates.io/geo) ecosystem.
+High-level Rust bindings for the latest stable version of [PROJ](https://github.com/OSGeo/proj) (7.1.x), compatible with the [Georust](https://crates.io/geo) ecosystem.
 
 # Requirements
 
-By default, this crate depends on a pre-built `libproj`, so PROJ v7.0.x must be present on your system. While this crate may be backwards-compatible with older PROJ 6 versions, this is neither tested nor supported.
+By default, this crate depends on a pre-built `libproj`, so PROJ v7.1.x must be present on your system. While this crate may be backwards-compatible with older PROJ 7 and PROJ 6 versions, this is neither tested nor supported.
 
 Two features are available:
 
-`proj = { version = "0.16.1", features = ["pkg_config"] }`  
-`proj = = { version = "0.16.1", features = ["bundled_proj"] }`  
+`proj = { version = "0.19.0", features = ["pkg_config"] }`  
+`proj = = { version = "0.19.0", features = ["bundled_proj"] }`  
 
 The `pkg_config` feature enables the use of `pkg-config` when linking against `libproj` – note that `pkg-config` must be available on your system.
 
