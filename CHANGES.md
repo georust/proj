@@ -1,3 +1,6 @@
+# 0.17.0
+- Update to PROJ 7.1.0
+
 # 0.16.4
 - Enabled bundled PROJ for macOS target
 
