@@ -4,6 +4,7 @@
 ///
 /// **Note**: `error_string_max_size` is set to 128 by libproj.
 // TODO: build some length checks for the errors that are stuffed into it
+// This functionality based on https://github.com/OSGeo/PROJ/blob/master/src/networkfilemanager.cpp#L1675
 use proj_sys::{proj_context_set_network_callbacks, PJ_CONTEXT, PROJ_NETWORK_HANDLE};
 
 use reqwest::blocking::Client;
@@ -174,7 +175,6 @@ fn _network_open(
     let void: *mut c_void = Box::into_raw(hd_boxed) as *mut c_void;
     let opaque: *mut PROJ_NETWORK_HANDLE = void as *mut PROJ_NETWORK_HANDLE;
     // If everything's OK, set the error string to empty
-    // TODO are you sure there's no internal nul tho
     let err_string = "";
     unsafe {
         out_error_string.copy_from_nonoverlapping(err_string.as_ptr().cast(), err_string.len());
@@ -275,8 +275,9 @@ pub(crate) unsafe extern "C" fn network_read_range(
     ) {
         Ok(res) => res,
         Err(e) => {
-            // I assume that if 0 is returned, whatever error is in out_error_string is displayed by libproj
-            let err_string = e.to_string();
+            // The assumption here is that if 0 is returned, whatever error is in out_error_string is displayed by libproj
+            // since this isn't a conversion using CString, nul chars must be manually stripped
+            let err_string = e.to_string().replace("0", "nought");
             out_error_string.copy_from_nonoverlapping(err_string.as_ptr().cast(), err_string.len());
             out_error_string.add(err_string.len()).write(0);
             0usize
@@ -335,7 +336,6 @@ fn _network_read_range(
             .copy_to_nonoverlapping(buffer as *mut u8, bufferlength.min(size_to_read));
     }
     let err_string = "";
-    // TODO are you sure there's no internal nul tho
     unsafe {
         out_error_string.copy_from_nonoverlapping(err_string.as_ptr().cast(), err_string.len());
         out_error_string.add(err_string.len()).write(0);
