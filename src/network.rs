@@ -21,6 +21,7 @@ use std::{thread, time};
 
 const CLIENT: &str = concat!("proj-rs/", env!("CARGO_PKG_VERSION"));
 const MAX_RETRIES: u8 = 8;
+const REDIRECT_CODES: [u16; 5] = [301, 302, 303, 307, 308];
 
 /// This struct is cast to `c_void`, then to `PROJ_NETWORK_HANDLE` so it can be passed around
 #[no_mangle]
@@ -116,14 +117,12 @@ fn _network_open(
 ) -> Result<*mut PROJ_NETWORK_HANDLE, ProjError> {
     let mut retries = 0;
     let mut url = _string(url)?;
-    // if there's an offset value, read from offset to (offset + length) - 1
     // - 1 is used because the HTTP convention is to use inclusive start and end offsets
     let end = offset as usize + size_to_read - 1;
     // RANGE header definition is "bytes=x-y"
     let hvalue = format!("bytes={}-{}", offset, end);
     // Create a new client that can be reused for subsequent queries
     let clt = Client::builder().build()?;
-    // Store req into the handle so new ranges can be queried
     let req = clt.request(Method::GET, &url);
     // this performs the initial byte read, presumably as an error check
     let initial = req.try_clone().ok_or(ProjError::RequestCloneError)?;
@@ -137,7 +136,7 @@ fn _network_open(
         thread::sleep(wait);
         let mut retry = req.try_clone().ok_or(ProjError::RequestCloneError)?;
         // If it's 3xx, try to get the location header and set it as the new URL
-        if status >= 300 && status < 400 {
+        if status < 400 && REDIRECT_CODES.contains(&status) {
             url = res
                 .headers()
                 .get("location")
@@ -151,7 +150,7 @@ fn _network_open(
         status = res.status().as_u16();
     }
     // Retries are exhausted to no avail, so give up with an error
-    if status >= 400 {
+    if status >= 300 {
         return Err(ProjError::DownloadError(
             res.status().as_str().to_string(),
             url,
@@ -168,6 +167,7 @@ fn _network_open(
             .as_ptr()
             .copy_to_nonoverlapping(buffer as *mut u8, contentlength.min(size_to_read))
     };
+    // Store req into the handle so new ranges can be queried
     let hd = HandleData::new(req, headers, None);
     // heap-allocate the struct and cast it to a void pointer so it can be passed around to PROJ
     let hd_boxed = Box::new(hd);
@@ -295,7 +295,6 @@ fn _network_read_range(
     out_error_string: *mut c_char,
     _: *mut c_void,
 ) -> Result<usize, ProjError> {
-    // if there's an offset value, read from offset to (offset + length) - 1
     // - 1 is used because the HTTP convention is to use inclusive start and end offsets
     let end = offset as usize + size_to_read - 1;
     let mut retries = 0;
@@ -342,19 +341,11 @@ fn _network_read_range(
     Ok(contentlength)
 }
 
-/// Set up and initialise the grid download callback functions for this and all subsequent PROJ contexts
-pub(crate) fn set_network_callbacks(ctx: *mut PJ_CONTEXT) -> i32 {
+/// Set up and initialise the grid download callback functions for all subsequent PROJ contexts
+pub(crate) fn set_network_callbacks() -> i32 {
     let ud: *mut c_void = ptr::null_mut();
     let dctx: *mut PJ_CONTEXT = ptr::null_mut();
     unsafe {
-        proj_context_set_network_callbacks(
-            ctx,
-            Some(network_open),
-            Some(network_close),
-            Some(network_get_header_value),
-            Some(network_read_range),
-            ud,
-        );
         proj_context_set_network_callbacks(
             dctx,
             Some(network_open),

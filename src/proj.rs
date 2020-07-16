@@ -3,12 +3,13 @@ use libc::c_int;
 use libc::{c_char, c_double};
 use num_traits::Float;
 use proj_sys::{
-    proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_context_create,
-    proj_context_destroy, proj_context_is_network_enabled, proj_context_set_enable_network,
-    proj_context_set_search_paths, proj_create, proj_create_crs_to_crs, proj_destroy,
-    proj_errno_string, proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization,
-    proj_pj_info, proj_trans, proj_trans_array, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD,
-    PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LP, PJ_XY,
+    proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_cleanup, proj_context_create,
+    proj_context_destroy, proj_context_get_url_endpoint, proj_context_is_network_enabled,
+    proj_context_set_enable_network, proj_context_set_search_paths, proj_context_set_url_endpoint,
+    proj_create, proj_create_crs_to_crs, proj_destroy, proj_errno_string,
+    proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization, proj_pj_info,
+    proj_trans, proj_trans_array, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD,
+    PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LP, PJ_XY,
 };
 
 use crate::network::set_network_callbacks;
@@ -108,20 +109,68 @@ fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
 
 /// Enable or disable network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for).
 ///
-/// This will configure network access for the current and all **subsequent** `Proj` instances, but will **not** affect pre-existing instances.
+/// This will configure network access for all **subsequent** `Proj` instances, but will **not** affect pre-existing instances.
 /// # Safety
 /// This method contains unsafe code.
-fn enable_network(ctx: *mut PJ_CONTEXT, enable: bool) -> Result<(), ProjError> {
+pub fn enable_network(enable: bool) -> Result<(), ProjError> {
     if enable {
-        let _ = match set_network_callbacks(ctx) {
+        let _ = match set_network_callbacks() {
             1 => Ok(1),
             _ => Err(ProjError::Network),
         }?;
     }
     let enable = if enable { 1 } else { 0 };
     let dctx: *mut PJ_CONTEXT = ptr::null_mut();
-    unsafe { proj_context_set_enable_network(ctx, enable) };
     unsafe { proj_context_set_enable_network(dctx, enable) };
+    Ok(())
+}
+
+/// Check whether network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for) is currently enabled or disabled.
+///
+/// # Safety
+/// This method contains unsafe code.
+pub fn network_enabled() -> bool {
+    let dctx: *mut PJ_CONTEXT = ptr::null_mut();
+    let res = unsafe { proj_context_is_network_enabled(dctx) };
+    match res {
+        1 => true,
+        _ => false,
+    }
+}
+
+/// Enable or disable the local cache of grid chunks for all subsequent PROJ instances
+///
+/// To avoid repeated network access, a local cache of downloaded chunks of grids is
+/// implemented as SQLite3 database, cache.db, stored in the PROJ user writable directory.
+/// This local caching is **enabled** by default.
+/// The default maximum size of the cache is 300 MB, which is more than half of the total size
+/// of grids available, at time of writing.
+///
+/// # Safety
+/// This method contains unsafe code.
+pub fn grid_cache_set_enable(enable: bool) {
+    let enable = if enable { 1 } else { 0 };
+    let dctx: *mut PJ_CONTEXT = ptr::null_mut();
+    let _ = unsafe { proj_grid_cache_set_enable(dctx, enable) };
+}
+
+/// Get the URL endpoint to query for remote grids
+///
+/// # Safety
+/// This method contains unsafe code.
+pub fn get_url_endpoint() -> Result<String, ProjError> {
+    let dctx: *mut PJ_CONTEXT = ptr::null_mut();
+    unsafe { _string(proj_context_get_url_endpoint(dctx)) }
+}
+
+/// Set the URL endpoint to query for remote grids for all subsequent PROJ instances
+///
+/// # Safety
+/// This method contains unsafe code.
+pub fn set_url_endpoint(endpoint: &str) -> Result<(), ProjError> {
+    let s = CString::new(endpoint)?;
+    let dctx: *mut PJ_CONTEXT = ptr::null_mut();
+    unsafe { proj_context_set_url_endpoint(dctx, s.as_ptr()) };
     Ok(())
 }
 
@@ -165,10 +214,9 @@ impl Proj {
     // is signalled by the choice of enum used as input to the PJ_COORD union
     // PJ_LP signals projection of geodetic coordinates, with output being PJ_XY
     // and vice versa, or using PJ_XY for conversion operations
-    pub fn new(definition: &str, network: bool) -> Option<Proj> {
-        let c_definition = CString::new(definition.as_bytes()).ok()?;
+    pub fn new(definition: &str) -> Option<Proj> {
+        let c_definition = CString::new(definition).ok()?;
         let ctx = unsafe { proj_context_create() };
-        enable_network(ctx, network).ok()?;
         let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
         if new_c_proj.is_null() {
             None
@@ -212,7 +260,7 @@ impl Proj {
     ///
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
-    /// let nad_ft_to_m = Proj::new_known_crs(&from, &to, None, false).unwrap();
+    /// let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
     /// let result = nad_ft_to_m
     ///     .convert(Point::new(4760096.421921f64, 3744293.729449f64))
     ///     .unwrap();
@@ -222,11 +270,10 @@ impl Proj {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn new_known_crs(from: &str, to: &str, area: Option<Area>, network: bool) -> Option<Proj> {
-        let from_c = CString::new(from.as_bytes()).ok()?;
-        let to_c = CString::new(to.as_bytes()).ok()?;
+    pub fn new_known_crs(from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
+        let from_c = CString::new(from).ok()?;
+        let to_c = CString::new(to).ok()?;
         let ctx = unsafe { proj_context_create() };
-        enable_network(ctx, network).ok()?;
         let proj_area = unsafe { proj_area_create() };
         area_set_bbox(proj_area, area);
         let new_c_proj =
@@ -329,35 +376,6 @@ impl Proj {
         _string(rv.definition)
     }
 
-    /// Check whether network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for) is currently enabled or disabled.
-    ///
-    /// # Safety
-    /// This method contains unsafe code.
-    pub fn network_enabled(&self) -> bool {
-        let res = unsafe { proj_context_is_network_enabled(self.ctx) };
-        match res {
-            1 => true,
-            _ => false,
-        }
-    }
-
-    /// Enable or disable the local cache of grid chunks for this and all subsequent PROJ instances
-    ///
-    /// To avoid repeated network access, a local cache of downloaded chunks of grids is
-    /// implemented as SQLite3 database, cache.db, stored in the PROJ user writable directory.
-    /// This local caching is **enabled** by default.
-    /// The default maximum size of the cache is 300 MB, which is more than half of the total size
-    /// of grids available, at time of writing.
-    ///
-    /// # Safety
-    /// This method contains unsafe code.
-    pub fn grid_cache_set_enable(&self, enable: bool) {
-        let enable = if enable { 1 } else { 0 };
-        let dctx: *mut PJ_CONTEXT = ptr::null_mut();
-        let _ = unsafe { proj_grid_cache_set_enable(self.ctx, enable) };
-        let _ = unsafe { proj_grid_cache_set_enable(dctx, enable) };
-    }
-
     /// Project geodetic coordinates (in radians) into the projection specified by `definition`
     ///
     /// **Note:** specifying `inverse` as `true` carries out an inverse projection *to* geodetic coordinates
@@ -433,7 +451,7 @@ impl Proj {
     ///
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
-    /// let ft_to_m = Proj::new_known_crs(&from, &to, None, false).unwrap();
+    /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
     /// let result = ft_to_m
     ///     .convert(Point::new(4760096.421921, 3744293.729449))
     ///     .unwrap();
@@ -490,7 +508,7 @@ impl Proj {
     /// # use assert_approx_eq::assert_approx_eq;
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
-    /// let ft_to_m = Proj::new_known_crs(&from, &to, None, false).unwrap();
+    /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
     /// let mut v = vec![
     ///     Point::new(4760096.421921, 3744293.729449),
     ///     Point::new(4760197.421921, 3744394.729449),
@@ -526,7 +544,7 @@ impl Proj {
     /// # use assert_approx_eq::assert_approx_eq;
     /// let stereo70 = Proj::new(
     ///     "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
-    ///     +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs", false
+    ///     +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs"
     /// )
     /// .unwrap();
     /// // Geodetic -> Pulkovo 1942(58) / Stereo70 (EPSG 3844)
@@ -617,18 +635,21 @@ impl Proj {
 impl Drop for Proj {
     fn drop(&mut self) {
         unsafe {
-            proj_destroy(self.c_proj);
-            proj_context_destroy(self.ctx);
             if let Some(area) = self.area {
                 proj_area_destroy(area)
             }
+            proj_destroy(self.c_proj);
+            proj_context_destroy(self.ctx);
+            // NB do NOT call until proj_destroy and proj_context_destroy have both returned:
+            // https://proj.org/development/reference/functions.html#c.proj_cleanup
+            proj_cleanup()
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::Proj;
+    use super::*;
     use geo_types::Point;
 
     fn assert_almost_eq(a: f64, b: f64) {
@@ -639,7 +660,7 @@ mod test {
     #[test]
     fn test_definition() {
         let wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
-        let proj = Proj::new(wgs84, false).unwrap();
+        let proj = Proj::new(wgs84).unwrap();
         assert_eq!(
             proj.def().unwrap(),
             "proj=longlat datum=WGS84 no_defs ellps=WGS84 towgs84=0,0,0"
@@ -648,7 +669,7 @@ mod test {
     #[test]
     fn test_searchpath() {
         let wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
-        let proj = Proj::new(wgs84, false).unwrap();
+        let proj = Proj::new(wgs84).unwrap();
         proj.set_search_paths(&"/foo").unwrap();
         let ipath = proj.info().unwrap().searchpath;
         let pathsep = if cfg!(windows) { ";" } else { ":" };
@@ -656,43 +677,45 @@ mod test {
         assert_eq!(&individual.last().unwrap(), &&"/foo")
     }
     #[test]
+    fn test_endpoint() {
+        let ep = get_url_endpoint().unwrap();
+        assert_eq!(&ep, "https://cdn.proj.org");
+        set_url_endpoint("https://github.com/georust").unwrap();
+        let ep = get_url_endpoint().unwrap();
+        assert_eq!(&ep, "https://github.com/georust");
+    }
+    #[test]
     fn test_from_crs() {
         let from = "EPSG:2230";
         let to = "EPSG:26946";
-        let proj = Proj::new_known_crs(&from, &to, None, false).unwrap();
+        let proj = Proj::new_known_crs(&from, &to, None).unwrap();
         let t = proj
             .convert(Point::new(4760096.421921, 3744293.729449))
             .unwrap();
         assert_almost_eq(t.x(), 1450880.29);
         assert_almost_eq(t.y(), 1141263.01);
     }
-    #[test]
-    fn test_network() {
-        // NAD83 to NAD83(HARN) in West-Virginia. Using wvhpgn.tif
-        let from = "EPSG:4269";
-        let to = "EPSG:4152";
-
-        let from2 = "EPSG:4326";
-        let to2 = "EPSG:4326+3855";
-
-        let proj = Proj::new_known_crs(&from, &to, None, false).unwrap();
-        // off by default
-        assert_eq!(proj.network_enabled(), false);
-        // switch it on and disable cache for subsequent calls
-        proj.grid_cache_set_enable(false);
-        let proj2 = Proj::new_known_crs(&from2, &to2, None, true).unwrap();
-        assert_eq!(proj2.network_enabled(), true);
-        let t = proj2.convert(Point::new(40.0, -80.0)).unwrap();
-        assert_almost_eq(t.x(), 39.99999839);
-        assert_almost_eq(t.y(), -79.99999807);
-    }
+    // #[test]
+    // fn test_network() {
+    //     let from = "EPSG:4326";
+    //     let to = "EPSG:4326+3855";
+    //     // off by default
+    //     assert_eq!(network_enabled(), false);
+    //     // switch it on and disable cache for subsequent calls
+    //     grid_cache_set_enable(false);
+    //     enable_network(true).unwrap();
+    //     let proj = Proj::new_known_crs(&from, &to, None).unwrap();
+    //     assert_eq!(network_enabled(), true);
+    //     let t = proj.convert(Point::new(40.0, -80.0)).unwrap();
+    //     assert_almost_eq(t.x(), 39.99999839);
+    //     assert_almost_eq(t.y(), -79.99999807);
+    // }
     #[test]
     // Carry out a projection from geodetic coordinates
     fn test_projection() {
         let stereo70 = Proj::new(
             "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
             +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs",
-            false,
         )
         .unwrap();
         // Geodetic -> Pulkovo 1942(58) / Stereo70 (EPSG 3844)
@@ -708,7 +731,6 @@ mod test {
         let stereo70 = Proj::new(
             "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
             +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs",
-            false,
         )
         .unwrap();
         // Pulkovo 1942(58) / Stereo70 (EPSG 3844) -> Geodetic
@@ -726,7 +748,6 @@ mod test {
             +proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy
             +towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 +units=m +no_defs
             ",
-            false,
         )
         .unwrap();
         // OSGB36 (EPSG 27700) -> Geodetic
@@ -748,7 +769,7 @@ mod test {
             +step +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666
             +lon_0=-116.25 +x_0=2000000 +y_0=500000
             +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs
-        ", false).unwrap();
+        ").unwrap();
         // Presidio, San Francisco
         let t = nad83_m
             .convert(Point::new(4760096.421921, 3744293.729449))
@@ -759,14 +780,13 @@ mod test {
     #[test]
     // Test that instantiation fails wth bad proj string input
     fn test_init_error() {
-        assert!(Proj::new("🦀", false).is_none());
+        assert!(Proj::new("🦀").is_none());
     }
     #[test]
     fn test_conversion_error() {
         // because step 1 isn't an inverse conversion, it's expecting lon lat input
         let nad83_m = Proj::new(
             "+proj=geos +lon_0=0.00 +lat_0=0.00 +a=6378169.00 +b=6356583.80 +h=35785831.0",
-            false,
         )
         .unwrap();
         let err = nad83_m
@@ -782,7 +802,6 @@ mod test {
     fn test_error_recovery() {
         let nad83_m = Proj::new(
             "+proj=geos +lon_0=0.00 +lat_0=0.00 +a=6378169.00 +b=6356583.80 +h=35785831.0",
-            false,
         )
         .unwrap();
 
@@ -805,7 +824,7 @@ mod test {
     fn test_array_convert() {
         let from = "EPSG:2230";
         let to = "EPSG:26946";
-        let ft_to_m = Proj::new_known_crs(&from, &to, None, false).unwrap();
+        let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
         let mut v = vec![
             Point::new(4760096.421921, 3744293.729449),
             Point::new(4760197.421921, 3744394.729449),
@@ -821,7 +840,7 @@ mod test {
     fn test_input_order() {
         let from = "EPSG:4326";
         let to = "EPSG:2230";
-        let to_feet = Proj::new_known_crs(&from, &to, None, false).unwrap();
+        let to_feet = Proj::new_known_crs(&from, &to, None).unwrap();
         // 👽
         let usa_m = Point::new(-115.797615, 37.2647978);
         let usa_ft = to_feet.convert(usa_m).unwrap();

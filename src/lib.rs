@@ -14,13 +14,18 @@
 //! for [conversion](struct.Proj.html#method.convert_array) and [projection](struct.Proj.html#method.project_array)
 //! of slices of `Point`s are available.
 //!
-//! ## Other Features
+//! ## Network Functionality
 //!
 //! `proj` supports [network grid download](https://proj.org/usage/network.html) functionality.
-//! Modifying the download CDN endpoint is **not** currently supported. Network access is **disabled** by default, and
-//! can be activated by passing a `true` `bool` to [`Proj::new()`](struct.Proj.html#method.new) or
-//! [`Proj::new_known_crs()`](struct.Proj.html#method.new_known_crs). Network functionality status can be queried with
-//! `Proj::network_enabled`.
+//! Network access is **disabled** by default, and
+//! can be activated by passing a `true` `bool` to [`enable_network()`](fn.enable_network.html).
+//! Network functionality status can be queried with
+//! `network_enabled`, and the download endpoint can be queried and set using `get_url_endpoint` and `set_url_endpoint`.
+//!
+//! ### Note:
+//! Changes to network settings only affect _subsequent_ `Proj` instances.
+//! For example: if you create a new transformation instance, _then_ call `enable_network`,
+//! No grid download will be attempted for that instance.
 //!
 //! # Requirements
 //!
@@ -47,7 +52,7 @@
 //!
 //! let from = "EPSG:2230";
 //! let to = "EPSG:26946";
-//! let nad_ft_to_m = Proj::new_known_crs(&from, &to, None, false).unwrap();
+//! let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
 //! let result = nad_ft_to_m
 //!     .convert(Point::new(4760096.421921f64, 3744293.729449f64))
 //!     .unwrap();
@@ -58,6 +63,11 @@
 mod network;
 mod proj;
 
+pub use crate::proj::enable_network;
+pub use crate::proj::get_url_endpoint;
+pub use crate::proj::grid_cache_set_enable;
+pub use crate::proj::network_enabled;
+pub use crate::proj::set_url_endpoint;
 pub use crate::proj::Area;
 pub use crate::proj::Proj;
 pub use crate::proj::ProjError;
