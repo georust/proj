@@ -159,15 +159,14 @@ fn _network_open(
         ));
     }
     // Write the initial read length value into the pointer
-    unsafe { out_size_read.write(res.content_length().ok_or(ProjError::ContentLength)? as usize) };
+    let contentlength = res.content_length().ok_or(ProjError::ContentLength)? as usize;
+    unsafe { out_size_read.write(contentlength) };
     let headers = res.headers().clone();
-    let response_bytes = res.bytes()?.into_iter().collect::<Vec<u8>>();
-    let bufferlength = response_bytes.len();
     // Copy the downloaded bytes into the buffer so it can be passed around
     unsafe {
-        response_bytes
+        &res.bytes()?
             .as_ptr()
-            .copy_to_nonoverlapping(buffer as *mut u8, bufferlength.min(size_to_read))
+            .copy_to_nonoverlapping(buffer as *mut u8, contentlength.min(size_to_read))
     };
     let hd = HandleData::new(req, headers, None);
     // heap-allocate the struct and cast it to a void pointer so it can be passed around to PROJ
@@ -327,13 +326,12 @@ fn _network_read_range(
         ));
     }
     let headers = res.headers().clone();
-    let response_bytes = res.bytes()?.into_iter().collect::<Vec<u8>>();
-    let bufferlength = response_bytes.len();
+    let contentlength = res.content_length().ok_or(ProjError::ContentLength)? as usize;
     // Copy the downloaded bytes into the buffer so it can be passed around
     unsafe {
-        response_bytes
+        res.bytes()?
             .as_ptr()
-            .copy_to_nonoverlapping(buffer as *mut u8, bufferlength.min(size_to_read));
+            .copy_to_nonoverlapping(buffer as *mut u8, contentlength.min(size_to_read));
     }
     let err_string = "";
     unsafe {
@@ -341,7 +339,7 @@ fn _network_read_range(
         out_error_string.add(err_string.len()).write(0);
     }
     hd.headers = headers;
-    Ok(bufferlength)
+    Ok(contentlength)
 }
 
 /// Set up and initialise the grid download callback functions for this and all subsequent PROJ contexts
