@@ -238,6 +238,9 @@ fn _network_get_header_value(
         .to_str()?;
     let cstr = CString::new(hvalue).unwrap();
     let header = cstr.into_raw();
+    // Raw pointers are Copy: the pointer returned by this function is never returned by libproj,so
+    // in order to avoid a memory leak, the pointer is copied and stored in the HandleData struct,
+    // which is dropped in close_network. As part of that, the pointer in hptr is returned to Rust
     hd.hptr = Some(header);
     Ok(header)
 }
