@@ -21,7 +21,8 @@ use std::{thread, time};
 
 const CLIENT: &str = concat!("proj-rs/", env!("CARGO_PKG_VERSION"));
 const MAX_RETRIES: u8 = 8;
-const REDIRECT_CODES: [u16; 5] = [301, 302, 303, 307, 308];
+// S3 sometimes sends these in place of actual client errors, so retry instead of erroring
+const RETRY_CODES: [u16; 4] = [429, 500, 502, 504];
 
 /// This struct is cast to `c_void`, then to `PROJ_NETWORK_HANDLE` so it can be passed around
 #[no_mangle]
@@ -116,7 +117,7 @@ fn _network_open(
     _: *mut c_void,
 ) -> Result<*mut PROJ_NETWORK_HANDLE, ProjError> {
     let mut retries = 0;
-    let mut url = _string(url)?;
+    let url = _string(url)?;
     // - 1 is used because the HTTP convention is to use inclusive start and end offsets
     let end = offset as usize + size_to_read - 1;
     // RANGE header definition is "bytes=x-y"
@@ -129,28 +130,32 @@ fn _network_open(
     let with_headers = initial.header("Range", &hvalue).header("Client", CLIENT);
     let mut res = with_headers.send()?;
     let mut status = res.status().as_u16();
-    // If something went wrong, start retrying
-    while status >= 300 && retries <= MAX_RETRIES {
-        retries += 1;
-        let wait = time::Duration::from_millis(get_wait_time_exp(retries as i32));
-        thread::sleep(wait);
-        let mut retry = req.try_clone().ok_or(ProjError::RequestCloneError)?;
-        // If it's 3xx, try to get the location header and set it as the new URL
-        if status < 400 && REDIRECT_CODES.contains(&status) {
-            url = res
-                .headers()
-                .get("location")
-                .ok_or_else(|| ProjError::HeaderError("location".to_string()))?
-                .to_str()?
-                .to_string();
-            retry = clt.request(Method::GET, &url);
+    // Check whether something went wrong on the server, or if it's an S3 retry code
+    if res.status().is_server_error() || RETRY_CODES.contains(&status) {
+        // Start retrying: up to MAX_RETRIES
+        while res.status().is_server_error()
+            || RETRY_CODES.contains(&status)
+            || retries <= MAX_RETRIES
+        {
+            retries += 1;
+            let wait = time::Duration::from_millis(get_wait_time_exp(retries as i32));
+            thread::sleep(wait);
+            let retry = req.try_clone().ok_or(ProjError::RequestCloneError)?;
+            let with_headers = retry.header("Range", &hvalue).header("Client", CLIENT);
+            res = with_headers.send()?;
+            status = res.status().as_u16();
         }
-        let with_headers = retry.header("Range", &hvalue).header("Client", CLIENT);
-        res = with_headers.send()?;
-        status = res.status().as_u16();
+    // Not a timeout or known S3 retry code: bail out
+    } else if res.status().is_client_error() {
+        return Err(ProjError::DownloadError(
+            res.status().as_str().to_string(),
+            url,
+            retries,
+        ));
     }
-    // Retries are exhausted to no avail, so give up with an error
-    if status >= 300 {
+    // Retries have been exhausted OR
+    // The loop ended prematurely due to a different error
+    if !res.status().is_success() {
         return Err(ProjError::DownloadError(
             res.status().as_str().to_string(),
             url,
@@ -307,20 +312,32 @@ fn _network_read_range(
     let with_headers = initial.header("Range", &hvalue).header("Client", CLIENT);
     let mut res = with_headers.send()?;
     let mut status = res.status().as_u16();
-    // If something went wrong, start retrying
-    // 3xx handling isn't required here, because range_read follows network_open
-    // so if network_open got 3xx, the URL has already been modified
-    while status >= 400 && retries <= MAX_RETRIES {
-        retries += 1;
-        let wait = time::Duration::from_millis(get_wait_time_exp(retries as i32));
-        thread::sleep(wait);
-        let retry = hd.client.try_clone().ok_or(ProjError::RequestCloneError)?;
-        let with_headers = retry.header("Range", &hvalue).header("Client", CLIENT);
-        res = with_headers.send()?;
-        status = res.status().as_u16();
+    // Check whether something went wrong on the server, or if it's an S3 retry code
+    if res.status().is_server_error() || RETRY_CODES.contains(&status) {
+        // Start retrying: up to MAX_RETRIES
+        while res.status().is_server_error()
+            || RETRY_CODES.contains(&status)
+            || retries <= MAX_RETRIES
+        {
+            retries += 1;
+            let wait = time::Duration::from_millis(get_wait_time_exp(retries as i32));
+            thread::sleep(wait);
+            let retry = hd.client.try_clone().ok_or(ProjError::RequestCloneError)?;
+            let with_range = retry.header("Range", &hvalue).header("Client", CLIENT);
+            res = with_range.send()?;
+            status = res.status().as_u16();
+        }
+    // Not a timeout or known S3 retry code: bail out
+    } else if res.status().is_client_error() {
+        return Err(ProjError::DownloadError(
+            res.status().as_str().to_string(),
+            res.url().to_string(),
+            retries,
+        ));
     }
-    // Retries are exhausted to no avail, so give up with an error
-    if status >= 400 {
+    // Retries have been exhausted OR
+    // The loop ended prematurely due to a different error
+    if !res.status().is_success() {
         return Err(ProjError::DownloadError(
             res.status().as_str().to_string(),
             res.url().to_string(),
