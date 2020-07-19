@@ -61,7 +61,7 @@ fn get_wait_time_exp(retrycount: i32) -> u64 {
     (retrycount as u64).pow(2) * 100u64
 }
 
-/// Process CDN response: handle retries in case of server error, or early return in for client errors
+/// Process CDN response: handle retries in case of server error, or early return for client errors
 fn error_handler<'a>(
     res: &'a mut Response,
     rb: RequestBuilder,
