@@ -7,7 +7,7 @@
 // This functionality based on https://github.com/OSGeo/PROJ/blob/master/src/networkfilemanager.cpp#L1675
 use proj_sys::{proj_context_set_network_callbacks, PJ_CONTEXT, PROJ_NETWORK_HANDLE};
 
-use reqwest::blocking::Client;
+use reqwest::blocking::{Client, RequestBuilder, Response};
 use reqwest::Method;
 use std::ffi::CString;
 use std::os::raw::c_ulonglong;
@@ -27,7 +27,7 @@ const RETRY_CODES: [u16; 4] = [429, 500, 502, 504];
 /// This struct is cast to `c_void`, then to `PROJ_NETWORK_HANDLE` so it can be passed around
 #[no_mangle]
 struct HandleData {
-    client: reqwest::blocking::RequestBuilder,
+    request: reqwest::blocking::RequestBuilder,
     headers: reqwest::header::HeaderMap,
     // this raw pointer is returned to libproj but never returned from libproj,
     // so a copy of the pointer (raw pointers are Copy) is stored here, so it can be
@@ -39,12 +39,12 @@ struct HandleData {
 
 impl HandleData {
     fn new(
-        client: reqwest::blocking::RequestBuilder,
+        request: reqwest::blocking::RequestBuilder,
         headers: reqwest::header::HeaderMap,
         hptr: Option<*const c_char>,
     ) -> Self {
         Self {
-            client,
+            request,
             headers,
             hptr,
         }
@@ -59,6 +59,49 @@ fn get_wait_time_exp(retrycount: i32) -> u64 {
         return 0;
     }
     (retrycount as u64).pow(2) * 100u64
+}
+
+/// Process CDN response: handle retries in case of server error, or early return in for client errors
+fn error_handler<'a>(
+    res: &'a mut Response,
+    rb: RequestBuilder,
+    hvalue: &str,
+) -> Result<&'a Response, ProjError> {
+    let mut status = res.status().as_u16();
+    let mut retries = 0;
+    // Check whether something went wrong on the server, or if it's an S3 retry code
+    if res.status().is_server_error() || RETRY_CODES.contains(&status) {
+        // Start retrying: up to MAX_RETRIES
+        while res.status().is_server_error()
+            || RETRY_CODES.contains(&status)
+            || retries <= MAX_RETRIES
+        {
+            retries += 1;
+            let wait = time::Duration::from_millis(get_wait_time_exp(retries as i32));
+            thread::sleep(wait);
+            let retry = rb.try_clone().ok_or(ProjError::RequestCloneError)?;
+            let with_range = retry.header("Range", hvalue).header("Client", CLIENT);
+            *res = with_range.send()?;
+            status = res.status().as_u16();
+        }
+    // Not a timeout or known S3 retry code: bail out
+    } else if res.status().is_client_error() {
+        return Err(ProjError::DownloadError(
+            res.status().as_str().to_string(),
+            res.url().to_string(),
+            retries,
+        ));
+    }
+    // Retries have been exhausted OR
+    // The loop ended prematurely due to a different error
+    if !res.status().is_success() {
+        return Err(ProjError::DownloadError(
+            res.status().as_str().to_string(),
+            res.url().to_string(),
+            retries,
+        ));
+    }
+    Ok(res)
 }
 
 /// Network callback: open
@@ -116,7 +159,6 @@ fn _network_open(
     out_error_string: *mut c_char,
     _: *mut c_void,
 ) -> Result<*mut PROJ_NETWORK_HANDLE, ProjError> {
-    let mut retries = 0;
     let url = _string(url)?;
     // - 1 is used because the HTTP convention is to use inclusive start and end offsets
     let end = offset as usize + size_to_read - 1;
@@ -129,39 +171,9 @@ fn _network_open(
     let initial = req.try_clone().ok_or(ProjError::RequestCloneError)?;
     let with_headers = initial.header("Range", &hvalue).header("Client", CLIENT);
     let mut res = with_headers.send()?;
-    let mut status = res.status().as_u16();
-    // Check whether something went wrong on the server, or if it's an S3 retry code
-    if res.status().is_server_error() || RETRY_CODES.contains(&status) {
-        // Start retrying: up to MAX_RETRIES
-        while res.status().is_server_error()
-            || RETRY_CODES.contains(&status)
-            || retries <= MAX_RETRIES
-        {
-            retries += 1;
-            let wait = time::Duration::from_millis(get_wait_time_exp(retries as i32));
-            thread::sleep(wait);
-            let retry = req.try_clone().ok_or(ProjError::RequestCloneError)?;
-            let with_headers = retry.header("Range", &hvalue).header("Client", CLIENT);
-            res = with_headers.send()?;
-            status = res.status().as_u16();
-        }
-    // Not a timeout or known S3 retry code: bail out
-    } else if res.status().is_client_error() {
-        return Err(ProjError::DownloadError(
-            res.status().as_str().to_string(),
-            url,
-            retries,
-        ));
-    }
-    // Retries have been exhausted OR
-    // The loop ended prematurely due to a different error
-    if !res.status().is_success() {
-        return Err(ProjError::DownloadError(
-            res.status().as_str().to_string(),
-            url,
-            retries,
-        ));
-    }
+    let eh_rb = req.try_clone().ok_or(ProjError::RequestCloneError)?;
+    // hand the response off to the error-handler, continue on success
+    error_handler(&mut res, eh_rb, &hvalue)?;
     // Write the initial read length value into the pointer
     let contentlength = res.content_length().ok_or(ProjError::ContentLength)? as usize;
     unsafe { out_size_read.write(contentlength) };
@@ -305,45 +317,14 @@ fn _network_read_range(
 ) -> Result<usize, ProjError> {
     // - 1 is used because the HTTP convention is to use inclusive start and end offsets
     let end = offset as usize + size_to_read - 1;
-    let mut retries = 0;
     let hvalue = format!("bytes={}-{}", offset, end);
     let mut hd = unsafe { &mut *(handle as *const c_void as *mut HandleData) };
-    let initial = hd.client.try_clone().ok_or(ProjError::RequestCloneError)?;
+    let initial = hd.request.try_clone().ok_or(ProjError::RequestCloneError)?;
     let with_headers = initial.header("Range", &hvalue).header("Client", CLIENT);
     let mut res = with_headers.send()?;
-    let mut status = res.status().as_u16();
-    // Check whether something went wrong on the server, or if it's an S3 retry code
-    if res.status().is_server_error() || RETRY_CODES.contains(&status) {
-        // Start retrying: up to MAX_RETRIES
-        while res.status().is_server_error()
-            || RETRY_CODES.contains(&status)
-            || retries <= MAX_RETRIES
-        {
-            retries += 1;
-            let wait = time::Duration::from_millis(get_wait_time_exp(retries as i32));
-            thread::sleep(wait);
-            let retry = hd.client.try_clone().ok_or(ProjError::RequestCloneError)?;
-            let with_range = retry.header("Range", &hvalue).header("Client", CLIENT);
-            res = with_range.send()?;
-            status = res.status().as_u16();
-        }
-    // Not a timeout or known S3 retry code: bail out
-    } else if res.status().is_client_error() {
-        return Err(ProjError::DownloadError(
-            res.status().as_str().to_string(),
-            res.url().to_string(),
-            retries,
-        ));
-    }
-    // Retries have been exhausted OR
-    // The loop ended prematurely due to a different error
-    if !res.status().is_success() {
-        return Err(ProjError::DownloadError(
-            res.status().as_str().to_string(),
-            res.url().to_string(),
-            retries,
-        ));
-    }
+    let eh_rb = hd.request.try_clone().ok_or(ProjError::RequestCloneError)?;
+    // hand the response off to the error-handler, continue on success
+    error_handler(&mut res, eh_rb, &hvalue)?;
     let headers = res.headers().clone();
     let contentlength = res.content_length().ok_or(ProjError::ContentLength)? as usize;
     // Copy the downloaded bytes into the buffer so it can be passed around
