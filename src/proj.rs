@@ -86,7 +86,7 @@ impl Area {
 }
 
 /// Easily get a String from the external library
-pub fn _string(raw_ptr: *const c_char) -> Result<String, ProjError> {
+pub(crate) fn _string(raw_ptr: *const c_char) -> Result<String, ProjError> {
     let c_str = unsafe { CStr::from_ptr(raw_ptr) };
     Ok(str::from_utf8(c_str.to_bytes())?.to_string())
 }
@@ -112,7 +112,7 @@ fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
 /// This will configure network access for all **subsequent** `Proj` instances, but will **not** affect pre-existing instances.
 /// # Safety
 /// This method contains unsafe code.
-pub fn enable_network(enable: bool) -> Result<(), ProjError> {
+pub fn enable_network(enable: bool) -> Result<u8, ProjError> {
     if enable {
         let _ = match set_network_callbacks() {
             1 => Ok(1),
@@ -121,8 +121,10 @@ pub fn enable_network(enable: bool) -> Result<(), ProjError> {
     }
     let enable = if enable { 1 } else { 0 };
     let dctx: *mut PJ_CONTEXT = ptr::null_mut();
-    unsafe { proj_context_set_enable_network(dctx, enable) };
-    Ok(())
+    match unsafe { proj_context_set_enable_network(dctx, enable) } {
+        1 => Ok(1),
+        _ => Err(ProjError::Network),
+    }
 }
 
 /// Check whether network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for) is currently enabled or disabled.
@@ -695,6 +697,7 @@ mod test {
         assert_almost_eq(t.x(), 1450880.29);
         assert_almost_eq(t.y(), 1141263.01);
     }
+    // This test is disabled by default as it requires network access
     // #[test]
     // fn test_network() {
     //     let from = "EPSG:4326";
