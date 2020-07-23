@@ -1,7 +1,7 @@
 #![doc(html_logo_url = "https://raw.githubusercontent.com/georust/meta/master/logo/logo.png")]
 //! `proj` provides bindings to the [PROJ](https://proj.org) v7.0.x API
 //!
-//! Two coordinate operations are currently provided: [projection](struct.Proj.html#method.project)
+//! Two coordinate transformation operations are currently provided: [projection](struct.Proj.html#method.project)
 //! (and inverse projection)
 //! and [conversion](struct.Proj.html#method.convert).
 //! Projection is intended for transformations between geodetic and projected coordinates,
@@ -13,19 +13,26 @@
 //! trait can be used as input for the projection and conversion functions, and methods
 //! for [conversion](struct.Proj.html#method.convert_array) and [projection](struct.Proj.html#method.project_array)
 //! of slices of `Point`s are available.
+//! # Usage
+//! Instantiating a transformation instance (`Proj`) is a two-step process:
+//! 1. Create a new `Context` by calling `Context::new`. This context may be modified to enable network downloads or modify search paths if you wish;
+//! 2. Create the transformation instance (`Proj`) by calling [`transform()`](proj/struct.Context.html#method.transform) or [`transform_known_crs()`](proj/struct.Context.html#method.transform_known_crs).
 //!
-//! ## Network Functionality
+//! ## Network, Cache, and Search Path Functionality
 //!
+//! ### Grid File Download
 //! `proj` supports [network grid download](https://proj.org/usage/network.html) functionality.
 //! Network access is **disabled** by default, and
-//! can be activated by passing a `true` `bool` to [`enable_network()`](fn.enable_network.html).
+//! can be activated by passing a `true` `bool` to [`enable_network()`](proj/struct.Context.html#method.enable_network).
 //! Network functionality status can be queried with
 //! `network_enabled`, and the download endpoint can be queried and set using `get_url_endpoint` and `set_url_endpoint`.
 //!
-//! ### Note:
-//! Changes to network settings only affect _subsequent_ `Proj` instances.
-//! For example: if you create a new transformation instance, _then_ call `enable_network`,
-//! No grid download will be attempted for that instance.
+//! #### Grid File Cache
+//! Up to 300 mb of downloaded grids are cached to save bandwidth: This cache can be enabled or disabled using [`grid_cache_enable`](proj/struct.Context.html#method.grid_cache_enable).
+//!
+//! ### Search Path Modification
+//! The path used to search for resource files can be modified using [`set_search_paths`](proj/struct.Context.html#method.set_search_paths)
+//!
 //!
 //! # Requirements
 //!
@@ -63,12 +70,9 @@
 mod network;
 mod proj;
 
-pub use crate::proj::enable_network;
-pub use crate::proj::get_url_endpoint;
-pub use crate::proj::grid_cache_set_enable;
-pub use crate::proj::network_enabled;
-pub use crate::proj::set_url_endpoint;
 pub use crate::proj::Area;
+pub use crate::proj::TransformBuilder;
+pub use crate::proj::Info;
 pub use crate::proj::Proj;
 pub use crate::proj::ProjError;
 pub use crate::proj::Projinfo;
