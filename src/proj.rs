@@ -385,7 +385,6 @@ impl Proj {
     // is signalled by the choice of enum used as input to the PJ_COORD union
     // PJ_LP signals projection of geodetic coordinates, with output being PJ_XY
     // and vice versa, or using PJ_XY for conversion operations
-    #[deprecated(since = "0.20.0", note = "please use `Context::transform` instead")]
     pub fn new(definition: &str) -> Option<Proj> {
         // steal ctx from Context
         let c_definition = CString::new(definition).ok()?;
@@ -443,10 +442,6 @@ impl Proj {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    #[deprecated(
-        since = "0.20.0",
-        note = "please use `Context::transform_known_crs` instead"
-    )]
     pub fn new_known_crs(from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
         let from_c = CString::new(from).ok()?;
         let to_c = CString::new(to).ok()?;
