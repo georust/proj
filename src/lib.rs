@@ -24,7 +24,9 @@
 //!
 //! **Note**:
 //!
-//! Both `TransformBuilder` and `Proj` implement the [`Info`](proj/trait.Info.html) trait, which can be used to get information about the current state of the `PROJ` instance.
+//! 1. Both `TransformBuilder` and `Proj` implement the [`Info`](proj/trait.Info.html) trait, which can be used to get information about the current state of the `PROJ` instance;
+//! 2. `Proj::new()` and `TransformBuilder::transform()` have the same signature;
+//! 3. `Proj::new_known_crs()` and `TransformBuilder::transform_known_crs()` have the same signature.
 //!
 //! ## Network, Cache, and Search Path Functionality
 //!
