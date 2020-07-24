@@ -353,7 +353,6 @@ impl TransformBuilder {
                 proj_destroy(new_c_proj);
                 normalised
             };
-            println!("{:?}", "Download not yet initiated");
             Some(Proj {
                 c_proj: normalised,
                 ctx,
@@ -798,20 +797,24 @@ mod test {
         assert!(f > 0.99999);
     }
     #[test]
-    fn flibble() {
+    fn test_network() {
         let tf = TransformBuilder::new();
-        let from = "EPSG:4326";
-        let to = "EPSG:4326+3855";
+        // OSGB 1936
+        let from = "EPSG:4277";
+        // ETRS89
+        let to = "EPSG:4258";
+        // File to download: uk_os_OSTN15_NTv2_OSGBtoETRS.tif
         // off by default, switch it on and check
         assert_eq!(tf.network_enabled(), false);
         tf.enable_network(true).unwrap();
         assert_eq!(tf.network_enabled(), true);
         // I expected the following call to trigger a download, but it doesn't!
         let proj = tf.transform_known_crs(&from, &to, None).unwrap();
-        // download begins here
-        let t = proj.convert(Point::new(40.0, -80.0)).unwrap();
-        assert_almost_eq(t.x(), 39.99999839);
-        assert_almost_eq(t.y(), -79.99999807);
+        // download begins here:
+        let t = proj.convert(Point::new(0.001653, 52.267733)).unwrap();
+        // Without grid download: -0.00000014658182154077693, 52.26815719726976
+        assert_almost_eq(t.x(), 0.000026091248979289044);
+        assert_almost_eq(t.y(), 52.26817146070213);
     }
     #[test]
     fn test_definition() {
@@ -825,10 +828,11 @@ mod test {
     // #[test]
     // fn test_searchpath() {
     //     let tf = TransformBuilder::new();
-    //     let wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
+    //     let from = "EPSG:4326";
+    //     let to = "EPSG:4326+3855";
     //     tf.set_search_paths(&"/foo").unwrap();
-    //     let proj = tf.transform(wgs84).unwrap();
-    //     let ipath = proj.info().unwrap().searchpath;
+    //     let ipath = tf.info().unwrap().searchpath;
+    //     let proj = tf.transform_known_crs(&from, &to, None).unwrap();
     //     let pathsep = if cfg!(windows) { ";" } else { ":" };
     //     let individual: Vec<&str> = ipath.split(pathsep).collect();
     //     assert_eq!(&individual.last().unwrap(), &&"/foo")
@@ -843,6 +847,7 @@ mod test {
         tf.set_url_endpoint("https://github.com/georust").unwrap();
         let proj = tf.transform_known_crs(&from, &to, None).unwrap();
         let ep = proj.get_url_endpoint().unwrap();
+        // Has the new endpoint propagated to the Proj instance?
         assert_eq!(&ep, "https://github.com/georust");
     }
     #[test]
@@ -856,22 +861,6 @@ mod test {
         assert_almost_eq(t.x(), 1450880.29);
         assert_almost_eq(t.y(), 1141263.01);
     }
-    // // This test is disabled by default as it requires network access
-    // // #[test]
-    // // fn test_network() {
-    // //     let from = "EPSG:4326";
-    // //     let to = "EPSG:4326+3855";
-    // //     // off by default
-    // //     assert_eq!(network_enabled(), false);
-    // //     // switch it on and disable cache for subsequent calls
-    // //     grid_cache_set_enable(false);
-    // //     enable_network(true).unwrap();
-    // //     let proj = Proj::new_known_crs(&from, &to, None).unwrap();
-    // //     assert_eq!(network_enabled(), true);
-    // //     let t = proj.convert(Point::new(40.0, -80.0)).unwrap();
-    // //     assert_almost_eq(t.x(), 39.99999839);
-    // //     assert_almost_eq(t.y(), -79.99999807);
-    // // }
     #[test]
     // Carry out a projection from geodetic coordinates
     fn test_projection() {
