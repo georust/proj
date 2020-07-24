@@ -210,7 +210,9 @@ impl TransformBuilder {
             }?;
         }
         let enable = if enable { 1 } else { 0 };
-        match (enable, unsafe { proj_context_set_enable_network(self.ctx(), enable) }) {
+        match (enable, unsafe {
+            proj_context_set_enable_network(self.ctx(), enable)
+        }) {
             // we asked to switch on: switched on
             (1, 1) => Ok(1),
             // we asked to switch off: switched off
@@ -220,7 +222,7 @@ impl TransformBuilder {
             // we asked to switch on, but it's still off
             (1, 0) => Err(ProjError::Network),
             // scrëm
-            _ => Err(ProjError::Network)
+            _ => Err(ProjError::Network),
         }
     }
 
@@ -370,6 +372,12 @@ impl TransformBuilder {
     pub fn transform_known_crs(mut self, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
         let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
         Some(transform_epsg(ctx, from, to, area)?)
+    }
+}
+
+impl Default for TransformBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
