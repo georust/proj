@@ -290,7 +290,7 @@ pub struct Projinfo {
 
 /// A `PROJ` Context instance, used to create a transformation object.
 ///
-/// Use the builder pattern to modify search paths and activate grid network download and cache.
+/// Create a transformation object by calling `transform_new` or `transform_known_crs`.
 pub struct TransformBuilder {
     ctx: *mut PJ_CONTEXT,
 }
