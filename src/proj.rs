@@ -271,20 +271,20 @@ impl TransformBuilder {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn transform(self, definition: &str) -> Option<Proj> {
+    pub fn transform(mut self, definition: &str) -> Option<Proj> {
         // In contrast to proj v4.x, the type of transformation
         // is signalled by the choice of enum used as input to the PJ_COORD union
         // PJ_LP signals projection of geodetic coordinates, with output being PJ_XY
         // and vice versa, or using PJ_XY for conversion operations
         let c_definition = CString::new(definition).ok()?;
-        // let ctx = unsafe { proj_context_create() };
-        let new_c_proj = unsafe { proj_create(self.ctx, c_definition.as_ptr()) };
+        let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
+        let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
         if new_c_proj.is_null() {
             None
         } else {
             Some(Proj {
                 c_proj: new_c_proj,
-                ctx: self.ctx,
+                ctx,
                 area: None,
             })
         }
