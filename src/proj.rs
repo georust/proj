@@ -107,11 +107,57 @@ fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
     }
 }
 
+// called by Proj::new and TransformBuilder::transform_new_crs
+fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Option<Proj> {
+    // In contrast to proj v4.x, the type of transformation
+    // is signalled by the choice of enum used as input to the PJ_COORD union
+    // PJ_LP signals projection of geodetic coordinates, with output being PJ_XY
+    // and vice versa, or using PJ_XY for conversion operations
+    let c_definition = CString::new(definition).ok()?;
+    let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
+    if new_c_proj.is_null() {
+        None
+    } else {
+        Some(Proj {
+            c_proj: new_c_proj,
+            ctx,
+            area: None,
+        })
+    }
+}
+
+// Called by new_known_crs and transform_known_crs
+fn transform_epsg(ctx: *mut PJ_CONTEXT, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
+    let from_c = CString::new(from).ok()?;
+    let to_c = CString::new(to).ok()?;
+    let proj_area = unsafe { proj_area_create() };
+    area_set_bbox(proj_area, area);
+    let new_c_proj =
+        unsafe { proj_create_crs_to_crs(ctx, from_c.as_ptr(), to_c.as_ptr(), proj_area) };
+    if new_c_proj.is_null() {
+        None
+    } else {
+        // Normalise input and output order to Lon, Lat / Easting Northing by inserting
+        // An axis swap operation if necessary
+        let normalised = unsafe {
+            let normalised = proj_normalize_for_visualization(ctx, new_c_proj);
+            // deallocate stale PJ pointer
+            proj_destroy(new_c_proj);
+            normalised
+        };
+        Some(Proj {
+            c_proj: normalised,
+            ctx,
+            area: Some(proj_area),
+        })
+    }
+}
+
 /// Read-only utility methods for providing information about the current PROJ instance
 pub trait Info {
     #[doc(hidden)]
     fn ctx(&self) -> *mut PJ_CONTEXT;
-    
+
     /// Return [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about the current PROJ context
     /// # Safety
     /// This method contains unsafe code.
@@ -272,22 +318,8 @@ impl TransformBuilder {
     /// # Safety
     /// This method contains unsafe code.
     pub fn transform(mut self, definition: &str) -> Option<Proj> {
-        // In contrast to proj v4.x, the type of transformation
-        // is signalled by the choice of enum used as input to the PJ_COORD union
-        // PJ_LP signals projection of geodetic coordinates, with output being PJ_XY
-        // and vice versa, or using PJ_XY for conversion operations
-        let c_definition = CString::new(definition).ok()?;
         let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
-        let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
-        if new_c_proj.is_null() {
-            None
-        } else {
-            Some(Proj {
-                c_proj: new_c_proj,
-                ctx,
-                area: None,
-            })
-        }
+        Some(transform_string(ctx, definition)?)
     }
 
     /// Try to create a transformation object that is a pipeline between two known coordinate reference systems.
@@ -332,33 +364,8 @@ impl TransformBuilder {
     /// # Safety
     /// This method contains unsafe code.
     pub fn transform_known_crs(mut self, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
-        let from_c = CString::new(from).ok()?;
-        let to_c = CString::new(to).ok()?;
-        let proj_area = unsafe { proj_area_create() };
-        area_set_bbox(proj_area, area);
-        // self is dropped when this function returns. In order to prevent the ctx from being destroyed,
-        // it's necessary to swap it for a placeholder. The original can then be used to construct
-        // the transformation object
         let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
-        let new_c_proj =
-            unsafe { proj_create_crs_to_crs(ctx, from_c.as_ptr(), to_c.as_ptr(), proj_area) };
-        if new_c_proj.is_null() {
-            None
-        } else {
-            // Normalise input and output order to Lon, Lat / Easting Northing by inserting
-            // An axis swap operation if necessary
-            let normalised = unsafe {
-                let normalised = proj_normalize_for_visualization(ctx, new_c_proj);
-                // deallocate stale PJ pointer
-                proj_destroy(new_c_proj);
-                normalised
-            };
-            Some(Proj {
-                c_proj: normalised,
-                ctx,
-                area: Some(proj_area),
-            })
-        }
+        Some(transform_epsg(ctx, from, to, area)?)
     }
 }
 
@@ -386,19 +393,8 @@ impl Proj {
     // PJ_LP signals projection of geodetic coordinates, with output being PJ_XY
     // and vice versa, or using PJ_XY for conversion operations
     pub fn new(definition: &str) -> Option<Proj> {
-        // steal ctx from Context
-        let c_definition = CString::new(definition).ok()?;
         let ctx = unsafe { proj_context_create() };
-        let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
-        if new_c_proj.is_null() {
-            None
-        } else {
-            Some(Proj {
-                c_proj: new_c_proj,
-                ctx,
-                area: None,
-            })
-        }
+        Some(transform_string(ctx, definition)?)
     }
 
     /// Try to create a new transformation object that is a pipeline between two known coordinate reference systems.
@@ -443,30 +439,8 @@ impl Proj {
     /// # Safety
     /// This method contains unsafe code.
     pub fn new_known_crs(from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
-        let from_c = CString::new(from).ok()?;
-        let to_c = CString::new(to).ok()?;
-        let proj_area = unsafe { proj_area_create() };
-        area_set_bbox(proj_area, area);
         let ctx = unsafe { proj_context_create() };
-        let new_c_proj =
-            unsafe { proj_create_crs_to_crs(ctx, from_c.as_ptr(), to_c.as_ptr(), proj_area) };
-        if new_c_proj.is_null() {
-            None
-        } else {
-            // Normalise input and output order to Lon, Lat / Easting Northing by inserting
-            // An axis swap operation if necessary
-            let normalised = unsafe {
-                let normalised = proj_normalize_for_visualization(ctx, new_c_proj);
-                // deallocate stale PJ pointer
-                proj_destroy(new_c_proj);
-                normalised
-            };
-            Some(Proj {
-                c_proj: normalised,
-                ctx,
-                area: Some(proj_area),
-            })
-        }
+        Some(transform_epsg(ctx, from, to, area)?)
     }
 
     /// Set the bounding box of the area of use
