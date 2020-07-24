@@ -210,9 +210,17 @@ impl TransformBuilder {
             }?;
         }
         let enable = if enable { 1 } else { 0 };
-        match unsafe { proj_context_set_enable_network(self.ctx(), enable) } {
-            1 => Ok(1),
-            _ => Err(ProjError::Network),
+        match (enable, unsafe { proj_context_set_enable_network(self.ctx(), enable) }) {
+            // we asked to switch on: switched on
+            (1, 1) => Ok(1),
+            // we asked to switch off: switched off
+            (0, 0) => Ok(0),
+            // we asked to switch off, but it's still on
+            (0, 1) => Err(ProjError::Network),
+            // we asked to switch on, but it's still off
+            (1, 0) => Err(ProjError::Network),
+            // scrëm
+            _ => Err(ProjError::Network)
         }
     }
 
@@ -771,8 +779,9 @@ mod test {
         // File to download: uk_os_OSTN15_NTv2_OSGBtoETRS.tif
         // off by default, switch it on and check
         assert_eq!(tf.network_enabled(), false);
+        tf.enable_network(false).unwrap();
+        assert_eq!(tf.network_enabled(), false);
         tf.enable_network(true).unwrap();
-        assert_eq!(tf.network_enabled(), true);
         // I expected the following call to trigger a download, but it doesn't!
         let proj = tf.transform_known_crs(&from, &to, None).unwrap();
         // download begins here:
