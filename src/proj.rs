@@ -813,44 +813,49 @@ mod test {
         assert_almost_eq(t.x(), 39.99999839);
         assert_almost_eq(t.y(), -79.99999807);
     }
-    // #[test]
-    // fn test_definition() {
-    //     let wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
-    //     let proj = Proj::new(wgs84).unwrap();
-    //     assert_eq!(
-    //         proj.def().unwrap(),
-    //         "proj=longlat datum=WGS84 no_defs ellps=WGS84 towgs84=0,0,0"
-    //     );
-    // }
+    #[test]
+    fn test_definition() {
+        let wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
+        let proj = Proj::new(wgs84).unwrap();
+        assert_eq!(
+            proj.def().unwrap(),
+            "proj=longlat datum=WGS84 no_defs ellps=WGS84 towgs84=0,0,0"
+        );
+    }
     // #[test]
     // fn test_searchpath() {
+    //     let tf = TransformBuilder::new();
     //     let wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
-    //     let proj = Proj::new(wgs84).unwrap();
-    //     proj.set_search_paths(&"/foo").unwrap();
+    //     tf.set_search_paths(&"/foo").unwrap();
+    //     let proj = tf.transform(wgs84).unwrap();
     //     let ipath = proj.info().unwrap().searchpath;
     //     let pathsep = if cfg!(windows) { ";" } else { ":" };
     //     let individual: Vec<&str> = ipath.split(pathsep).collect();
     //     assert_eq!(&individual.last().unwrap(), &&"/foo")
     // }
-    // // #[test]
-    // // fn test_endpoint() {
-    // //     let ep = get_url_endpoint().unwrap();
-    // //     assert_eq!(&ep, "https://cdn.proj.org");
-    // //     set_url_endpoint("https://github.com/georust").unwrap();
-    // //     let ep = get_url_endpoint().unwrap();
-    // //     assert_eq!(&ep, "https://github.com/georust");
-    // // }
-    // #[test]
-    // fn test_from_crs() {
-    //     let from = "EPSG:2230";
-    //     let to = "EPSG:26946";
-    //     let proj = Proj::new_known_crs(&from, &to, None).unwrap();
-    //     let t = proj
-    //         .convert(Point::new(4760096.421921, 3744293.729449))
-    //         .unwrap();
-    //     assert_almost_eq(t.x(), 1450880.29);
-    //     assert_almost_eq(t.y(), 1141263.01);
-    // }
+    #[test]
+    fn test_set_endpoint() {
+        let from = "EPSG:4326";
+        let to = "EPSG:4326+3855";
+        let tf = TransformBuilder::new();
+        let ep = tf.get_url_endpoint().unwrap();
+        assert_eq!(&ep, "https://cdn.proj.org");
+        tf.set_url_endpoint("https://github.com/georust").unwrap();
+        let proj = tf.transform_known_crs(&from, &to, None).unwrap();
+        let ep = proj.get_url_endpoint().unwrap();
+        assert_eq!(&ep, "https://github.com/georust");
+    }
+    #[test]
+    fn test_from_crs() {
+        let from = "EPSG:2230";
+        let to = "EPSG:26946";
+        let proj = Proj::new_known_crs(&from, &to, None).unwrap();
+        let t = proj
+            .convert(Point::new(4760096.421921, 3744293.729449))
+            .unwrap();
+        assert_almost_eq(t.x(), 1450880.29);
+        assert_almost_eq(t.y(), 1141263.01);
+    }
     // // This test is disabled by default as it requires network access
     // // #[test]
     // // fn test_network() {
@@ -867,141 +872,141 @@ mod test {
     // //     assert_almost_eq(t.x(), 39.99999839);
     // //     assert_almost_eq(t.y(), -79.99999807);
     // // }
-    // #[test]
-    // // Carry out a projection from geodetic coordinates
-    // fn test_projection() {
-    //     let stereo70 = Proj::new(
-    //         "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
-    //         +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs",
-    //     )
-    //     .unwrap();
-    //     // Geodetic -> Pulkovo 1942(58) / Stereo70 (EPSG 3844)
-    //     let t = stereo70
-    //         .project(Point::new(0.436332, 0.802851), false)
-    //         .unwrap();
-    //     assert_almost_eq(t.x(), 500119.7035366755);
-    //     assert_almost_eq(t.y(), 500027.77901023754);
-    // }
-    // #[test]
-    // // Carry out an inverse projection to geodetic coordinates
-    // fn test_inverse_projection() {
-    //     let stereo70 = Proj::new(
-    //         "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
-    //         +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs",
-    //     )
-    //     .unwrap();
-    //     // Pulkovo 1942(58) / Stereo70 (EPSG 3844) -> Geodetic
-    //     let t = stereo70
-    //         .project(Point::new(500119.70352012233, 500027.77896348457), true)
-    //         .unwrap();
-    //     assert_almost_eq(t.x(), 0.436332);
-    //     assert_almost_eq(t.y(), 0.802851);
-    // }
-    // #[test]
-    // // Carry out an inverse projection to geodetic coordinates
-    // fn test_london_inverse() {
-    //     let osgb36 = Proj::new(
-    //         "
-    //         +proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy
-    //         +towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 +units=m +no_defs
-    //         ",
-    //     )
-    //     .unwrap();
-    //     // OSGB36 (EPSG 27700) -> Geodetic
-    //     let t = osgb36
-    //         .project(Point::new(548295.39, 182498.46), true)
-    //         .unwrap();
-    //     assert_almost_eq(t.x(), 0.0023755864848281206);
-    //     assert_almost_eq(t.y(), 0.8992274896304518);
-    // }
-    // #[test]
-    // // Carry out a conversion from NAD83 feet (EPSG 2230) to NAD83 metres (EPSG 26946)
-    // fn test_conversion() {
-    //     let nad83_m = Proj::new("
-    //         +proj=pipeline
-    //         +step +inv +proj=lcc +lat_1=33.88333333333333
-    //         +lat_2=32.78333333333333 +lat_0=32.16666666666666
-    //         +lon_0=-116.25 +x_0=2000000.0001016 +y_0=500000.0001016001 +ellps=GRS80
-    //         +towgs84=0,0,0,0,0,0,0 +units=us-ft +no_defs
-    //         +step +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666
-    //         +lon_0=-116.25 +x_0=2000000 +y_0=500000
-    //         +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs
-    //     ").unwrap();
-    //     // Presidio, San Francisco
-    //     let t = nad83_m
-    //         .convert(Point::new(4760096.421921, 3744293.729449))
-    //         .unwrap();
-    //     assert_almost_eq(t.x(), 1450880.29);
-    //     assert_almost_eq(t.y(), 1141263.01);
-    // }
-    // #[test]
-    // // Test that instantiation fails wth bad proj string input
-    // fn test_init_error() {
-    //     assert!(Proj::new("🦀").is_none());
-    // }
-    // #[test]
-    // fn test_conversion_error() {
-    //     // because step 1 isn't an inverse conversion, it's expecting lon lat input
-    //     let nad83_m = Proj::new(
-    //         "+proj=geos +lon_0=0.00 +lat_0=0.00 +a=6378169.00 +b=6356583.80 +h=35785831.0",
-    //     )
-    //     .unwrap();
-    //     let err = nad83_m
-    //         .convert(Point::new(4760096.421921, 3744293.729449))
-    //         .unwrap_err();
-    //     assert_eq!(
-    //         "The conversion failed with the following error: latitude or longitude exceeded limits",
-    //         err.to_string()
-    //     );
-    // }
+    #[test]
+    // Carry out a projection from geodetic coordinates
+    fn test_projection() {
+        let stereo70 = Proj::new(
+            "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
+            +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs",
+        )
+        .unwrap();
+        // Geodetic -> Pulkovo 1942(58) / Stereo70 (EPSG 3844)
+        let t = stereo70
+            .project(Point::new(0.436332, 0.802851), false)
+            .unwrap();
+        assert_almost_eq(t.x(), 500119.7035366755);
+        assert_almost_eq(t.y(), 500027.77901023754);
+    }
+    #[test]
+    // Carry out an inverse projection to geodetic coordinates
+    fn test_inverse_projection() {
+        let stereo70 = Proj::new(
+            "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
+            +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs",
+        )
+        .unwrap();
+        // Pulkovo 1942(58) / Stereo70 (EPSG 3844) -> Geodetic
+        let t = stereo70
+            .project(Point::new(500119.70352012233, 500027.77896348457), true)
+            .unwrap();
+        assert_almost_eq(t.x(), 0.436332);
+        assert_almost_eq(t.y(), 0.802851);
+    }
+    #[test]
+    // Carry out an inverse projection to geodetic coordinates
+    fn test_london_inverse() {
+        let osgb36 = Proj::new(
+            "
+            +proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy
+            +towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 +units=m +no_defs
+            ",
+        )
+        .unwrap();
+        // OSGB36 (EPSG 27700) -> Geodetic
+        let t = osgb36
+            .project(Point::new(548295.39, 182498.46), true)
+            .unwrap();
+        assert_almost_eq(t.x(), 0.0023755864848281206);
+        assert_almost_eq(t.y(), 0.8992274896304518);
+    }
+    #[test]
+    // Carry out a conversion from NAD83 feet (EPSG 2230) to NAD83 metres (EPSG 26946)
+    fn test_conversion() {
+        let nad83_m = Proj::new("
+            +proj=pipeline
+            +step +inv +proj=lcc +lat_1=33.88333333333333
+            +lat_2=32.78333333333333 +lat_0=32.16666666666666
+            +lon_0=-116.25 +x_0=2000000.0001016 +y_0=500000.0001016001 +ellps=GRS80
+            +towgs84=0,0,0,0,0,0,0 +units=us-ft +no_defs
+            +step +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666
+            +lon_0=-116.25 +x_0=2000000 +y_0=500000
+            +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs
+        ").unwrap();
+        // Presidio, San Francisco
+        let t = nad83_m
+            .convert(Point::new(4760096.421921, 3744293.729449))
+            .unwrap();
+        assert_almost_eq(t.x(), 1450880.29);
+        assert_almost_eq(t.y(), 1141263.01);
+    }
+    #[test]
+    // Test that instantiation fails wth bad proj string input
+    fn test_init_error() {
+        assert!(Proj::new("🦀").is_none());
+    }
+    #[test]
+    fn test_conversion_error() {
+        // because step 1 isn't an inverse conversion, it's expecting lon lat input
+        let nad83_m = Proj::new(
+            "+proj=geos +lon_0=0.00 +lat_0=0.00 +a=6378169.00 +b=6356583.80 +h=35785831.0",
+        )
+        .unwrap();
+        let err = nad83_m
+            .convert(Point::new(4760096.421921, 3744293.729449))
+            .unwrap_err();
+        assert_eq!(
+            "The conversion failed with the following error: latitude or longitude exceeded limits",
+            err.to_string()
+        );
+    }
 
-    // #[test]
-    // fn test_error_recovery() {
-    //     let nad83_m = Proj::new(
-    //         "+proj=geos +lon_0=0.00 +lat_0=0.00 +a=6378169.00 +b=6356583.80 +h=35785831.0",
-    //     )
-    //     .unwrap();
+    #[test]
+    fn test_error_recovery() {
+        let nad83_m = Proj::new(
+            "+proj=geos +lon_0=0.00 +lat_0=0.00 +a=6378169.00 +b=6356583.80 +h=35785831.0",
+        )
+        .unwrap();
 
-    //     // we expect this first conversion to fail (copied from above test case)
-    //     assert!(nad83_m
-    //         .convert(Point::new(4760096.421921, 3744293.729449))
-    //         .is_err());
+        // we expect this first conversion to fail (copied from above test case)
+        assert!(nad83_m
+            .convert(Point::new(4760096.421921, 3744293.729449))
+            .is_err());
 
-    //     // but a subsequent valid conversion should still be successful
-    //     assert!(nad83_m.convert(Point::new(0.0, 0.0)).is_ok());
+        // but a subsequent valid conversion should still be successful
+        assert!(nad83_m.convert(Point::new(0.0, 0.0)).is_ok());
 
-    //     // also test with project() function
-    //     assert!(nad83_m
-    //         .project(Point::new(99999.0, 99999.0), false)
-    //         .is_err());
-    //     assert!(nad83_m.project(Point::new(0.0, 0.0), false).is_ok());
-    // }
+        // also test with project() function
+        assert!(nad83_m
+            .project(Point::new(99999.0, 99999.0), false)
+            .is_err());
+        assert!(nad83_m.project(Point::new(0.0, 0.0), false).is_ok());
+    }
 
-    // #[test]
-    // fn test_array_convert() {
-    //     let from = "EPSG:2230";
-    //     let to = "EPSG:26946";
-    //     let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
-    //     let mut v = vec![
-    //         Point::new(4760096.421921, 3744293.729449),
-    //         Point::new(4760197.421921, 3744394.729449),
-    //     ];
-    //     ft_to_m.convert_array(&mut v).unwrap();
-    //     assert_almost_eq(v[0].x(), 1450880.2910605003f64);
-    //     assert_almost_eq(v[1].y(), 1141293.7960220212f64);
-    // }
+    #[test]
+    fn test_array_convert() {
+        let from = "EPSG:2230";
+        let to = "EPSG:26946";
+        let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+        let mut v = vec![
+            Point::new(4760096.421921, 3744293.729449),
+            Point::new(4760197.421921, 3744394.729449),
+        ];
+        ft_to_m.convert_array(&mut v).unwrap();
+        assert_almost_eq(v[0].x(), 1450880.2910605003f64);
+        assert_almost_eq(v[1].y(), 1141293.7960220212f64);
+    }
 
-    // #[test]
-    // // Ensure that input and output order are normalised to Lon, Lat / Easting Northing
-    // // Without normalisation this test would fail, as EPSG:4326 expects Lat, Lon input order.
-    // fn test_input_order() {
-    //     let from = "EPSG:4326";
-    //     let to = "EPSG:2230";
-    //     let to_feet = Proj::new_known_crs(&from, &to, None).unwrap();
-    //     // 👽
-    //     let usa_m = Point::new(-115.797615, 37.2647978);
-    //     let usa_ft = to_feet.convert(usa_m).unwrap();
-    //     assert_eq!(6693625.67217475, usa_ft.x());
-    //     assert_eq!(3497301.5918027186, usa_ft.y());
-    // }
+    #[test]
+    // Ensure that input and output order are normalised to Lon, Lat / Easting Northing
+    // Without normalisation this test would fail, as EPSG:4326 expects Lat, Lon input order.
+    fn test_input_order() {
+        let from = "EPSG:4326";
+        let to = "EPSG:2230";
+        let to_feet = Proj::new_known_crs(&from, &to, None).unwrap();
+        // 👽
+        let usa_m = Point::new(-115.797615, 37.2647978);
+        let usa_ft = to_feet.convert(usa_m).unwrap();
+        assert_eq!(6693625.67217475, usa_ft.x());
+        assert_eq!(3497301.5918027186, usa_ft.y());
+    }
 }
