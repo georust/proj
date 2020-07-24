@@ -107,12 +107,8 @@ fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
     }
 }
 
-// called by Proj::new and TransformBuilder::transform_new_crs
+/// called by Proj::new and TransformBuilder::transform_new_crs
 fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Option<Proj> {
-    // In contrast to proj v4.x, the type of transformation
-    // is signalled by the choice of enum used as input to the PJ_COORD union
-    // PJ_LP signals projection of geodetic coordinates, with output being PJ_XY
-    // and vice versa, or using PJ_XY for conversion operations
     let c_definition = CString::new(definition).ok()?;
     let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
     if new_c_proj.is_null() {
