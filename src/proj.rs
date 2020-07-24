@@ -122,7 +122,7 @@ fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Option<Proj> {
     }
 }
 
-// Called by new_known_crs and transform_known_crs
+/// Called by new_known_crs and transform_known_crs
 fn transform_epsg(ctx: *mut PJ_CONTEXT, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
     let from_c = CString::new(from).ok()?;
     let to_c = CString::new(to).ok()?;
@@ -790,18 +790,17 @@ mod test {
             "proj=longlat datum=WGS84 no_defs ellps=WGS84 towgs84=0,0,0"
         );
     }
-    // #[test]
-    // fn test_searchpath() {
-    //     let tf = TransformBuilder::new();
-    //     let from = "EPSG:4326";
-    //     let to = "EPSG:4326+3855";
-    //     tf.set_search_paths(&"/foo").unwrap();
-    //     let ipath = tf.info().unwrap().searchpath;
-    //     let proj = tf.transform_known_crs(&from, &to, None).unwrap();
-    //     let pathsep = if cfg!(windows) { ";" } else { ":" };
-    //     let individual: Vec<&str> = ipath.split(pathsep).collect();
-    //     assert_eq!(&individual.last().unwrap(), &&"/foo")
-    // }
+    #[test]
+    #[should_panic]
+    // This failure is a bug in libproj
+    fn test_searchpath() {
+        let tf = TransformBuilder::new();
+        tf.set_search_paths(&"/foo").unwrap();
+        let ipath = tf.info().unwrap().searchpath;
+        let pathsep = if cfg!(windows) { ";" } else { ":" };
+        let individual: Vec<&str> = ipath.split(pathsep).collect();
+        assert_eq!(&individual.last().unwrap(), &&"/foo")
+    }
     #[test]
     fn test_set_endpoint() {
         let from = "EPSG:4326";
