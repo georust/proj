@@ -1,22 +1,30 @@
 #![doc(html_logo_url = "https://raw.githubusercontent.com/georust/meta/master/logo/logo.png")]
 //! `proj` provides bindings to the [PROJ](https://proj.org) v7.0.x API
 //!
-//! Two coordinate transformation operations are currently provided: [projection](struct.Proj.html#method.project)
-//! (and inverse projection)
-//! and [conversion](struct.Proj.html#method.convert).
-//! Projection is intended for transformations between geodetic and projected coordinates,
+//! Two coordinate transformation operations are currently provided: _projection_
+//! (and inverse projection) and _conversion_.
+//! Projection is intended for transformations between geodetic and projected coordinates
 //! and vice versa (inverse projection), while conversion is intended for transformations between projected
 //! coordinate systems. The PROJ [documentation](https://proj.org/operations/index.html)
-//! explains the distinction between these operations.
+//! explains the distinction between these operations in more detail.
 //!
 //! Anything that can be converted into a [`geo-types`](https://docs.rs/geo-types) `Point` via the `Into`
 //! trait can be used as input for the projection and conversion functions, and methods
 //! for [conversion](struct.Proj.html#method.convert_array) and [projection](struct.Proj.html#method.project_array)
 //! of slices of `Point`s are available.
+//!
 //! # Usage
-//! Instantiating a transformation instance (`Proj`) is a two-step process:
-//! 1. Create a new `Context` by calling `Context::new`. This context may be modified to enable network downloads or modify search paths if you wish;
-//! 2. Create the transformation instance (`Proj`) by calling [`transform()`](proj/struct.Context.html#method.transform) or [`transform_known_crs()`](proj/struct.Context.html#method.transform_known_crs).
+//! There are two options for creating a transformation:
+//!
+//! 1. If you don't require additional grids or other customisation:
+//!     - Call `Proj::new` or `Proj::new_known_crs`. This creates a transformation instance ([`Proj`](proj/struct.Proj.html))
+//! 2. If you require a grid for the transformation you wish to carry out, or you need to customise the search path or the grid endpoint:
+//!     - Create a new [`TransformBuilder`](proj/struct.TransformBuilder.html) by calling `TransformBuilder::new()`. It may be modified to enable network downloads, disable the grid, cache or modify search paths;
+//!     - Call [`TransformBuilder.transform()`](proj/struct.TransformBuilder.html#method.transform) or [`TransformBuilder.transform_known_crs()`](proj/struct.TransformBuilder.html#method.transform_known_crs). This creates a transformation instance (`Proj`)
+//!
+//! **Note**:
+//!
+//! Both `TransformBuilder` and `Proj` implement the [`Info`](proj/trait.Info.html) trait, which can be used to get information about the current state of the `PROJ` instance.
 //!
 //! ## Network, Cache, and Search Path Functionality
 //!

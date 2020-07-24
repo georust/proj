@@ -107,38 +107,12 @@ fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
     }
 }
 
-// /// An instance of a PROJ [Context](struct.TransformBuilder.html) or a [Transformation / Projection](struct.Proj.html) object
-// pub enum ContextTransform {
-//     TransformBuilder,
-//     Proj,
-// }
-
-// /// Information about the current PROJ context. Available on `Context` or `Proj` instances.
-// pub trait Info {
-//     /// Check whether network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for) is currently enabled or disabled.
-//     ///
-//     /// # Safety
-//     /// This method contains unsafe code.
-//     fn network_enabled(&self) -> bool;
-
-//     /// Get the URL endpoint to query for remote grids
-//     ///
-//     /// # Safety
-//     /// This method contains unsafe code.
-//     fn get_url_endpoint(&self) -> Result<String, ProjError>;
-
-//     /// Return [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about the current PROJ context
-//     ///
-//     /// # Safety
-//     /// This method contains unsafe code.
-//     fn info(&self) -> Result<Projinfo, ProjError>;
-// }
-
-/// Utility methods for providing information about PROJ
+/// Read-only utility methods for providing information about the current PROJ instance
 pub trait Info {
+    #[doc(hidden)]
     fn ctx(&self) -> *mut PJ_CONTEXT;
-    /// Check whether network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for) is currently enabled or disabled.
-    ///
+    
+    /// Return [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about the current PROJ context
     /// # Safety
     /// This method contains unsafe code.
     fn info(&self) -> Result<Projinfo, ProjError> {
@@ -153,7 +127,7 @@ pub trait Info {
         })
     }
 
-    /// Get the URL endpoint to query for remote grids
+    /// Check whether network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for) is currently enabled or disabled.
     ///
     /// # Safety
     /// This method contains unsafe code.
@@ -165,7 +139,7 @@ pub trait Info {
         }
     }
 
-    /// Return [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about the current PROJ context
+    /// Get the URL endpoint to query for remote grids
     ///
     /// # Safety
     /// This method contains unsafe code.
@@ -175,11 +149,82 @@ pub trait Info {
 }
 
 impl Info for TransformBuilder {
+    #[doc(hidden)]
     fn ctx(&self) -> *mut PJ_CONTEXT {
         self.ctx
     }
 }
+
+impl TransformBuilder {
+    /// Enable or disable network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for).
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn enable_network(&self, enable: bool) -> Result<u8, ProjError> {
+        if enable {
+            let _ = match set_network_callbacks(self.ctx()) {
+                1 => Ok(1),
+                _ => Err(ProjError::Network),
+            }?;
+        }
+        let enable = if enable { 1 } else { 0 };
+        match unsafe { proj_context_set_enable_network(self.ctx(), enable) } {
+            1 => Ok(1),
+            _ => Err(ProjError::Network),
+        }
+    }
+
+    /// Add a [resource file search path](https://proj.org/resource_files.html), maintaining existing entries.
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn set_search_paths<P: AsRef<Path>>(&self, newpath: P) -> Result<(), ProjError> {
+        let existing = self.info()?.searchpath;
+        let pathsep = if cfg!(windows) { ";" } else { ":" };
+        let mut individual: Vec<&str> = existing.split(pathsep).collect();
+        let np = Path::new(newpath.as_ref());
+        individual.push(np.to_str().ok_or(ProjError::Path)?);
+        let newlength = individual.len() as i32;
+        // convert path entries to CString
+        let paths_c = individual
+            .iter()
+            .map(|str| CString::new(*str))
+            .collect::<Result<Vec<_>, std::ffi::NulError>>()?;
+        // …then to raw pointers
+        let paths_p: Vec<_> = paths_c.iter().map(|cstr| cstr.as_ptr()).collect();
+        // …then pass the slice of raw pointers as a raw pointer (const char* const*)
+        unsafe { proj_context_set_search_paths(self.ctx(), newlength, paths_p.as_ptr()) }
+        Ok(())
+    }
+
+    /// Enable or disable the local cache of grid chunks
+    ///
+    /// To avoid repeated network access, a local cache of downloaded chunks of grids is
+    /// implemented as SQLite3 database, cache.db, stored in the PROJ user writable directory.
+    /// This local caching is **enabled** by default.
+    /// The default maximum size of the cache is 300 MB, which is more than half of the total size
+    /// of grids available, at time of writing.
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn grid_cache_enable(&self, enable: bool) {
+        let enable = if enable { 1 } else { 0 };
+        let _ = unsafe { proj_grid_cache_set_enable(self.ctx(), enable) };
+    }
+
+    /// Set the URL endpoint to query for remote grids
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn set_url_endpoint(&self, endpoint: &str) -> Result<(), ProjError> {
+        let s = CString::new(endpoint)?;
+        unsafe { proj_context_set_url_endpoint(self.ctx(), s.as_ptr()) };
+        Ok(())
+    }
+}
+
 impl Info for Proj {
+    #[doc(hidden)]
     fn ctx(&self) -> *mut PJ_CONTEXT {
         self.ctx
     }
@@ -209,78 +254,13 @@ pub struct TransformBuilder {
 }
 
 impl TransformBuilder {
+    /// Create a new `TransformBuilder`, allowing grid downloads and other customisation.
     pub fn new() -> Self {
         let ctx = unsafe { proj_context_create() };
         TransformBuilder { ctx }
     }
 
-    /// Enable or disable network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for).
-    ///
-    /// # Safety
-    /// This method contains unsafe code.
-    pub fn enable_network(&self, enable: bool) -> Result<u8, ProjError> {
-        if enable {
-            let _ = match set_network_callbacks(self.ctx) {
-                1 => Ok(1),
-                _ => Err(ProjError::Network),
-            }?;
-        }
-        let enable = if enable { 1 } else { 0 };
-        match unsafe { proj_context_set_enable_network(self.ctx, enable) } {
-            1 => Ok(1),
-            _ => Err(ProjError::Network),
-        }
-    }
-
-    /// Set the URL endpoint to query for remote grids
-    ///
-    /// # Safety
-    /// This method contains unsafe code.
-    pub fn set_url_endpoint(&self, endpoint: &str) -> Result<(), ProjError> {
-        let s = CString::new(endpoint)?;
-        unsafe { proj_context_set_url_endpoint(self.ctx, s.as_ptr()) };
-        Ok(())
-    }
-
-    /// Enable or disable the local cache of grid chunks
-    ///
-    /// To avoid repeated network access, a local cache of downloaded chunks of grids is
-    /// implemented as SQLite3 database, cache.db, stored in the PROJ user writable directory.
-    /// This local caching is **enabled** by default.
-    /// The default maximum size of the cache is 300 MB, which is more than half of the total size
-    /// of grids available, at time of writing.
-    ///
-    /// # Safety
-    /// This method contains unsafe code.
-    pub fn grid_cache_enable(&self, enable: bool) {
-        let enable = if enable { 1 } else { 0 };
-        let _ = unsafe { proj_grid_cache_set_enable(self.ctx, enable) };
-    }
-
-    /// Add a [resource file search path](https://proj.org/resource_files.html), maintaining existing entries.
-    ///
-    /// # Safety
-    /// This method contains unsafe code.
-    pub fn set_search_paths<P: AsRef<Path>>(&self, newpath: P) -> Result<(), ProjError> {
-        let existing = self.info()?.searchpath;
-        let pathsep = if cfg!(windows) { ";" } else { ":" };
-        let mut individual: Vec<&str> = existing.split(pathsep).collect();
-        let np = Path::new(newpath.as_ref());
-        individual.push(np.to_str().ok_or(ProjError::Path)?);
-        let newlength = individual.len() as i32;
-        // convert path entries to CString
-        let paths_c = individual
-            .iter()
-            .map(|str| CString::new(*str))
-            .collect::<Result<Vec<_>, std::ffi::NulError>>()?;
-        // …then to raw pointers
-        let paths_p: Vec<_> = paths_c.iter().map(|cstr| cstr.as_ptr()).collect();
-        // …then pass the slice of raw pointers as a raw pointer (const char* const*)
-        unsafe { proj_context_set_search_paths(self.ctx, newlength, paths_p.as_ptr()) }
-        Ok(())
-    }
-
-    /// Try to instantiate a new `PROJ` instance for coordinate transformation
+    /// Try to create a coordinate transformation object
     ///
     /// **Note:** for projection operations, `definition` specifies
     /// the **output** projection; input coordinates
@@ -310,7 +290,7 @@ impl TransformBuilder {
         }
     }
 
-    /// Create a transformation object that is a pipeline between two known coordinate reference systems.
+    /// Try to create a transformation object that is a pipeline between two known coordinate reference systems.
     /// `from` and `to` can be:
     ///
     /// - an `"AUTHORITY:CODE"`, like `"EPSG:25832"`.
@@ -351,34 +331,39 @@ impl TransformBuilder {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn transform_known_crs(self, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
+    pub fn transform_known_crs(mut self, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
         let from_c = CString::new(from).ok()?;
         let to_c = CString::new(to).ok()?;
         let proj_area = unsafe { proj_area_create() };
         area_set_bbox(proj_area, area);
+        // self is dropped when this function returns. In order to prevent the ctx from being destroyed,
+        // it's necessary to swap it for a placeholder. The original can then be used to construct
+        // the transformation object
+        let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
         let new_c_proj =
-            unsafe { proj_create_crs_to_crs(self.ctx, from_c.as_ptr(), to_c.as_ptr(), proj_area) };
+            unsafe { proj_create_crs_to_crs(ctx, from_c.as_ptr(), to_c.as_ptr(), proj_area) };
         if new_c_proj.is_null() {
             None
         } else {
             // Normalise input and output order to Lon, Lat / Easting Northing by inserting
             // An axis swap operation if necessary
             let normalised = unsafe {
-                let normalised = proj_normalize_for_visualization(self.ctx, new_c_proj);
+                let normalised = proj_normalize_for_visualization(ctx, new_c_proj);
                 // deallocate stale PJ pointer
                 proj_destroy(new_c_proj);
                 normalised
             };
+            println!("{:?}", "Download not yet initiated");
             Some(Proj {
                 c_proj: normalised,
-                ctx: self.ctx,
+                ctx,
                 area: Some(proj_area),
             })
         }
     }
 }
 
-/// A `PROJ` instance
+/// A coordinate transformation object
 pub struct Proj {
     c_proj: *mut PJconsts,
     ctx: *mut PJ_CONTEXT,
@@ -386,7 +371,7 @@ pub struct Proj {
 }
 
 impl Proj {
-    /// Try to instantiate a new `PROJ` instance
+    /// Try to create a new transformation object
     ///
     /// **Note:** for projection operations, `definition` specifies
     /// the **output** projection; input coordinates
@@ -397,7 +382,6 @@ impl Proj {
     ///
     /// # Safety
     /// This method contains unsafe code.
-
     // In contrast to proj v4.x, the type of transformation
     // is signalled by the choice of enum used as input to the PJ_COORD union
     // PJ_LP signals projection of geodetic coordinates, with output being PJ_XY
@@ -419,7 +403,7 @@ impl Proj {
         }
     }
 
-    /// Create a transformation object that is a pipeline between two known coordinate reference systems.
+    /// Try to create a new transformation object that is a pipeline between two known coordinate reference systems.
     /// `from` and `to` can be:
     ///
     /// - an `"AUTHORITY:CODE"`, like `"EPSG:25832"`.
@@ -780,28 +764,28 @@ impl Proj {
     }
 }
 
-// impl Drop for Proj {
-//     fn drop(&mut self) {
-//         unsafe {
-//             if let Some(area) = self.area {
-//                 proj_area_destroy(area)
-//             }
-//             proj_destroy(self.c_proj);
-//             proj_context_destroy(self.ctx);
-//             // NB do NOT call until proj_destroy and proj_context_destroy have both returned:
-//             // https://proj.org/development/reference/functions.html#c.proj_cleanup
-//             proj_cleanup()
-//         }
-//     }
-// }
+impl Drop for Proj {
+    fn drop(&mut self) {
+        unsafe {
+            if let Some(area) = self.area {
+                proj_area_destroy(area)
+            }
+            proj_destroy(self.c_proj);
+            proj_context_destroy(self.ctx);
+            // NB do NOT call until proj_destroy and proj_context_destroy have both returned:
+            // https://proj.org/development/reference/functions.html#c.proj_cleanup
+            proj_cleanup()
+        }
+    }
+}
 
-// impl Drop for TransformBuilder {
-//     fn drop(&mut self) {
-//         unsafe {
-//             proj_context_destroy(self.ctx);
-//         }
-//     }
-// }
+impl Drop for TransformBuilder {
+    fn drop(&mut self) {
+        unsafe {
+            proj_context_destroy(self.ctx);
+        }
+    }
+}
 
 #[cfg(test)]
 mod test {
@@ -815,19 +799,17 @@ mod test {
     }
     #[test]
     fn flibble() {
-        let mut tf = TransformBuilder::new();
-        // off by default
-        assert_eq!(tf.network_enabled(), false);
-        tf.grid_cache_enable(true);
-        tf.enable_network(true).unwrap();
-        assert_eq!(tf.network_enabled(), true);
+        let tf = TransformBuilder::new();
         let from = "EPSG:4326";
         let to = "EPSG:4326+3855";
-        // This should trigger a download
+        // off by default, switch it on and check
+        assert_eq!(tf.network_enabled(), false);
+        tf.enable_network(true).unwrap();
+        assert_eq!(tf.network_enabled(), true);
+        // I expected the following call to trigger a download, but it doesn't!
         let proj = tf.transform_known_crs(&from, &to, None).unwrap();
-        println!("{:?}", "yo");
+        // download begins here
         let t = proj.convert(Point::new(40.0, -80.0)).unwrap();
-        println!("{:?}", "done");
         assert_almost_eq(t.x(), 39.99999839);
         assert_almost_eq(t.y(), -79.99999807);
     }
