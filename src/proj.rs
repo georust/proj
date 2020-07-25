@@ -763,6 +763,7 @@ impl Drop for ProjBuilder {
     fn drop(&mut self) {
         unsafe {
             proj_context_destroy(self.ctx);
+            proj_cleanup()
         }
     }
 }
