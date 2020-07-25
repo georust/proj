@@ -81,8 +81,8 @@ mod network;
 mod proj;
 
 pub use crate::proj::Area;
-pub use crate::proj::ProjBuilder;
 pub use crate::proj::Info;
 pub use crate::proj::Proj;
+pub use crate::proj::ProjBuilder;
 pub use crate::proj::ProjError;
 pub use crate::proj::Projinfo;
