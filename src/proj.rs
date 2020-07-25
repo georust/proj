@@ -323,7 +323,7 @@ impl TransformBuilder {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn transform(mut self, definition: &str) -> Option<Proj> {
+    pub fn proj(mut self, definition: &str) -> Option<Proj> {
         let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
         Some(transform_string(ctx, definition)?)
     }
