@@ -17,8 +17,8 @@ use proj_sys::{proj_errno, proj_errno_reset};
 
 use std::ffi::CStr;
 use std::ffi::CString;
+use std::path::Path;
 use std::str;
-use std::{path::Path, ptr};
 use thiserror::Error;
 
 /// Errors originating in PROJ which can occur during projection and conversion
@@ -107,73 +107,179 @@ fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
     }
 }
 
-/// Enable or disable network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for).
-///
-/// This will configure network access for all **subsequent** `Proj` instances, but will **not** affect pre-existing instances.
-/// # Safety
-/// This method contains unsafe code.
-pub fn enable_network(enable: bool) -> Result<u8, ProjError> {
-    if enable {
-        let _ = match set_network_callbacks() {
-            1 => Ok(1),
+/// called by Proj::new and TransformBuilder::transform_new_crs
+fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Option<Proj> {
+    let c_definition = CString::new(definition).ok()?;
+    let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
+    if new_c_proj.is_null() {
+        None
+    } else {
+        Some(Proj {
+            c_proj: new_c_proj,
+            ctx,
+            area: None,
+        })
+    }
+}
+
+/// Called by new_known_crs and transform_known_crs
+fn transform_epsg(ctx: *mut PJ_CONTEXT, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
+    let from_c = CString::new(from).ok()?;
+    let to_c = CString::new(to).ok()?;
+    let proj_area = unsafe { proj_area_create() };
+    area_set_bbox(proj_area, area);
+    let new_c_proj =
+        unsafe { proj_create_crs_to_crs(ctx, from_c.as_ptr(), to_c.as_ptr(), proj_area) };
+    if new_c_proj.is_null() {
+        None
+    } else {
+        // Normalise input and output order to Lon, Lat / Easting Northing by inserting
+        // An axis swap operation if necessary
+        let normalised = unsafe {
+            let normalised = proj_normalize_for_visualization(ctx, new_c_proj);
+            // deallocate stale PJ pointer
+            proj_destroy(new_c_proj);
+            normalised
+        };
+        Some(Proj {
+            c_proj: normalised,
+            ctx,
+            area: Some(proj_area),
+        })
+    }
+}
+
+/// Read-only utility methods for providing information about the current PROJ instance
+pub trait Info {
+    #[doc(hidden)]
+    fn ctx(&self) -> *mut PJ_CONTEXT;
+
+    /// Return [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about the current PROJ context
+    /// # Safety
+    /// This method contains unsafe code.
+    fn info(&self) -> Result<Projinfo, ProjError> {
+        let pinfo: PJ_INFO = unsafe { proj_info() };
+        Ok(Projinfo {
+            major: pinfo.major,
+            minor: pinfo.minor,
+            patch: pinfo.patch,
+            release: _string(pinfo.release)?,
+            version: _string(pinfo.version)?,
+            searchpath: _string(pinfo.searchpath)?,
+        })
+    }
+
+    /// Check whether network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for) is currently enabled or disabled.
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    fn network_enabled(&self) -> bool {
+        let res = unsafe { proj_context_is_network_enabled(self.ctx()) };
+        match res {
+            1 => true,
+            _ => false,
+        }
+    }
+
+    /// Get the URL endpoint to query for remote grids
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    fn get_url_endpoint(&self) -> Result<String, ProjError> {
+        unsafe { _string(proj_context_get_url_endpoint(self.ctx())) }
+    }
+}
+
+impl Info for TransformBuilder {
+    #[doc(hidden)]
+    fn ctx(&self) -> *mut PJ_CONTEXT {
+        self.ctx
+    }
+}
+
+impl TransformBuilder {
+    /// Enable or disable network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for).
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn enable_network(&self, enable: bool) -> Result<u8, ProjError> {
+        if enable {
+            let _ = match set_network_callbacks(self.ctx()) {
+                1 => Ok(1),
+                _ => Err(ProjError::Network),
+            }?;
+        }
+        let enable = if enable { 1 } else { 0 };
+        match (enable, unsafe {
+            proj_context_set_enable_network(self.ctx(), enable)
+        }) {
+            // we asked to switch on: switched on
+            (1, 1) => Ok(1),
+            // we asked to switch off: switched off
+            (0, 0) => Ok(0),
+            // we asked to switch off, but it's still on
+            (0, 1) => Err(ProjError::Network),
+            // we asked to switch on, but it's still off
+            (1, 0) => Err(ProjError::Network),
+            // scrëm
             _ => Err(ProjError::Network),
-        }?;
+        }
     }
-    let enable = if enable { 1 } else { 0 };
-    let dctx: *mut PJ_CONTEXT = ptr::null_mut();
-    match unsafe { proj_context_set_enable_network(dctx, enable) } {
-        1 => Ok(1),
-        _ => Err(ProjError::Network),
+
+    /// Add a [resource file search path](https://proj.org/resource_files.html), maintaining existing entries.
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn set_search_paths<P: AsRef<Path>>(&self, newpath: P) -> Result<(), ProjError> {
+        let existing = self.info()?.searchpath;
+        let pathsep = if cfg!(windows) { ";" } else { ":" };
+        let mut individual: Vec<&str> = existing.split(pathsep).collect();
+        let np = Path::new(newpath.as_ref());
+        individual.push(np.to_str().ok_or(ProjError::Path)?);
+        let newlength = individual.len() as i32;
+        // convert path entries to CString
+        let paths_c = individual
+            .iter()
+            .map(|str| CString::new(*str))
+            .collect::<Result<Vec<_>, std::ffi::NulError>>()?;
+        // …then to raw pointers
+        let paths_p: Vec<_> = paths_c.iter().map(|cstr| cstr.as_ptr()).collect();
+        // …then pass the slice of raw pointers as a raw pointer (const char* const*)
+        unsafe { proj_context_set_search_paths(self.ctx(), newlength, paths_p.as_ptr()) }
+        Ok(())
+    }
+
+    /// Enable or disable the local cache of grid chunks
+    ///
+    /// To avoid repeated network access, a local cache of downloaded chunks of grids is
+    /// implemented as SQLite3 database, cache.db, stored in the PROJ user writable directory.
+    /// This local caching is **enabled** by default.
+    /// The default maximum size of the cache is 300 MB, which is more than half of the total size
+    /// of grids available, at time of writing.
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn grid_cache_enable(&self, enable: bool) {
+        let enable = if enable { 1 } else { 0 };
+        let _ = unsafe { proj_grid_cache_set_enable(self.ctx(), enable) };
+    }
+
+    /// Set the URL endpoint to query for remote grids
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn set_url_endpoint(&self, endpoint: &str) -> Result<(), ProjError> {
+        let s = CString::new(endpoint)?;
+        unsafe { proj_context_set_url_endpoint(self.ctx(), s.as_ptr()) };
+        Ok(())
     }
 }
 
-/// Check whether network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for) is currently enabled or disabled.
-///
-/// # Safety
-/// This method contains unsafe code.
-pub fn network_enabled() -> bool {
-    let dctx: *mut PJ_CONTEXT = ptr::null_mut();
-    let res = unsafe { proj_context_is_network_enabled(dctx) };
-    match res {
-        1 => true,
-        _ => false,
+impl Info for Proj {
+    #[doc(hidden)]
+    fn ctx(&self) -> *mut PJ_CONTEXT {
+        self.ctx
     }
-}
-
-/// Enable or disable the local cache of grid chunks for all subsequent PROJ instances
-///
-/// To avoid repeated network access, a local cache of downloaded chunks of grids is
-/// implemented as SQLite3 database, cache.db, stored in the PROJ user writable directory.
-/// This local caching is **enabled** by default.
-/// The default maximum size of the cache is 300 MB, which is more than half of the total size
-/// of grids available, at time of writing.
-///
-/// # Safety
-/// This method contains unsafe code.
-pub fn grid_cache_set_enable(enable: bool) {
-    let enable = if enable { 1 } else { 0 };
-    let dctx: *mut PJ_CONTEXT = ptr::null_mut();
-    let _ = unsafe { proj_grid_cache_set_enable(dctx, enable) };
-}
-
-/// Get the URL endpoint to query for remote grids
-///
-/// # Safety
-/// This method contains unsafe code.
-pub fn get_url_endpoint() -> Result<String, ProjError> {
-    let dctx: *mut PJ_CONTEXT = ptr::null_mut();
-    unsafe { _string(proj_context_get_url_endpoint(dctx)) }
-}
-
-/// Set the URL endpoint to query for remote grids for all subsequent PROJ instances
-///
-/// # Safety
-/// This method contains unsafe code.
-pub fn set_url_endpoint(endpoint: &str) -> Result<(), ProjError> {
-    let s = CString::new(endpoint)?;
-    let dctx: *mut PJ_CONTEXT = ptr::null_mut();
-    unsafe { proj_context_set_url_endpoint(dctx, s.as_ptr()) };
-    Ok(())
 }
 
 enum Transformation {
@@ -181,7 +287,7 @@ enum Transformation {
     Conversion,
 }
 
-/// [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about the current PROJ context
+/// [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about PROJ
 #[derive(Clone, Debug)]
 pub struct Projinfo {
     pub major: i32,
@@ -192,15 +298,21 @@ pub struct Projinfo {
     pub searchpath: String,
 }
 
-/// A `PROJ` instance
-pub struct Proj {
-    c_proj: *mut PJconsts,
+/// A `PROJ` Context instance, used to create a transformation object.
+///
+/// Create a transformation object by calling `transform_new` or `transform_known_crs`.
+pub struct TransformBuilder {
     ctx: *mut PJ_CONTEXT,
-    area: Option<*mut PJ_AREA>,
 }
 
-impl Proj {
-    /// Try to instantiate a new `PROJ` instance
+impl TransformBuilder {
+    /// Create a new `TransformBuilder`, allowing grid downloads and other customisation.
+    pub fn new() -> Self {
+        let ctx = unsafe { proj_context_create() };
+        TransformBuilder { ctx }
+    }
+
+    /// Try to create a coordinate transformation object
     ///
     /// **Note:** for projection operations, `definition` specifies
     /// the **output** projection; input coordinates
@@ -211,27 +323,93 @@ impl Proj {
     ///
     /// # Safety
     /// This method contains unsafe code.
+    pub fn transform(mut self, definition: &str) -> Option<Proj> {
+        let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
+        Some(transform_string(ctx, definition)?)
+    }
 
+    /// Try to create a transformation object that is a pipeline between two known coordinate reference systems.
+    /// `from` and `to` can be:
+    ///
+    /// - an `"AUTHORITY:CODE"`, like `"EPSG:25832"`.
+    /// - a PROJ string, like `"+proj=longlat +datum=WGS84"`. When using that syntax, the unit is expected to be degrees.
+    /// - the name of a CRS as found in the PROJ database, e.g `"WGS84"`, `"NAD27"`, etc.
+    /// - more generally, any string accepted by [`new()`](struct.Proj.html#method.new)
+    ///
+    /// If you wish to alter the particular area of use, you may do so using [`area_set_bbox()`](struct.Proj.html#method.area_set_bbox)
+    /// ## A Note on Coordinate Order
+    /// The required input **and** output coordinate order is **normalised** to `Longitude, Latitude` / `Easting, Northing`.
+    ///
+    /// This overrides the expected order of the specified input and / or output CRS if necessary.
+    /// See the [PROJ API](https://proj.org/development/reference/functions.html#c.proj_normalize_for_visualization)
+    ///
+    /// For example: per its definition, EPSG:4326 has an axis order of Latitude, Longitude. Without
+    /// normalisation, crate users would have to
+    /// [remember](https://proj.org/development/reference/functions.html#c.proj_create_crs_to_crs)
+    /// to reverse the coordinates of `Point` or `Coordinate` structs in order for a conversion operation to
+    /// return correct results.
+    ///
+    ///```rust
+    /// # use assert_approx_eq::assert_approx_eq;
+    /// extern crate proj;
+    /// use proj::Proj;
+    ///
+    /// extern crate geo_types;
+    /// use geo_types::Point;
+    ///
+    /// let from = "EPSG:2230";
+    /// let to = "EPSG:26946";
+    /// let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+    /// let result = nad_ft_to_m
+    ///     .convert(Point::new(4760096.421921f64, 3744293.729449f64))
+    ///     .unwrap();
+    /// assert_approx_eq!(result.x(), 1450880.29f64, 1.0e-2);
+    /// assert_approx_eq!(result.y(), 1141263.01f64, 1.0e-2);
+    /// ```
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn transform_known_crs(mut self, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
+        let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
+        Some(transform_epsg(ctx, from, to, area)?)
+    }
+}
+
+impl Default for TransformBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// A coordinate transformation object
+pub struct Proj {
+    c_proj: *mut PJconsts,
+    ctx: *mut PJ_CONTEXT,
+    area: Option<*mut PJ_AREA>,
+}
+
+impl Proj {
+    /// Try to create a new transformation object
+    ///
+    /// **Note:** for projection operations, `definition` specifies
+    /// the **output** projection; input coordinates
+    /// are assumed to be geodetic in radians, unless an inverse projection is intended.
+    ///
+    /// For conversion operations, `definition` defines input, output, and
+    /// any intermediate steps that are required. See the `convert` example for more details.
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
     // In contrast to proj v4.x, the type of transformation
     // is signalled by the choice of enum used as input to the PJ_COORD union
     // PJ_LP signals projection of geodetic coordinates, with output being PJ_XY
     // and vice versa, or using PJ_XY for conversion operations
     pub fn new(definition: &str) -> Option<Proj> {
-        let c_definition = CString::new(definition).ok()?;
         let ctx = unsafe { proj_context_create() };
-        let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
-        if new_c_proj.is_null() {
-            None
-        } else {
-            Some(Proj {
-                c_proj: new_c_proj,
-                ctx,
-                area: None,
-            })
-        }
+        Some(transform_string(ctx, definition)?)
     }
 
-    /// Create a transformation object that is a pipeline between two known coordinate reference systems.
+    /// Try to create a new transformation object that is a pipeline between two known coordinate reference systems.
     /// `from` and `to` can be:
     ///
     /// - an `"AUTHORITY:CODE"`, like `"EPSG:25832"`.
@@ -273,76 +451,8 @@ impl Proj {
     /// # Safety
     /// This method contains unsafe code.
     pub fn new_known_crs(from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
-        let from_c = CString::new(from).ok()?;
-        let to_c = CString::new(to).ok()?;
         let ctx = unsafe { proj_context_create() };
-        let proj_area = unsafe { proj_area_create() };
-        area_set_bbox(proj_area, area);
-        let new_c_proj =
-            unsafe { proj_create_crs_to_crs(ctx, from_c.as_ptr(), to_c.as_ptr(), proj_area) };
-        if new_c_proj.is_null() {
-            None
-        } else {
-            // Normalise input and output order to Lon, Lat / Easting Northing by inserting
-            // An axis swap operation if necessary
-            let normalised = unsafe {
-                let normalised = proj_normalize_for_visualization(ctx, new_c_proj);
-                // deallocate stale PJ pointer
-                proj_destroy(new_c_proj);
-                normalised
-            };
-            Some(Proj {
-                c_proj: normalised,
-                ctx,
-                area: Some(proj_area),
-            })
-        }
-    }
-
-    /// Return [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about the current PROJ context
-    ///
-    /// # Safety
-    /// This method contains unsafe code.
-    pub fn info(&self) -> Result<Projinfo, ProjError> {
-        let pinfo: PJ_INFO = unsafe { proj_info() };
-        Ok(Projinfo {
-            major: pinfo.major,
-            minor: pinfo.minor,
-            patch: pinfo.patch,
-            release: _string(pinfo.release)?,
-            version: _string(pinfo.version)?,
-            searchpath: _string(pinfo.searchpath)?,
-        })
-    }
-
-    /// Add a [resource file search path](https://proj.org/resource_files.html), maintaining existing entries.
-    ///
-    /// Changes to the search path [_should be_](https://github.com/OSGeo/PROJ/issues/2266) reflected in this
-    /// and **all** subsequently-created `Proj` instances, but **not** in other concurrently-existing instances.
-    ///
-    /// # Safety
-    /// This method contains unsafe code.
-    pub fn set_search_paths<P: AsRef<Path>>(&self, newpath: P) -> Result<(), ProjError> {
-        let existing = self.info()?.searchpath;
-        let pathsep = if cfg!(windows) { ";" } else { ":" };
-        let mut individual: Vec<&str> = existing.split(pathsep).collect();
-        let np = Path::new(newpath.as_ref());
-        individual.push(np.to_str().ok_or(ProjError::Path)?);
-        let newlength = individual.len() as i32;
-        // convert path entries to CString
-        let paths_c = individual
-            .iter()
-            .map(|str| CString::new(*str))
-            .collect::<Result<Vec<_>, std::ffi::NulError>>()?;
-        // …then to raw pointers
-        let paths_p: Vec<_> = paths_c.iter().map(|cstr| cstr.as_ptr()).collect();
-        // …then pass the slice of raw pointers as a raw pointer (const char* const*)
-        // We pass a null pointer as the context, as we want the search path to be
-        // available to all contexts
-        let dctx: *mut PJ_CONTEXT = ptr::null_mut();
-        unsafe { proj_context_set_search_paths(self.ctx, newlength, paths_p.as_ptr()) }
-        unsafe { proj_context_set_search_paths(dctx, newlength, paths_p.as_ptr()) }
-        Ok(())
+        Some(transform_epsg(ctx, from, to, area)?)
     }
 
     /// Set the bounding box of the area of use
@@ -649,6 +759,14 @@ impl Drop for Proj {
     }
 }
 
+impl Drop for TransformBuilder {
+    fn drop(&mut self) {
+        unsafe {
+            proj_context_destroy(self.ctx);
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -660,6 +778,35 @@ mod test {
         assert!(f > 0.99999);
     }
     #[test]
+    // This test should be disabled by default, as it requires network access
+    fn test_network_enabled_conversion() {
+        let tf = TransformBuilder::new();
+        let tf2 = TransformBuilder::new();
+        // OSGB 1936
+        let from = "EPSG:4277";
+        // ETRS89
+        let to = "EPSG:4258";
+        // File to download: uk_os_OSTN15_NTv2_OSGBtoETRS.tif
+        // off by default, switch it on and check, leave tf2 disabled
+        assert_eq!(tf.network_enabled(), false);
+        assert_eq!(tf2.network_enabled(), false);
+        tf.enable_network(true).unwrap();
+        assert_eq!(tf.network_enabled(), true);
+        // I expected the following call to trigger a download, but it doesn't!
+        let proj = tf.transform_known_crs(&from, &to, None).unwrap();
+        let proj2 = tf2.transform_known_crs(&from, &to, None).unwrap();
+        // download begins here:
+        let t = proj.convert(Point::new(0.001653, 52.267733)).unwrap();
+        let t2 = proj2.convert(Point::new(0.001653, 52.267733)).unwrap();
+        
+        // High-quality OSTN15 conversion
+        assert_almost_eq(t.x(), 0.000026091248979289044);
+        assert_almost_eq(t.y(), 52.26817146070213);
+        // Without the grid download, it's a less precise conversion
+        assert_almost_eq(t2.x(), -0.00000014658182154077693);
+        assert_almost_eq(t2.y(), 52.26815719726976);
+    }
+    #[test]
     fn test_definition() {
         let wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
         let proj = Proj::new(wgs84).unwrap();
@@ -669,21 +816,27 @@ mod test {
         );
     }
     #[test]
+    #[should_panic]
+    // This failure is a bug in libproj
     fn test_searchpath() {
-        let wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
-        let proj = Proj::new(wgs84).unwrap();
-        proj.set_search_paths(&"/foo").unwrap();
-        let ipath = proj.info().unwrap().searchpath;
+        let tf = TransformBuilder::new();
+        tf.set_search_paths(&"/foo").unwrap();
+        let ipath = tf.info().unwrap().searchpath;
         let pathsep = if cfg!(windows) { ";" } else { ":" };
         let individual: Vec<&str> = ipath.split(pathsep).collect();
         assert_eq!(&individual.last().unwrap(), &&"/foo")
     }
     #[test]
-    fn test_endpoint() {
-        let ep = get_url_endpoint().unwrap();
+    fn test_set_endpoint() {
+        let from = "EPSG:4326";
+        let to = "EPSG:4326+3855";
+        let tf = TransformBuilder::new();
+        let ep = tf.get_url_endpoint().unwrap();
         assert_eq!(&ep, "https://cdn.proj.org");
-        set_url_endpoint("https://github.com/georust").unwrap();
-        let ep = get_url_endpoint().unwrap();
+        tf.set_url_endpoint("https://github.com/georust").unwrap();
+        let proj = tf.transform_known_crs(&from, &to, None).unwrap();
+        let ep = proj.get_url_endpoint().unwrap();
+        // Has the new endpoint propagated to the Proj instance?
         assert_eq!(&ep, "https://github.com/georust");
     }
     #[test]
@@ -697,42 +850,6 @@ mod test {
         assert_almost_eq(t.x(), 1450880.29);
         assert_almost_eq(t.y(), 1141263.01);
     }
-    // This test is disabled by default as it requires network access
-    #[test]
-    fn test_network() {
-        let from = "EPSG:4326";
-        let to = "EPSG:4326+3855";
-        let proj = Proj::new_known_crs(&from, &to, None).unwrap();
-        assert_eq!(proj.network_enabled(), false);
-        // Network download is off by default
-        // switch on cache and enable network
-        proj.grid_cache_enable(true);
-        proj.enable_network(true).unwrap();
-        assert_eq!(proj.network_enabled(), true);
-
-        let t = proj.convert(Point::new(40.0, -80.0)).unwrap();
-        assert_almost_eq(t.x(), 39.99999839);
-        assert_almost_eq(t.y(), -79.99999807);
-    }
-    // #[test]
-    // fn flibble() {
-    //     let mut tf = TransformBuilder::new();
-    //     // off by default
-    //     assert_eq!(tf.network_enabled(), false);
-    //     tf.grid_cache_enable(true);
-    //     tf.enable_network(true).unwrap();
-    //     assert_eq!(tf.network_enabled(), true);
-    //     let from = "EPSG:4326";
-    //     let to = "EPSG:4326+3855";
-    //     // This should trigger a download???
-    //     let proj = tf.transform_known_crs(&from, &to, None).unwrap();
-    //     println!("{:?}", "yo");
-    //     // Download begins here???
-    //     let t = proj.convert(Point::new(40.0, -80.0)).unwrap();
-    //     println!("{:?}", "done");
-    //     assert_almost_eq(t.x(), 39.99999839);
-    //     assert_almost_eq(t.y(), -79.99999807);
-    // }
     #[test]
     // Carry out a projection from geodetic coordinates
     fn test_projection() {
