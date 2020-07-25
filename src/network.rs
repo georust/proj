@@ -72,9 +72,9 @@ fn error_handler<'a>(
     // Check whether something went wrong on the server, or if it's an S3 retry code
     if res.status().is_server_error() || RETRY_CODES.contains(&status) {
         // Start retrying: up to MAX_RETRIES
-        while res.status().is_server_error()
-            || RETRY_CODES.contains(&status)
-            || retries <= MAX_RETRIES
+        while (res.status().is_server_error()
+            || RETRY_CODES.contains(&status))
+            && retries <= MAX_RETRIES
         {
             retries += 1;
             let wait = time::Duration::from_millis(get_wait_time_exp(retries as i32));
