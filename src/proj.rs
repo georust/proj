@@ -107,7 +107,7 @@ fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
     }
 }
 
-/// called by Proj::new and TransformBuilder::transform_new_crs
+/// called by Proj::new and ProjBuilder::transform_new_crs
 fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Option<Proj> {
     let c_definition = CString::new(definition).ok()?;
     let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
@@ -190,14 +190,14 @@ pub trait Info {
     }
 }
 
-impl Info for TransformBuilder {
+impl Info for ProjBuilder {
     #[doc(hidden)]
     fn ctx(&self) -> *mut PJ_CONTEXT {
         self.ctx
     }
 }
 
-impl TransformBuilder {
+impl ProjBuilder {
     /// Enable or disable network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for).
     ///
     /// # Safety
@@ -301,15 +301,15 @@ pub struct Projinfo {
 /// A `PROJ` Context instance, used to create a transformation object.
 ///
 /// Create a transformation object by calling `transform_new` or `transform_known_crs`.
-pub struct TransformBuilder {
+pub struct ProjBuilder {
     ctx: *mut PJ_CONTEXT,
 }
 
-impl TransformBuilder {
-    /// Create a new `TransformBuilder`, allowing grid downloads and other customisation.
+impl ProjBuilder {
+    /// Create a new `ProjBuilder`, allowing grid downloads and other customisation.
     pub fn new() -> Self {
         let ctx = unsafe { proj_context_create() };
-        TransformBuilder { ctx }
+        ProjBuilder { ctx }
     }
 
     /// Try to create a coordinate transformation object
@@ -375,7 +375,7 @@ impl TransformBuilder {
     }
 }
 
-impl Default for TransformBuilder {
+impl Default for ProjBuilder {
     fn default() -> Self {
         Self::new()
     }
@@ -759,7 +759,7 @@ impl Drop for Proj {
     }
 }
 
-impl Drop for TransformBuilder {
+impl Drop for ProjBuilder {
     fn drop(&mut self) {
         unsafe {
             proj_context_destroy(self.ctx);
@@ -780,8 +780,8 @@ mod test {
     #[test]
     // This test should be disabled by default, as it requires network access
     fn test_network_enabled_conversion() {
-        let tf = TransformBuilder::new();
-        let tf2 = TransformBuilder::new();
+        let tf = ProjBuilder::new();
+        let tf2 = ProjBuilder::new();
         // OSGB 1936
         let from = "EPSG:4277";
         // ETRS89
@@ -819,7 +819,7 @@ mod test {
     #[should_panic]
     // This failure is a bug in libproj
     fn test_searchpath() {
-        let tf = TransformBuilder::new();
+        let tf = ProjBuilder::new();
         tf.set_search_paths(&"/foo").unwrap();
         let ipath = tf.info().unwrap().searchpath;
         let pathsep = if cfg!(windows) { ";" } else { ":" };
@@ -830,7 +830,7 @@ mod test {
     fn test_set_endpoint() {
         let from = "EPSG:4326";
         let to = "EPSG:4326+3855";
-        let tf = TransformBuilder::new();
+        let tf = ProjBuilder::new();
         let ep = tf.get_url_endpoint().unwrap();
         assert_eq!(&ep, "https://cdn.proj.org");
         tf.set_url_endpoint("https://github.com/georust").unwrap();
