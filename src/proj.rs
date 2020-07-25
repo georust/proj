@@ -122,7 +122,7 @@ fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Option<Proj> {
     }
 }
 
-/// Called by new_known_crs and transform_known_crs
+/// Called by new_known_crs and proj_known_crs
 fn transform_epsg(ctx: *mut PJ_CONTEXT, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
     let from_c = CString::new(from).ok()?;
     let to_c = CString::new(to).ok()?;
@@ -300,7 +300,7 @@ pub struct Projinfo {
 
 /// A `PROJ` Context instance, used to create a transformation object.
 ///
-/// Create a transformation object by calling `transform_new` or `transform_known_crs`.
+/// Create a transformation object by calling `proj` or `proj_known_crs`.
 pub struct ProjBuilder {
     ctx: *mut PJ_CONTEXT,
 }
@@ -369,7 +369,7 @@ impl ProjBuilder {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn transform_known_crs(mut self, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
+    pub fn proj_known_crs(mut self, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
         let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
         Some(transform_epsg(ctx, from, to, area)?)
     }
@@ -794,8 +794,8 @@ mod test {
         tf.enable_network(true).unwrap();
         assert_eq!(tf.network_enabled(), true);
         // I expected the following call to trigger a download, but it doesn't!
-        let proj = tf.transform_known_crs(&from, &to, None).unwrap();
-        let proj2 = tf2.transform_known_crs(&from, &to, None).unwrap();
+        let proj = tf.proj_known_crs(&from, &to, None).unwrap();
+        let proj2 = tf2.proj_known_crs(&from, &to, None).unwrap();
         // download begins here:
         let t = proj.convert(Point::new(0.001653, 52.267733)).unwrap();
         let t2 = proj2.convert(Point::new(0.001653, 52.267733)).unwrap();
@@ -835,7 +835,7 @@ mod test {
         let ep = tf.get_url_endpoint().unwrap();
         assert_eq!(&ep, "https://cdn.proj.org");
         tf.set_url_endpoint("https://github.com/georust").unwrap();
-        let proj = tf.transform_known_crs(&from, &to, None).unwrap();
+        let proj = tf.proj_known_crs(&from, &to, None).unwrap();
         let ep = proj.get_url_endpoint().unwrap();
         // Has the new endpoint propagated to the Proj instance?
         assert_eq!(&ep, "https://github.com/georust");

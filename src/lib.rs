@@ -20,13 +20,13 @@
 //!     - Call `Proj::new` or `Proj::new_known_crs`. This creates a transformation instance ([`Proj`](proj/struct.Proj.html))
 //! 2. If you require a grid for the transformation you wish to carry out, or you need to customise the search path or the grid endpoint:
 //!     - Create a new [`ProjBuilder`](proj/struct.ProjBuilder.html) by calling `ProjBuilder::new()`. It may be modified to enable network downloads, disable the grid, cache or modify search paths;
-//!     - Call [`ProjBuilder.proj()`](proj/struct.ProjBuilder.html#method.proj) or [`ProjBuilder.transform_known_crs()`](proj/struct.ProjBuilder.html#method.transform_known_crs). This creates a transformation instance (`Proj`)
+//!     - Call [`ProjBuilder.proj()`](proj/struct.ProjBuilder.html#method.proj) or [`ProjBuilder.proj_known_crs()`](proj/struct.ProjBuilder.html#method.proj_known_crs). This creates a transformation instance (`Proj`)
 //!
 //! **Note**:
 //!
 //! 1. Both `ProjBuilder` and `Proj` implement the [`Info`](proj/trait.Info.html) trait, which can be used to get information about the current state of the `PROJ` instance;
 //! 2. `Proj::new()` and `ProjBuilder::proj()` have the same signature;
-//! 3. `Proj::new_known_crs()` and `ProjBuilder::transform_known_crs()` have the same signature.
+//! 3. `Proj::new_known_crs()` and `ProjBuilder::proj_known_crs()` have the same signature.
 //!
 //! ## Network, Cache, and Search Path Functionality
 //!
