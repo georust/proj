@@ -65,7 +65,6 @@ fn get_wait_time_exp(retrycount: i32) -> u64 {
 fn error_handler<'a>(
     res: &'a mut Response,
     rb: RequestBuilder,
-    hvalue: &str,
 ) -> Result<&'a Response, ProjError> {
     let mut status = res.status().as_u16();
     let mut retries = 0;
@@ -80,7 +79,7 @@ fn error_handler<'a>(
             let wait = time::Duration::from_millis(get_wait_time_exp(retries as i32));
             thread::sleep(wait);
             let retry = rb.try_clone().ok_or(ProjError::RequestCloneError)?;
-            let with_range = retry.header("Range", hvalue).header("Client", CLIENT);
+            let with_range = retry.header("Client", CLIENT);
             *res = with_range.send()?;
             status = res.status().as_u16();
         }
@@ -171,9 +170,9 @@ fn _network_open(
     let initial = req.try_clone().ok_or(ProjError::RequestCloneError)?;
     let with_headers = initial.header("Range", &hvalue).header("Client", CLIENT);
     let mut res = with_headers.send()?;
-    let eh_rb = req.try_clone().ok_or(ProjError::RequestCloneError)?;
+    let eh_rb = req.try_clone().ok_or(ProjError::RequestCloneError)?.header("Range", &hvalue);
     // hand the response off to the error-handler, continue on success
-    error_handler(&mut res, eh_rb, &hvalue)?;
+    error_handler(&mut res, eh_rb)?;
     // Write the initial read length value into the pointer
     let contentlength = res.content_length().ok_or(ProjError::ContentLength)? as usize;
     unsafe { out_size_read.write(contentlength) };
@@ -322,9 +321,9 @@ fn _network_read_range(
     let initial = hd.request.try_clone().ok_or(ProjError::RequestCloneError)?;
     let with_headers = initial.header("Range", &hvalue).header("Client", CLIENT);
     let mut res = with_headers.send()?;
-    let eh_rb = hd.request.try_clone().ok_or(ProjError::RequestCloneError)?;
+    let eh_rb = hd.request.try_clone().ok_or(ProjError::RequestCloneError)?.header("Range", &hvalue);
     // hand the response off to the error-handler, continue on success
-    error_handler(&mut res, eh_rb, &hvalue)?;
+    error_handler(&mut res, eh_rb)?;
     let headers = res.headers().clone();
     let contentlength = res.content_length().ok_or(ProjError::ContentLength)? as usize;
     // Copy the downloaded bytes into the buffer so it can be passed around
