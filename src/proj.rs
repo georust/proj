@@ -3,17 +3,22 @@ use libc::c_int;
 use libc::{c_char, c_double};
 use num_traits::Float;
 use proj_sys::{
-    proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_context_create,
-    proj_context_destroy, proj_context_set_search_paths, proj_create, proj_create_crs_to_crs,
-    proj_destroy, proj_errno_string, proj_info, proj_normalize_for_visualization, proj_pj_info,
+    proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_cleanup, proj_context_create,
+    proj_context_destroy, proj_context_get_url_endpoint, proj_context_is_network_enabled,
+    proj_context_set_enable_network, proj_context_set_search_paths, proj_context_set_url_endpoint,
+    proj_create, proj_create_crs_to_crs, proj_destroy, proj_errno_string,
+    proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization, proj_pj_info,
     proj_trans, proj_trans_array, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD,
     PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LP, PJ_XY,
 };
+
+use crate::network::set_network_callbacks;
 use proj_sys::{proj_errno, proj_errno_reset};
+
 use std::ffi::CStr;
 use std::ffi::CString;
+use std::path::Path;
 use std::str;
-use std::{path::Path, ptr};
 use thiserror::Error;
 
 /// Errors originating in PROJ which can occur during projection and conversion
@@ -35,6 +40,22 @@ pub enum ProjError {
     Utf8Error(#[from] std::str::Utf8Error),
     #[error("Couldn't convert number to f64")]
     FloatConversion,
+    #[error("Network download functionality could not be enabled")]
+    Network,
+    #[error("Could not set remote grid download callbacks")]
+    RemoteCallbacks,
+    #[error("Couldn't build request")]
+    BuilderError(#[from] reqwest::Error),
+    #[error("Couldn't clone request")]
+    RequestCloneError,
+    #[error("Could not retrieve content length")]
+    ContentLength,
+    #[error("Couldn't retrieve header for key {0}")]
+    HeaderError(String),
+    #[error("Couldn't convert header value to str")]
+    HeaderConversion(#[from] reqwest::header::ToStrError),
+    #[error("A {0} error occurred for url {1} after {2} retries")]
+    DownloadError(String, String, u8),
 }
 
 /// The bounding box of an area of use
@@ -65,7 +86,7 @@ impl Area {
 }
 
 /// Easily get a String from the external library
-fn _string(raw_ptr: *const c_char) -> Result<String, ProjError> {
+pub(crate) fn _string(raw_ptr: *const c_char) -> Result<String, ProjError> {
     let c_str = unsafe { CStr::from_ptr(raw_ptr) };
     Ok(str::from_utf8(c_str.to_bytes())?.to_string())
 }
@@ -86,68 +107,57 @@ fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
     }
 }
 
-/// A `PROJ` instance
-pub struct Proj {
-    c_proj: *mut PJconsts,
-    ctx: *mut PJ_CONTEXT,
-    area: Option<*mut PJ_AREA>,
-}
-
-enum Transformation {
-    Projection,
-    Conversion,
-}
-
-/// [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about the current PROJ context
-#[derive(Clone, Debug)]
-pub struct Projinfo {
-    pub major: i32,
-    pub minor: i32,
-    pub patch: i32,
-    pub release: String,
-    pub version: String,
-    pub searchpath: String,
-}
-
-impl Proj {
-    /// Try to instantiate a new `PROJ` instance
-    ///
-    /// **Note:** for projection operations, `definition` specifies
-    /// the **output** projection; input coordinates
-    /// are assumed to be geodetic in radians, unless an inverse projection is intended.
-    ///
-    /// For conversion operations, `definition` defines input, output, and
-    /// any intermediate steps that are required. See the `convert` example for more details.
-    ///
-    /// # Safety
-    /// This method contains unsafe code.
-
-    // In contrast to proj v4.x, the type of transformation
-    // is signalled by the choice of enum used as input to the PJ_COORD union
-    // PJ_LP signals projection of geodetic coordinates, with output being PJ_XY
-    // and vice versa, or using PJ_XY for conversion operations
-    pub fn new(definition: &str) -> Option<Proj> {
-        let c_definition = CString::new(definition.as_bytes()).ok()?;
-        let ctx = unsafe { proj_context_create() };
-        let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
-        // check for unexpected returned object type
-        // let return_code: i32 = unsafe { proj_get_type(new_c_proj) };
-        if new_c_proj.is_null() {
-            None
-        } else {
-            Some(Proj {
-                c_proj: new_c_proj,
-                ctx,
-                area: None,
-            })
-        }
+/// called by Proj::new and ProjBuilder::transform_new_crs
+fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Option<Proj> {
+    let c_definition = CString::new(definition).ok()?;
+    let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
+    if new_c_proj.is_null() {
+        None
+    } else {
+        Some(Proj {
+            c_proj: new_c_proj,
+            ctx,
+            area: None,
+        })
     }
+}
+
+/// Called by new_known_crs and proj_known_crs
+fn transform_epsg(ctx: *mut PJ_CONTEXT, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
+    let from_c = CString::new(from).ok()?;
+    let to_c = CString::new(to).ok()?;
+    let proj_area = unsafe { proj_area_create() };
+    area_set_bbox(proj_area, area);
+    let new_c_proj =
+        unsafe { proj_create_crs_to_crs(ctx, from_c.as_ptr(), to_c.as_ptr(), proj_area) };
+    if new_c_proj.is_null() {
+        None
+    } else {
+        // Normalise input and output order to Lon, Lat / Easting Northing by inserting
+        // An axis swap operation if necessary
+        let normalised = unsafe {
+            let normalised = proj_normalize_for_visualization(ctx, new_c_proj);
+            // deallocate stale PJ pointer
+            proj_destroy(new_c_proj);
+            normalised
+        };
+        Some(Proj {
+            c_proj: normalised,
+            ctx,
+            area: Some(proj_area),
+        })
+    }
+}
+
+/// Read-only utility methods for providing information about the current PROJ instance
+pub trait Info {
+    #[doc(hidden)]
+    fn ctx(&self) -> *mut PJ_CONTEXT;
 
     /// Return [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about the current PROJ context
-    ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn info(&self) -> Result<Projinfo, ProjError> {
+    fn info(&self) -> Result<Projinfo, ProjError> {
         let pinfo: PJ_INFO = unsafe { proj_info() };
         Ok(Projinfo {
             major: pinfo.major,
@@ -159,9 +169,64 @@ impl Proj {
         })
     }
 
-    /// Add a [resource file search path](https://proj.org/resource_files.html), maintaining existing entries.
+    /// Check whether network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for) is currently enabled or disabled.
     ///
-    /// Changes to the search path [_should be_](https://github.com/OSGeo/PROJ/issues/2266) reflected in all existing and subsequently-created `Proj` instances
+    /// # Safety
+    /// This method contains unsafe code.
+    fn network_enabled(&self) -> bool {
+        let res = unsafe { proj_context_is_network_enabled(self.ctx()) };
+        match res {
+            1 => true,
+            _ => false,
+        }
+    }
+
+    /// Get the URL endpoint to query for remote grids
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    fn get_url_endpoint(&self) -> Result<String, ProjError> {
+        unsafe { _string(proj_context_get_url_endpoint(self.ctx())) }
+    }
+}
+
+impl Info for ProjBuilder {
+    #[doc(hidden)]
+    fn ctx(&self) -> *mut PJ_CONTEXT {
+        self.ctx
+    }
+}
+
+impl ProjBuilder {
+    /// Enable or disable network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for).
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn enable_network(&self, enable: bool) -> Result<u8, ProjError> {
+        if enable {
+            let _ = match set_network_callbacks(self.ctx()) {
+                1 => Ok(1),
+                _ => Err(ProjError::Network),
+            }?;
+        }
+        let enable = if enable { 1 } else { 0 };
+        match (enable, unsafe {
+            proj_context_set_enable_network(self.ctx(), enable)
+        }) {
+            // we asked to switch on: switched on
+            (1, 1) => Ok(1),
+            // we asked to switch off: switched off
+            (0, 0) => Ok(0),
+            // we asked to switch off, but it's still on
+            (0, 1) => Err(ProjError::Network),
+            // we asked to switch on, but it's still off
+            (1, 0) => Err(ProjError::Network),
+            // scrëm
+            _ => Err(ProjError::Network),
+        }
+    }
+
+    /// Add a [resource file search path](https://proj.org/resource_files.html), maintaining existing entries.
     ///
     /// # Safety
     /// This method contains unsafe code.
@@ -180,14 +245,171 @@ impl Proj {
         // …then to raw pointers
         let paths_p: Vec<_> = paths_c.iter().map(|cstr| cstr.as_ptr()).collect();
         // …then pass the slice of raw pointers as a raw pointer (const char* const*)
-        // We pass a null pointer as the context, as we want the search path to be
-        // available to all contexts
-        let dctx: *mut PJ_CONTEXT = ptr::null_mut();
-        unsafe { proj_context_set_search_paths(dctx, newlength, paths_p.as_ptr()) }
+        unsafe { proj_context_set_search_paths(self.ctx(), newlength, paths_p.as_ptr()) }
         Ok(())
     }
 
-    /// Create a transformation object that is a pipeline between two known coordinate reference systems.
+    /// Enable or disable the local cache of grid chunks
+    ///
+    /// To avoid repeated network access, a local cache of downloaded chunks of grids is
+    /// implemented as SQLite3 database, cache.db, stored in the PROJ user writable directory.
+    /// This local caching is **enabled** by default.
+    /// The default maximum size of the cache is 300 MB, which is more than half of the total size
+    /// of grids available, at time of writing.
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn grid_cache_enable(&self, enable: bool) {
+        let enable = if enable { 1 } else { 0 };
+        let _ = unsafe { proj_grid_cache_set_enable(self.ctx(), enable) };
+    }
+
+    /// Set the URL endpoint to query for remote grids
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn set_url_endpoint(&self, endpoint: &str) -> Result<(), ProjError> {
+        let s = CString::new(endpoint)?;
+        unsafe { proj_context_set_url_endpoint(self.ctx(), s.as_ptr()) };
+        Ok(())
+    }
+}
+
+impl Info for Proj {
+    #[doc(hidden)]
+    fn ctx(&self) -> *mut PJ_CONTEXT {
+        self.ctx
+    }
+}
+
+enum Transformation {
+    Projection,
+    Conversion,
+}
+
+/// [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about PROJ
+#[derive(Clone, Debug)]
+pub struct Projinfo {
+    pub major: i32,
+    pub minor: i32,
+    pub patch: i32,
+    pub release: String,
+    pub version: String,
+    pub searchpath: String,
+}
+
+/// A `PROJ` Context instance, used to create a transformation object.
+///
+/// Create a transformation object by calling `proj` or `proj_known_crs`.
+pub struct ProjBuilder {
+    ctx: *mut PJ_CONTEXT,
+}
+
+impl ProjBuilder {
+    /// Create a new `ProjBuilder`, allowing grid downloads and other customisation.
+    pub fn new() -> Self {
+        let ctx = unsafe { proj_context_create() };
+        ProjBuilder { ctx }
+    }
+
+    /// Try to create a coordinate transformation object
+    ///
+    /// **Note:** for projection operations, `definition` specifies
+    /// the **output** projection; input coordinates
+    /// are assumed to be geodetic in radians, unless an inverse projection is intended.
+    ///
+    /// For conversion operations, `definition` defines input, output, and
+    /// any intermediate steps that are required. See the `convert` example for more details.
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn proj(mut self, definition: &str) -> Option<Proj> {
+        let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
+        Some(transform_string(ctx, definition)?)
+    }
+
+    /// Try to create a transformation object that is a pipeline between two known coordinate reference systems.
+    /// `from` and `to` can be:
+    ///
+    /// - an `"AUTHORITY:CODE"`, like `"EPSG:25832"`.
+    /// - a PROJ string, like `"+proj=longlat +datum=WGS84"`. When using that syntax, the unit is expected to be degrees.
+    /// - the name of a CRS as found in the PROJ database, e.g `"WGS84"`, `"NAD27"`, etc.
+    /// - more generally, any string accepted by [`new()`](struct.Proj.html#method.new)
+    ///
+    /// If you wish to alter the particular area of use, you may do so using [`area_set_bbox()`](struct.Proj.html#method.area_set_bbox)
+    /// ## A Note on Coordinate Order
+    /// The required input **and** output coordinate order is **normalised** to `Longitude, Latitude` / `Easting, Northing`.
+    ///
+    /// This overrides the expected order of the specified input and / or output CRS if necessary.
+    /// See the [PROJ API](https://proj.org/development/reference/functions.html#c.proj_normalize_for_visualization)
+    ///
+    /// For example: per its definition, EPSG:4326 has an axis order of Latitude, Longitude. Without
+    /// normalisation, crate users would have to
+    /// [remember](https://proj.org/development/reference/functions.html#c.proj_create_crs_to_crs)
+    /// to reverse the coordinates of `Point` or `Coordinate` structs in order for a conversion operation to
+    /// return correct results.
+    ///
+    ///```rust
+    /// # use assert_approx_eq::assert_approx_eq;
+    /// extern crate proj;
+    /// use proj::Proj;
+    ///
+    /// extern crate geo_types;
+    /// use geo_types::Point;
+    ///
+    /// let from = "EPSG:2230";
+    /// let to = "EPSG:26946";
+    /// let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+    /// let result = nad_ft_to_m
+    ///     .convert(Point::new(4760096.421921f64, 3744293.729449f64))
+    ///     .unwrap();
+    /// assert_approx_eq!(result.x(), 1450880.29f64, 1.0e-2);
+    /// assert_approx_eq!(result.y(), 1141263.01f64, 1.0e-2);
+    /// ```
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn proj_known_crs(mut self, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
+        let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
+        Some(transform_epsg(ctx, from, to, area)?)
+    }
+}
+
+impl Default for ProjBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// A coordinate transformation object
+pub struct Proj {
+    c_proj: *mut PJconsts,
+    ctx: *mut PJ_CONTEXT,
+    area: Option<*mut PJ_AREA>,
+}
+
+impl Proj {
+    /// Try to create a new transformation object
+    ///
+    /// **Note:** for projection operations, `definition` specifies
+    /// the **output** projection; input coordinates
+    /// are assumed to be geodetic in radians, unless an inverse projection is intended.
+    ///
+    /// For conversion operations, `definition` defines input, output, and
+    /// any intermediate steps that are required. See the `convert` example for more details.
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    // In contrast to proj v4.x, the type of transformation
+    // is signalled by the choice of enum used as input to the PJ_COORD union
+    // PJ_LP signals projection of geodetic coordinates, with output being PJ_XY
+    // and vice versa, or using PJ_XY for conversion operations
+    pub fn new(definition: &str) -> Option<Proj> {
+        let ctx = unsafe { proj_context_create() };
+        Some(transform_string(ctx, definition)?)
+    }
+
+    /// Try to create a new transformation object that is a pipeline between two known coordinate reference systems.
     /// `from` and `to` can be:
     ///
     /// - an `"AUTHORITY:CODE"`, like `"EPSG:25832"`.
@@ -229,30 +451,8 @@ impl Proj {
     /// # Safety
     /// This method contains unsafe code.
     pub fn new_known_crs(from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
-        let from_c = CString::new(from.as_bytes()).ok()?;
-        let to_c = CString::new(to.as_bytes()).ok()?;
         let ctx = unsafe { proj_context_create() };
-        let proj_area = unsafe { proj_area_create() };
-        area_set_bbox(proj_area, area);
-        let new_c_proj =
-            unsafe { proj_create_crs_to_crs(ctx, from_c.as_ptr(), to_c.as_ptr(), proj_area) };
-        if new_c_proj.is_null() {
-            None
-        } else {
-            // Normalise input and output order to Lon, Lat / Easting Northing by inserting
-            // An axis swap operation if necessary
-            let normalised = unsafe {
-                let normalised = proj_normalize_for_visualization(ctx, new_c_proj);
-                // deallocate stale PJ pointer
-                proj_destroy(new_c_proj);
-                normalised
-            };
-            Some(Proj {
-                c_proj: normalised,
-                ctx,
-                area: Some(proj_area),
-            })
-        }
+        Some(transform_epsg(ctx, from, to, area)?)
     }
 
     /// Set the bounding box of the area of use
@@ -287,6 +487,7 @@ impl Proj {
         let rv = unsafe { proj_pj_info(self.c_proj) };
         _string(rv.definition)
     }
+
     /// Project geodetic coordinates (in radians) into the projection specified by `definition`
     ///
     /// **Note:** specifying `inverse` as `true` carries out an inverse projection *to* geodetic coordinates
@@ -455,7 +656,7 @@ impl Proj {
     /// # use assert_approx_eq::assert_approx_eq;
     /// let stereo70 = Proj::new(
     ///     "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
-    ///     +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs",
+    ///     +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs"
     /// )
     /// .unwrap();
     /// // Geodetic -> Pulkovo 1942(58) / Stereo70 (EPSG 3844)
@@ -546,24 +747,65 @@ impl Proj {
 impl Drop for Proj {
     fn drop(&mut self) {
         unsafe {
-            proj_destroy(self.c_proj);
-            proj_context_destroy(self.ctx);
             if let Some(area) = self.area {
                 proj_area_destroy(area)
             }
+            proj_destroy(self.c_proj);
+            proj_context_destroy(self.ctx);
+            // NB do NOT call until proj_destroy and proj_context_destroy have both returned:
+            // https://proj.org/development/reference/functions.html#c.proj_cleanup
+            proj_cleanup()
+        }
+    }
+}
+
+impl Drop for ProjBuilder {
+    fn drop(&mut self) {
+        unsafe {
+            proj_context_destroy(self.ctx);
+            proj_cleanup()
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::Proj;
+    use super::*;
     use geo_types::Point;
 
     fn assert_almost_eq(a: f64, b: f64) {
         let f: f64 = a / b;
         assert!(f < 1.00001);
         assert!(f > 0.99999);
+    }
+    #[test]
+    // This test should be disabled by default, as it requires network access
+    fn test_network_enabled_conversion() {
+        let tf = ProjBuilder::new();
+        let tf2 = ProjBuilder::new();
+        // OSGB 1936
+        let from = "EPSG:4277";
+        // ETRS89
+        let to = "EPSG:4258";
+        // File to download: uk_os_OSTN15_NTv2_OSGBtoETRS.tif
+        // off by default, switch it on and check, leave tf2 disabled
+        assert_eq!(tf.network_enabled(), false);
+        assert_eq!(tf2.network_enabled(), false);
+        tf.enable_network(true).unwrap();
+        assert_eq!(tf.network_enabled(), true);
+        // I expected the following call to trigger a download, but it doesn't!
+        let proj = tf.proj_known_crs(&from, &to, None).unwrap();
+        let proj2 = tf2.proj_known_crs(&from, &to, None).unwrap();
+        // download begins here:
+        let t = proj.convert(Point::new(0.001653, 52.267733)).unwrap();
+        let t2 = proj2.convert(Point::new(0.001653, 52.267733)).unwrap();
+        
+        // High-quality OSTN15 conversion
+        assert_almost_eq(t.x(), 0.000026091248979289044);
+        assert_almost_eq(t.y(), 52.26817146070213);
+        // Without the grid download, it's a less precise conversion
+        assert_almost_eq(t2.x(), -0.00000014658182154077693);
+        assert_almost_eq(t2.y(), 52.26815719726976);
     }
     #[test]
     fn test_definition() {
@@ -575,14 +817,28 @@ mod test {
         );
     }
     #[test]
+    #[should_panic]
+    // This failure is a bug in libproj
     fn test_searchpath() {
-        let wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
-        let proj = Proj::new(wgs84).unwrap();
-        proj.set_search_paths(&"/foo").unwrap();
-        let ipath = proj.info().unwrap().searchpath;
+        let tf = ProjBuilder::new();
+        tf.set_search_paths(&"/foo").unwrap();
+        let ipath = tf.info().unwrap().searchpath;
         let pathsep = if cfg!(windows) { ";" } else { ":" };
         let individual: Vec<&str> = ipath.split(pathsep).collect();
         assert_eq!(&individual.last().unwrap(), &&"/foo")
+    }
+    #[test]
+    fn test_set_endpoint() {
+        let from = "EPSG:4326";
+        let to = "EPSG:4326+3855";
+        let tf = ProjBuilder::new();
+        let ep = tf.get_url_endpoint().unwrap();
+        assert_eq!(&ep, "https://cdn.proj.org");
+        tf.set_url_endpoint("https://github.com/georust").unwrap();
+        let proj = tf.proj_known_crs(&from, &to, None).unwrap();
+        let ep = proj.get_url_endpoint().unwrap();
+        // Has the new endpoint propagated to the Proj instance?
+        assert_eq!(&ep, "https://github.com/georust");
     }
     #[test]
     fn test_from_crs() {

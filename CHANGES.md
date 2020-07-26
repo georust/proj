@@ -1,13 +1,13 @@
 # Changes
 
+## 0.20.0
+* Add network control and grid download functionality
+
 ## 0.19.0
 * Update to proj-sys 0.17.1
 
 ## 0.18.0
 * Bump geo-types
-
-## 0.17.2
-* add network control functionality
 
 ## 0.17.1
 * Fix docs
