@@ -46,4 +46,8 @@ before_install:
 script:
   - cargo test $PROJ_FEATURES
 
+after_failure:
+  - ls /home/travis/build/georust/proj-sys/PROJSRC/
+  - ls /home/travis/build/georust/proj-sys/PROJSRC/proj
+
 cache: cargo
