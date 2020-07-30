@@ -20,7 +20,7 @@ Note that these features are **mutually exclusive**.
 1. `pkg_config` (Linux and macOS targets)
     - uses [`pkg-config`](https://en.wikipedia.org/wiki/Pkg-config) to add search paths to the build script. Requires `pkg-config` to be installed (available on Homebrew, Macports, apt etc.)
 2. `bundled_proj` (Linux and macOS targets):
-    - allow the crate to internally build and depend on a bundled PROJ library. This may make it easier to compile the crate, but is not yet thoroughly tested. Note that SQLite3 must be present on your system if you wish to use this feature.
+    - allow the crate to internally build and depend on a bundled PROJ library. This may make it easier to compile the crate, but is not yet thoroughly tested. Note that SQLite3 and `libtiff` must be present on your system if you wish to use this feature. Note that this feature builds `libproj` **without** its native network functionality, and you will have to implement your own set of callbacks if you wish to make use of them (see the `proj` crate for an example of this).
 
 ## License
 
