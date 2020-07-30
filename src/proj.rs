@@ -778,35 +778,35 @@ mod test {
         assert!(f < 1.00001);
         assert!(f > 0.99999);
     }
-    #[test]
-    // This test should be disabled by default, as it requires network access
-    fn test_network_enabled_conversion() {
-        let tf = ProjBuilder::new();
-        let tf2 = ProjBuilder::new();
-        // OSGB 1936
-        let from = "EPSG:4277";
-        // ETRS89
-        let to = "EPSG:4258";
-        // File to download: uk_os_OSTN15_NTv2_OSGBtoETRS.tif
-        // off by default, switch it on and check, leave tf2 disabled
-        assert_eq!(tf.network_enabled(), false);
-        assert_eq!(tf2.network_enabled(), false);
-        tf.enable_network(true).unwrap();
-        assert_eq!(tf.network_enabled(), true);
-        // I expected the following call to trigger a download, but it doesn't!
-        let proj = tf.proj_known_crs(&from, &to, None).unwrap();
-        let proj2 = tf2.proj_known_crs(&from, &to, None).unwrap();
-        // download begins here:
-        let t = proj.convert(Point::new(0.001653, 52.267733)).unwrap();
-        let t2 = proj2.convert(Point::new(0.001653, 52.267733)).unwrap();
+    // #[test]
+    // // This test should be disabled by default, as it requires network access
+    // fn test_network_enabled_conversion() {
+    //     let tf = ProjBuilder::new();
+    //     let tf2 = ProjBuilder::new();
+    //     // OSGB 1936
+    //     let from = "EPSG:4277";
+    //     // ETRS89
+    //     let to = "EPSG:4258";
+    //     // File to download: uk_os_OSTN15_NTv2_OSGBtoETRS.tif
+    //     // off by default, switch it on and check, leave tf2 disabled
+    //     assert_eq!(tf.network_enabled(), false);
+    //     assert_eq!(tf2.network_enabled(), false);
+    //     tf.enable_network(true).unwrap();
+    //     assert_eq!(tf.network_enabled(), true);
+    //     // I expected the following call to trigger a download, but it doesn't!
+    //     let proj = tf.proj_known_crs(&from, &to, None).unwrap();
+    //     let proj2 = tf2.proj_known_crs(&from, &to, None).unwrap();
+    //     // download begins here:
+    //     let t = proj.convert(Point::new(0.001653, 52.267733)).unwrap();
+    //     let t2 = proj2.convert(Point::new(0.001653, 52.267733)).unwrap();
         
-        // High-quality OSTN15 conversion
-        assert_almost_eq(t.x(), 0.000026091248979289044);
-        assert_almost_eq(t.y(), 52.26817146070213);
-        // Without the grid download, it's a less precise conversion
-        assert_almost_eq(t2.x(), -0.00000014658182154077693);
-        assert_almost_eq(t2.y(), 52.26815719726976);
-    }
+    //     // High-quality OSTN15 conversion
+    //     assert_almost_eq(t.x(), 0.000026091248979289044);
+    //     assert_almost_eq(t.y(), 52.26817146070213);
+    //     // Without the grid download, it's a less precise conversion
+    //     assert_almost_eq(t2.x(), -0.00000014658182154077693);
+    //     assert_almost_eq(t2.y(), 52.26815719726976);
+    // }
     #[test]
     fn test_definition() {
         let wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
