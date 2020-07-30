@@ -12,10 +12,14 @@ matrix:
     - env: PROJ_FEATURES="--features pkg_config"
 
 before_install:
-  - sudo apt-get update
-  - wget https://download.osgeo.org/proj/proj-7.1.0.tar.gz
-  - tar -xzvf proj-7.1.0.tar.gz
-  - pushd proj-7.1.0 && ./configure --prefix=/usr && make && sudo make install && popd
+  - |
+    if [ "$TRAVIS_OS_NAME" == "linux" ] && [ "$PROJ_FEATURES" != "--features bundled_proj" ]; then
+      sudo apt-get update
+      sudo apt-get -y install pkg-config
+      wget https://download.osgeo.org/proj/proj-7.1.0.tar.gz
+      tar -xzvf proj-7.1.0.tar.gz
+      pushd proj-7.1.0 && ./configure --prefix=/usr && make && sudo make install && popd
+    fi
 
 script:
   - (cargo build --release $PROJ_FEATURES && cargo test --release $PROJ_FEATURES)
