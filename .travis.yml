@@ -29,7 +29,7 @@ jobs:
 
 before_install:
   - |
-    if [ "$TRAVIS_OS_NAME" = "linux" ] && [ "$PROJ_FEATURES" != "bundled_proj" ]; then
+    if [ "$TRAVIS_OS_NAME" == "linux" ] && [ "$PROJ_FEATURES" != "--features bundled_proj" ]; then
       sudo apt-get update
       sudo apt-get -y install pkg-config
       wget https://download.osgeo.org/proj/proj-7.1.0.tar.gz
@@ -37,7 +37,7 @@ before_install:
       pushd proj-7.1.0 && ./configure --prefix=/usr && make && sudo make install && popd
     fi
   - |
-    if [ "$TRAVIS_OS_NAME" = "osx" ] && [ "$PROJ_FEATURES" != "bundled_proj" ]; then
+    if [ "$TRAVIS_OS_NAME" == "osx" ] && [ "$PROJ_FEATURES" != "--features bundled_proj" ]; then
       brew update
       brew upgrade pkg-config
       brew upgrade proj
