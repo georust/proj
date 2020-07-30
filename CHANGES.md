@@ -1,3 +1,6 @@
+# 0.18.0
+- The `bundled_proj` feature statically links libproj and disables native network functionality
+
 # 0.17.0
 - Update to PROJ 7.1.0
 
