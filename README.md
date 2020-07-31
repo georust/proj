@@ -13,7 +13,7 @@ Two features are available:
 
 The `pkg_config` feature enables the use of `pkg-config` when linking against `libproj` – note that `pkg-config` must be available on your system.
 
-The `bundled_proj` feature allows you to use a statically-linked `libproj` included with (and built from source by) the `proj-sys` crate, upon which this crate depends. Note that this feature requires Sqlite3 and `libtiff` to be present on your system.
+The `bundled_proj` feature allows you to use a statically-linked `libproj` included with (and built from source by) the `proj-sys` crate. Note that this feature requires Sqlite3 and `libtiff` to be present on your system.
 
 # Examples
 

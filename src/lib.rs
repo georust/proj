@@ -1,5 +1,5 @@
 #![doc(html_logo_url = "https://raw.githubusercontent.com/georust/meta/master/logo/logo.png")]
-//! `proj` provides bindings to the [PROJ](https://proj.org) v7.0.x API
+//! `proj` provides bindings to the [PROJ](https://proj.org) v7.1.x API
 //!
 //! Two coordinate transformation operations are currently provided: _projection_
 //! (and inverse projection) and _conversion_.
@@ -8,7 +8,7 @@
 //! coordinate systems. The PROJ [documentation](https://proj.org/operations/index.html)
 //! explains the distinction between these operations in more detail.
 //!
-//! Anything that can be converted into a [`geo-types`](https://docs.rs/geo-types) `Point` via the `Into`
+//! Anything that can be converted into a [`geo-types`](https://docs.rs/geo-types) [`Point`](https://docs.rs/geo-types/*/geo_types/struct.Point.html) via the `Into`
 //! trait can be used as input for the projection and conversion functions, and methods
 //! for [conversion](struct.Proj.html#method.convert_array) and [projection](struct.Proj.html#method.project_array)
 //! of slices of `Point`s are available.
@@ -46,7 +46,7 @@
 //!
 //! # Requirements
 //!
-//! By default, this requires `libproj` 7.0.x to be present on your system. While this crate may be backwards-compatible with older PROJ 6 versions, this is neither tested nor supported.
+//! By default, the crate requires `libproj` 7.1.x to be present on your system. While it may be backwards-compatible with older PROJ 6 versions, this is neither tested nor supported.
 //!
 //! Two features are available:
 //!
@@ -55,7 +55,7 @@
 //!
 //! The `pkg_config` feature enables the use of `pkg-config` when linking against `libproj` – note that `pkg-config` must be available on your system.
 //!
-//! The `bundled_proj` feature allows you to link against a `libproj` version included with (and built from source by) the `proj-sys` crate, upon which this crate is built. To do so, enable the `bundled_proj` Cargo feature. Note that this feature requires sqlite3 to be available on your system.
+//! The `bundled_proj` feature statically links against a `libproj` included with (and built from source by) the `proj-sys` crate. Note that this feature requires Sqlite3 and `libtiff` to be available on your system.
 //!
 //! # Example
 //!
