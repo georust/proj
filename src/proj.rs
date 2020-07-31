@@ -799,7 +799,7 @@ mod test {
     //     // download begins here:
     //     let t = proj.convert(Point::new(0.001653, 52.267733)).unwrap();
     //     let t2 = proj2.convert(Point::new(0.001653, 52.267733)).unwrap();
-        
+
     //     // High-quality OSTN15 conversion
     //     assert_almost_eq(t.x(), 0.000026091248979289044);
     //     assert_almost_eq(t.y(), 52.26817146070213);

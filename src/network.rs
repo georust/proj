@@ -62,17 +62,13 @@ fn get_wait_time_exp(retrycount: i32) -> u64 {
 }
 
 /// Process CDN response: handle retries in case of server error, or early return for client errors
-fn error_handler<'a>(
-    res: &'a mut Response,
-    rb: RequestBuilder,
-) -> Result<&'a Response, ProjError> {
+fn error_handler<'a>(res: &'a mut Response, rb: RequestBuilder) -> Result<&'a Response, ProjError> {
     let mut status = res.status().as_u16();
     let mut retries = 0;
     // Check whether something went wrong on the server, or if it's an S3 retry code
     if res.status().is_server_error() || RETRY_CODES.contains(&status) {
         // Start retrying: up to MAX_RETRIES
-        while (res.status().is_server_error()
-            || RETRY_CODES.contains(&status))
+        while (res.status().is_server_error() || RETRY_CODES.contains(&status))
             && retries <= MAX_RETRIES
         {
             retries += 1;
@@ -170,7 +166,10 @@ fn _network_open(
     let initial = req.try_clone().ok_or(ProjError::RequestCloneError)?;
     let with_headers = initial.header("Range", &hvalue).header("Client", CLIENT);
     let mut res = with_headers.send()?;
-    let eh_rb = req.try_clone().ok_or(ProjError::RequestCloneError)?.header("Range", &hvalue);
+    let eh_rb = req
+        .try_clone()
+        .ok_or(ProjError::RequestCloneError)?
+        .header("Range", &hvalue);
     // hand the response off to the error-handler, continue on success
     error_handler(&mut res, eh_rb)?;
     // Write the initial read length value into the pointer
@@ -321,7 +320,11 @@ fn _network_read_range(
     let initial = hd.request.try_clone().ok_or(ProjError::RequestCloneError)?;
     let with_headers = initial.header("Range", &hvalue).header("Client", CLIENT);
     let mut res = with_headers.send()?;
-    let eh_rb = hd.request.try_clone().ok_or(ProjError::RequestCloneError)?.header("Range", &hvalue);
+    let eh_rb = hd
+        .request
+        .try_clone()
+        .ok_or(ProjError::RequestCloneError)?
+        .header("Range", &hvalue);
     // hand the response off to the error-handler, continue on success
     error_handler(&mut res, eh_rb)?;
     let headers = res.headers().clone();
