@@ -124,6 +124,7 @@ fn main() {
     // Build PROJ from the included tar
     // NOTE: The PROJ build expects Sqlite3 to be present on the system.
     let path = "PROJSRC/proj-7.1.0.tar.gz";
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     let tar_gz = File::open(path).expect("Couldn't open PROJ source tar");
     let tar = GzDecoder::new(tar_gz);
     let mut archive = Archive::new(tar);
@@ -134,14 +135,17 @@ fn main() {
     config.define("ENABLE_CURL", "OFF");
     config.define("ENABLE_TIFF", "ON");
     let proj = config.build();
-
-    // Tell cargo to tell rustc where to look for PROJ.
+    // Tell cargo to tell rustc to link libproj, and where to find it
+    // libproj will be built in $OUT_DIR/lib
+    println!("cargo:rustc-link-lib=static=proj");
     println!(
         "cargo:rustc-link-search=native={}",
         proj.join("lib").display()
     );
-    // Tell cargo to tell rustc to link PROJ.
-    println!("cargo:rustc-link-lib=static=proj");
+    println!(
+        "cargo:rustc-link-search={}",
+        &out_path.join("build/lib").display()
+    );
     // The PROJ library needs SQLite and the C++ standard library.
     println!("cargo:rustc-link-lib=dylib=sqlite3");
     println!("cargo:rustc-link-lib=dylib=tiff");
@@ -153,7 +157,6 @@ fn main() {
         println!("cargo:warning=proj-sys: Not configuring an explicit C++ standard library on this target.");
     }
 
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     bindgen::builder()
         .header(proj.join("include").join("proj.h").to_str().unwrap())
         .trust_clang_mangling(false)
