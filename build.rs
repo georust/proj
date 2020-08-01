@@ -144,6 +144,10 @@ fn main() {
     );
     println!(
         "cargo:rustc-link-search={}",
+        &out_path.join("lib64").display()
+    );
+    println!(
+        "cargo:rustc-link-search={}",
         &out_path.join("build/lib").display()
     );
     // The PROJ library needs SQLite and the C++ standard library.
