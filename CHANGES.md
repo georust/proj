@@ -1,3 +1,9 @@
+# 0.18.2
+- Add inline docs
+
+# 0.18.1
+- Expand link-search paths for bundled_proj feature in build.rs
+
 # 0.18.0
 - The `bundled_proj` feature statically links libproj and disables native network functionality
 

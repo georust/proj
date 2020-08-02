@@ -7,7 +7,7 @@ A guide to the functions can be found here: https://proj.org/development/referen
 
 ## Requirements
 
-By default, this crate depends on a pre-built library, so `libproj` (via `PROJ v7.1.x`) must be present on your system. While this crate may be backwards-compatible with older PROJ 7 and PROJ 6 versions, this is neither tested or supported.
+By default, `libproj` (via `PROJ v7.1.x`) must be present on your system. While this crate may be backwards-compatible with older PROJ 7 and PROJ 6 versions, this is neither tested or supported.
 
 ## Optional Features
 Enable these in your `Cargo.toml` like so:
