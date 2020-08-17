@@ -1,5 +1,8 @@
 # Changes
 
+## 0.20.3
+* Disable default features in Reqwest
+
 ## 0.20.0
 * Add network control and grid download functionality
 

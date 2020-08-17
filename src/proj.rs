@@ -776,10 +776,9 @@ mod test {
     fn assert_almost_eq(a: f64, b: f64) {
         let f: f64 = a / b;
         assert!(f < 1.00001);
-        assert!(f > 0.99999);
+        assert!(f > 0.99999);    // This test should be disabled by default, as it requires network access
     }
     // #[test]
-    // // This test should be disabled by default, as it requires network access
     // fn test_network_enabled_conversion() {
     //     let tf = ProjBuilder::new();
     //     let tf2 = ProjBuilder::new();
