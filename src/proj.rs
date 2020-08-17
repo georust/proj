@@ -776,10 +776,9 @@ mod test {
     fn assert_almost_eq(a: f64, b: f64) {
         let f: f64 = a / b;
         assert!(f < 1.00001);
-        assert!(f > 0.99999);
+        assert!(f > 0.99999);    // This test should be disabled by default, as it requires network access
     }
     // #[test]
-    // // This test should be disabled by default, as it requires network access
     // fn test_network_enabled_conversion() {
     //     let tf = ProjBuilder::new();
     //     let tf2 = ProjBuilder::new();
@@ -799,7 +798,7 @@ mod test {
     //     // download begins here:
     //     let t = proj.convert(Point::new(0.001653, 52.267733)).unwrap();
     //     let t2 = proj2.convert(Point::new(0.001653, 52.267733)).unwrap();
-        
+
     //     // High-quality OSTN15 conversion
     //     assert_almost_eq(t.x(), 0.000026091248979289044);
     //     assert_almost_eq(t.y(), 52.26817146070213);
