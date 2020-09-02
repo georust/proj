@@ -131,6 +131,13 @@ fn main() {
     archive.unpack("PROJSRC/proj").expect("Couldn't unpack tar");
     let mut config = cmake::Config::new("PROJSRC/proj/proj-7.1.0");
     config.define("BUILD_SHARED_LIBS", "OFF");
+    config.define("BUILD_TESTING", "OFF");
+    config.define("BUILD_CCT", "OFF");
+    config.define("BUILD_CS2CS", "OFF");
+    config.define("BUILD_GEOD", "OFF");
+    config.define("BUILD_GIE", "OFF");
+    config.define("BUILD_PROJ", "OFF");
+    config.define("BUILD_PROJINFO", "OFF");
     config.define("BUILD_PROJSYNC", "OFF");
     config.define("ENABLE_CURL", "OFF");
     config.define("ENABLE_TIFF", "ON");
