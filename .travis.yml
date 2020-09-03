@@ -10,6 +10,7 @@ matrix:
     - env: PROJ_FEATURES=""
     - env: PROJ_FEATURES="--features bundled_proj"
     - env: PROJ_FEATURES="--features pkg_config"
+    - env: PROJ_FEATURES="--features network"
 
 before_install:
   - |

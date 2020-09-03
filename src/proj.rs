@@ -5,14 +5,15 @@ use num_traits::Float;
 use proj_sys::{
     proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_cleanup, proj_context_create,
     proj_context_destroy, proj_context_get_url_endpoint, proj_context_is_network_enabled,
-    proj_context_set_enable_network, proj_context_set_search_paths, proj_context_set_url_endpoint,
-    proj_create, proj_create_crs_to_crs, proj_destroy, proj_errno_string,
-    proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization, proj_pj_info,
-    proj_trans, proj_trans_array, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD,
-    PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LP, PJ_XY,
+    proj_context_set_search_paths, proj_context_set_url_endpoint, proj_create,
+    proj_create_crs_to_crs, proj_destroy, proj_errno_string, proj_grid_cache_set_enable, proj_info,
+    proj_normalize_for_visualization, proj_pj_info, proj_trans, proj_trans_array, PJconsts,
+    PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LP, PJ_XY,
 };
 
-use crate::network::set_network_callbacks;
+#[cfg(feature = "network")]
+use proj_sys::proj_context_set_enable_network;
+
 use proj_sys::{proj_errno, proj_errno_reset};
 
 use std::ffi::CStr;
@@ -45,6 +46,7 @@ pub enum ProjError {
     #[error("Could not set remote grid download callbacks")]
     RemoteCallbacks,
     #[error("Couldn't build request")]
+    #[cfg(feature = "network")]
     BuilderError(#[from] reqwest::Error),
     #[error("Couldn't clone request")]
     RequestCloneError,
@@ -52,6 +54,7 @@ pub enum ProjError {
     ContentLength,
     #[error("Couldn't retrieve header for key {0}")]
     HeaderError(String),
+    #[cfg(feature = "network")]
     #[error("Couldn't convert header value to str")]
     HeaderConversion(#[from] reqwest::header::ToStrError),
     #[error("A {0} error occurred for url {1} after {2} retries")]
@@ -202,9 +205,10 @@ impl ProjBuilder {
     ///
     /// # Safety
     /// This method contains unsafe code.
+    #[cfg(feature = "network")]
     pub fn enable_network(&self, enable: bool) -> Result<u8, ProjError> {
         if enable {
-            let _ = match set_network_callbacks(self.ctx()) {
+            let _ = match crate::network::set_network_callbacks(self.ctx()) {
                 1 => Ok(1),
                 _ => Err(ProjError::Network),
             }?;
