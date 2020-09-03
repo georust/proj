@@ -31,7 +31,8 @@
 //! ## Network, Cache, and Search Path Functionality
 //!
 //! ### Grid File Download
-//! `proj` supports [network grid download](https://proj.org/usage/network.html) functionality.
+//! `proj` supports [network grid download](https://proj.org/usage/network.html) functionality via
+//! the [`network` feature](#feature-flags).
 //! Network access is **disabled** by default, and
 //! can be activated by passing a `true` `bool` to [`enable_network()`](proj/struct.ProjBuilder.html#method.enable_network).
 //! Network functionality status can be queried with
@@ -48,14 +49,16 @@
 //!
 //! By default, the crate requires `libproj` 7.1.x to be present on your system. While it may be backwards-compatible with older PROJ 6 versions, this is neither tested nor supported.
 //!
-//! Two features are available:
+//!## Feature Flags
 //!
-//! `proj = { version = "0.16.1", features = ["pkg_config"] }`  
-//! `proj = = { version = "0.16.1", features = ["bundled_proj"] }`  
-//!
-//! The `pkg_config` feature enables the use of `pkg-config` when linking against `libproj` – note that `pkg-config` must be available on your system.
-//!
-//! The `bundled_proj` feature statically links against a `libproj` included with (and built from source by) the `proj-sys` crate. Note that this feature requires Sqlite3 and `libtiff` to be available on your system.
+//! - `pkg_config`: enables the use of `pkg-config` when linking against `libproj` —
+//!   note that `pkg-config` must be available on your system.
+//! - `bundled_proj`: builds `libproj` from source bundled in the `proj-sys` crate.
+//!   Note that this feature requires Sqlite3 and `libtiff` to be present on your
+//!   system.
+//! - `network`: exposes APIs which, when enabled, can fetch data from the internet to improve
+//!   projection accuracy. See [`enable_network`](struct.ProjBuilder.html#method.enable_network) for
+//!   details.
 //!
 //! # Example
 //!
@@ -76,6 +79,8 @@
 //! assert_approx_eq!(result.x(), 1450880.29f64, 1.0e-2);
 //! assert_approx_eq!(result.y(), 1141263.01f64, 1.0e-2);
 //! ```
+
+#![feature(doc_cfg)]
 
 #[cfg(feature = "network")]
 mod network;

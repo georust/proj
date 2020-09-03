@@ -6,14 +6,17 @@ High-level Rust bindings for the latest stable version of [PROJ](https://github.
 
 By default, this crate depends on a pre-built `libproj`, so PROJ v7.1.x must be present on your system. While this crate may be backwards-compatible with older PROJ 7 and PROJ 6 versions, this is neither tested nor supported.
 
-Two features are available:
+## Feature Flags
 
-`proj = { version = "0.19.0", features = ["pkg_config"] }`  
-`proj = = { version = "0.19.0", features = ["bundled_proj"] }`  
-
-The `pkg_config` feature enables the use of `pkg-config` when linking against `libproj` – note that `pkg-config` must be available on your system.
-
-The `bundled_proj` feature allows you to use a statically-linked `libproj` included with (and built from source by) the `proj-sys` crate. Note that this feature requires Sqlite3 and `libtiff` to be present on your system.
+- `pkg_config`: enables the use of `pkg-config` when linking against `libproj` —
+  note that `pkg-config` must be available on your system.
+- `bundled_proj`: builds `libproj` from source bundled in the `proj-sys` crate.
+  Note that this feature requires Sqlite3 and `libtiff` to be present on your
+  system.
+- `network`: exposes APIs which, when enabled, can fetch data from the internet
+  to improve projection accuracy. See
+  [`enable_network`](struct.ProjBuilder.html#method.enable_network) for
+  details.
 
 # Examples
 

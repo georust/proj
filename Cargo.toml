@@ -29,4 +29,4 @@ network = ["reqwest"]
 assert_approx_eq = "1.1.0"
 
 [package.metadata.docs.rs]
-features = [ "proj-sys/nobuild" ] # This feature will be enabled during the docs.rs build
+features = [ "proj-sys/nobuild", "network" ]
