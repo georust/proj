@@ -205,7 +205,7 @@ impl ProjBuilder {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    #[doc(cfg(feature = "network"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "network")))]
     #[cfg(feature = "network")]
     pub fn enable_network(&self, enable: bool) -> Result<u8, ProjError> {
         if enable {

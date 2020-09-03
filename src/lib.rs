@@ -80,7 +80,7 @@
 //! assert_approx_eq!(result.y(), 1141263.01f64, 1.0e-2);
 //! ```
 
-#![feature(doc_cfg)]
+#[cfg_attr(docsrs, feature(doc_cfg))]
 
 #[cfg(feature = "network")]
 mod network;
