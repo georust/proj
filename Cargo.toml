@@ -18,14 +18,16 @@ geo-types ="0.6.0"
 libc = "0.2.62"
 num-traits = "0.2.8"
 thiserror = "1.0.4"
-reqwest = { version = "0.10.6", default-features= false, features = ["blocking", "rustls-tls"] }
+reqwest = { version = "0.10.6", optional = true, default-features = false, features = ["blocking", "rustls-tls"] }
 
 [features]
 bundled_proj = [ "proj-sys/bundled_proj" ]
 pkg_config = [ "proj-sys/pkg_config" ]
+network = ["reqwest"]
 
 [dev-dependencies]
 assert_approx_eq = "1.1.0"
 
 [package.metadata.docs.rs]
-features = [ "proj-sys/nobuild" ] # This feature will be enabled during the docs.rs build
+features = [ "proj-sys/nobuild", "network" ]
+rustdoc-args = ["--cfg", "docsrs"]
