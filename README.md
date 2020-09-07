@@ -24,10 +24,7 @@ By default, this crate depends on a pre-built `libproj`, accessed by the [`proj-
 
 ## Convert from [NAD 83 US Survey Feet](https://epsg.io/2230) to [NAD 83 Meters](https://epsg.io/26946) Using EPSG Codes
 ```rust
-use proj::Proj;
-
-extern crate geo_types;
-use geo_types::Point;
+use proj::{Proj, Point};
 
 let from = "EPSG:2230";
 let to = "EPSG:26946";
@@ -47,10 +44,7 @@ Note that as of v5.0.0, PROJ uses the [`pipeline`](https://proj.org/operations/p
 
 ## Convert from [NAD 83 US Survey Feet](https://epsg.io/2230) to [NAD 83 Meters](https://epsg.io/26946) Using the `pipeline` Operator
 ```rust
-use proj::Proj;
-
-extern crate geo_types;
-use geo_types::Point;
+use proj::{Proj, Point};
 
 let ft_to_m = Proj::new("
     +proj=pipeline
@@ -70,10 +64,7 @@ assert_eq!(result.y(), 1141263.01);
 
 ## Inverse Projection from [Stereo70](https://epsg.io/3844) to Geodetic
 ```rust
-use proj::Proj;
-
-extern crate geo_types;
-use geo_types::Point;
+use proj::{Proj, Point};
 
 // Carry out an inverse projection from Pulkovo 1942(58) / Stereo70 (EPSG 3844)
 // into geodetic lon and lat coordinates (in radians)

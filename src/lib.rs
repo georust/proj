@@ -66,16 +66,13 @@
 //! ```
 //! use assert_approx_eq::assert_approx_eq;
 //! extern crate proj;
-//! use proj::Proj;
-//!
-//! extern crate geo_types;
-//! use geo_types::Point;
+//! use proj::{Proj, Point};
 //!
 //! let from = "EPSG:2230";
 //! let to = "EPSG:26946";
 //! let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
 //! let result = nad_ft_to_m
-//!     .convert(Point::new(4760096.421921f64, 3744293.729449f64))
+//!     .convert((4760096.421921f64, 3744293.729449f64))
 //!     .unwrap();
 //! assert_approx_eq!(result.x(), 1450880.29f64, 1.0e-2);
 //! assert_approx_eq!(result.y(), 1141263.01f64, 1.0e-2);
@@ -89,6 +86,7 @@ mod proj;
 
 pub use crate::proj::Area;
 pub use crate::proj::Info;
+pub use crate::proj::Point;
 pub use crate::proj::Proj;
 pub use crate::proj::ProjBuilder;
 pub use crate::proj::ProjError;
