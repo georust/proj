@@ -819,7 +819,7 @@ mod test {
         assert!(f > 0.99999);
     }
 
-    #[cfg(feature="network")]
+    #[cfg(feature = "network")]
     #[test]
     fn test_network_enabled_conversion() {
         // OSGB 1936
@@ -837,7 +837,7 @@ mod test {
         assert_eq!(online_builder.network_enabled(), true);
         assert_eq!(offline_builder.network_enabled(), false);
 
-        // Disable caching to ensure we're accessing the network. 
+        // Disable caching to ensure we're accessing the network.
         // Cache is stored in proj's [user writeable directory](https://proj.org/resource_files.html#user-writable-directory)
         online_builder.grid_cache_enable(false);
 
@@ -847,8 +847,12 @@ mod test {
 
         // download begins here:
         // File to download: uk_os_OSTN15_NTv2_OSGBtoETRS.tif
-        let online_t = online_proj.convert(MyPoint::new(0.001653, 52.267733)).unwrap();
-        let offline_t = offline_proj.convert(MyPoint::new(0.001653, 52.267733)).unwrap();
+        let online_t = online_proj
+            .convert(MyPoint::new(0.001653, 52.267733))
+            .unwrap();
+        let offline_t = offline_proj
+            .convert(MyPoint::new(0.001653, 52.267733))
+            .unwrap();
 
         // Grid download results in a high-quality OSTN15 conversion
         assert_almost_eq(online_t.x(), 0.000026091248979289044);
