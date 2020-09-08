@@ -783,35 +783,47 @@ mod test {
         assert!(f < 1.00001);
         assert!(f > 0.99999);
     }
-    // This test should be disabled by default, as it requires network access
-    // #[test]
-    // fn test_network_enabled_conversion() {
-    //     let tf = ProjBuilder::new();
-    //     let tf2 = ProjBuilder::new();
-    //     // OSGB 1936
-    //     let from = "EPSG:4277";
-    //     // ETRS89
-    //     let to = "EPSG:4258";
-    //     // File to download: uk_os_OSTN15_NTv2_OSGBtoETRS.tif
-    //     // off by default, switch it on and check, leave tf2 disabled
-    //     assert_eq!(tf.network_enabled(), false);
-    //     assert_eq!(tf2.network_enabled(), false);
-    //     tf.enable_network(true).unwrap();
-    //     assert_eq!(tf.network_enabled(), true);
-    //     // I expected the following call to trigger a download, but it doesn't!
-    //     let proj = tf.proj_known_crs(&from, &to, None).unwrap();
-    //     let proj2 = tf2.proj_known_crs(&from, &to, None).unwrap();
-    //     // download begins here:
-    //     let t = proj.convert(Point::new(0.001653, 52.267733)).unwrap();
-    //     let t2 = proj2.convert(Point::new(0.001653, 52.267733)).unwrap();
 
-    //     // High-quality OSTN15 conversion
-    //     assert_almost_eq(t.x(), 0.000026091248979289044);
-    //     assert_almost_eq(t.y(), 52.26817146070213);
-    //     // Without the grid download, it's a less precise conversion
-    //     assert_almost_eq(t2.x(), -0.00000014658182154077693);
-    //     assert_almost_eq(t2.y(), 52.26815719726976);
-    // }
+    #[cfg(feature="network")]
+    #[test]
+    fn test_network_enabled_conversion() {
+        // OSGB 1936
+        let from = "EPSG:4277";
+        // ETRS89
+        let to = "EPSG:4258";
+
+        let online_builder = ProjBuilder::new();
+        let offline_builder = ProjBuilder::new();
+
+        assert_eq!(online_builder.network_enabled(), false);
+        assert_eq!(offline_builder.network_enabled(), false);
+
+        online_builder.enable_network(true).unwrap();
+        assert_eq!(online_builder.network_enabled(), true);
+        assert_eq!(offline_builder.network_enabled(), false);
+
+        // Disable caching to ensure we're accessing the network. 
+        // Cache is stored in proj's [user writeable directory](https://proj.org/resource_files.html#user-writable-directory)
+        online_builder.grid_cache_enable(false);
+
+        // I expected the following call to trigger a download, but it doesn't!
+        let online_proj = online_builder.proj_known_crs(&from, &to, None).unwrap();
+        let offline_proj = offline_builder.proj_known_crs(&from, &to, None).unwrap();
+
+        // download begins here:
+        // File to download: uk_os_OSTN15_NTv2_OSGBtoETRS.tif
+        let online_t = online_proj.convert(Point::new(0.001653, 52.267733)).unwrap();
+        let offline_t = offline_proj.convert(Point::new(0.001653, 52.267733)).unwrap();
+
+        // Grid download results in a high-quality OSTN15 conversion
+        assert_almost_eq(online_t.x(), 0.000026091248979289044);
+        assert_almost_eq(online_t.y(), 52.26817146070213);
+
+        // Without the grid download, it's a less precise conversion
+        assert_almost_eq(offline_t.x(), -0.00000014658182154077693);
+        assert_almost_eq(offline_t.y(), 52.26815719726976);
+    }
+
     #[test]
     fn test_definition() {
         let wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
