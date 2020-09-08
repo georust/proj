@@ -82,6 +82,11 @@
 
 #[cfg(feature = "network")]
 mod network;
+
+#[cfg_attr(docsrs, feature(doc_cfg))]
+#[cfg(feature = "geo-types")]
+mod geo_types;
+
 mod proj;
 
 pub use crate::proj::Area;
