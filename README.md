@@ -9,13 +9,13 @@ By default, this crate depends on a pre-built `libproj`, so PROJ v7.1.x must be 
 ## Feature Flags
 
 - `pkg_config`: enables the use of `pkg-config` when linking against `libproj` —
-  note that `pkg-config` must be available on your system.
+  note that `pkg-config` must be available on your system. This feature and `bundled_proj` are mutually exclusive.
 - `bundled_proj`: builds `libproj` from source bundled in the `proj-sys` crate.
   Note that this feature requires Sqlite3 and `libtiff` to be present on your
-  system.
+  system. This feature and `bundled_proj` are mutually exclusive.
 - `network`: exposes APIs which, when enabled, can fetch grid data from the
   internet to improve projection accuracy. See
-  [`enable_network`](struct.ProjBuilder.html#method.enable_network) for
+  [`enable_network`](https://docs.rs/proj/latest/proj/struct.ProjBuilder.html#method.enable_network) for
   details.
 
 # Examples
