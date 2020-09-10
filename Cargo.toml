@@ -21,8 +21,9 @@ tar = "0.4.26"
 
 [features]
 nobuild = []
-pkg_config = []
 bundled_proj = []
+# `pkg_config` feature is deprecated and does nothing
+pkg_config = []
 
 [package.metadata.docs.rs]
 features = [ "nobuild" ] # This feature will be enabled during the docs.rs build
