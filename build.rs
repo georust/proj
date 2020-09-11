@@ -13,6 +13,7 @@ const MINIMUM_PROJ_VERSION: &str = "7.1.0";
 #[cfg(feature = "nobuild")]
 fn main() {} // Skip the build script on docs.rs
 
+#[cfg(not(feature = "nobuild"))]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let include_path = if cfg!(feature = "bundled_proj") {
         println!("feature flags specified source build");
