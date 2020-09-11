@@ -10,13 +10,13 @@
 //! explains the distinction between these operations in more detail.
 //!
 //! Out of the box, any `(x, y)` numeric tuple can be provided as input to proj. You can [conform
-//! your own types](#conform-your-own-types) to the [Point](proj/trait.Point.html) trait to pass
+//! your own types](#conform-your-own-types) to the [Coord](proj/trait.Coord.html) trait to pass
 //! them in directly and avoid intermediate allocations. There is a [`geo-types`
 //! feature](#feature-flags) to enable such impl's for users of the the [`geo-types`
 //! crate](https://docs.rs/geo-types).
 //!
 //! Methods for [conversion](struct.Proj.html#method.convert_array) and
-//! [projection](struct.Proj.html#method.project_array) of slices of `Point`s are also available.
+//! [projection](struct.Proj.html#method.project_array) of slices of `Coord`s are also available.
 //!
 //! # Usage
 //!
@@ -62,7 +62,7 @@
 //!## Feature Flags
 //!
 //! - `geo-types`: include [trait impls for
-//! `geo-types`](proj/trait.Point.html#impl-Point%3CT%3E-for-Coordinate%3CT%3E). See
+//! `geo-types`](proj/trait.Coord.html#impl-Coord%3CT%3E-for-Coordinate%3CT%3E). See
 //!   [example](#integration-with-geo-types).
 //! - `pkg_config`: enables the use of `pkg-config` when linking against `libproj` —
 //!   note that `pkg-config` must be available on your system.
@@ -79,7 +79,7 @@
 //!
 //! ```
 //! # use assert_approx_eq::assert_approx_eq;
-//! use proj::{Proj, Point};
+//! use proj::{Proj, Coord};
 //!
 //! let my_point = (4760096.421921f64, 3744293.729449f64);
 //!
@@ -97,19 +97,19 @@
 //!
 //! ## Conform your own types
 //!
-//! If you have your own geometric types, you can conform them to the `Point` trait and use `proj`
+//! If you have your own geometric types, you can conform them to the `Coord` trait and use `proj`
 //! without any intermediate allocation.
 //!
 //! ```
 //! # use assert_approx_eq::assert_approx_eq;
-//! use proj::{Proj, Point};
+//! use proj::{Proj, Coord};
 //!
 //! struct MyPointOfIntereset {
 //!     lat: f64,
 //!     lon: f64,
 //! }
 //!
-//! impl Point<f64> for MyPointOfIntereset {
+//! impl Coord<f64> for MyPointOfIntereset {
 //!     fn x(&self) -> f64 {
 //!         self.lon
 //!     }
@@ -172,7 +172,7 @@ mod proj;
 
 pub use crate::proj::Area;
 pub use crate::proj::Info;
-pub use crate::proj::Point;
+pub use crate::proj::Coord;
 pub use crate::proj::Proj;
 pub use crate::proj::ProjBuilder;
 pub use crate::proj::ProjError;

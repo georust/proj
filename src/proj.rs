@@ -26,12 +26,12 @@ impl<T: Num + Copy + NumCast + PartialOrd> CoordinateType for T {}
 
 /// A point in two dimensional space. The primary unit of input/output for proj.
 ///
-/// By default, any numeric `(x, y)` tuple implements `Point`, but you can conform your type to
-/// `Point` to pass it directly into proj.
+/// By default, any numeric `(x, y)` tuple implements `Coord`, but you can conform your type to
+/// `Coord` to pass it directly into proj.
 ///
 /// See the [`geo-types` feature](#feature-flags) for interop with the [`geo-types`
 /// crate](https://docs.rs/crate/geo-types)
-pub trait Point<T>
+pub trait Coord<T>
 where
     T: CoordinateType,
 {
@@ -40,7 +40,7 @@ where
     fn from_xy(x: T, y: T) -> Self;
 }
 
-impl<T: CoordinateType> Point<T> for (T, T) {
+impl<T: CoordinateType> Coord<T> for (T, T) {
     fn x(&self) -> T {
         self.0
     }
@@ -387,7 +387,7 @@ impl ProjBuilder {
     ///```rust
     /// # use assert_approx_eq::assert_approx_eq;
     /// extern crate proj;
-    /// use proj::{Proj, Point};
+    /// use proj::{Proj, Coord};
     ///
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
@@ -465,7 +465,7 @@ impl Proj {
     ///```rust
     /// # use assert_approx_eq::assert_approx_eq;
     /// extern crate proj;
-    /// use proj::{Proj, Point};
+    /// use proj::{Proj, Coord};
     ///
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
@@ -524,9 +524,9 @@ impl Proj {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn project<P, F>(&self, point: P, inverse: bool) -> Result<P, ProjError>
+    pub fn project<C, F>(&self, point: C, inverse: bool) -> Result<C, ProjError>
     where
-        P: Point<F>,
+        C: Coord<F>,
         F: Float,
     {
         let inv = if inverse {
@@ -554,7 +554,7 @@ impl Proj {
             err = proj_errno(self.c_proj);
         }
         if err == 0 {
-            Ok(Point::from_xy(
+            Ok(Coord::from_xy(
                 F::from(new_x).ok_or(ProjError::FloatConversion)?,
                 F::from(new_y).ok_or(ProjError::FloatConversion)?,
             ))
@@ -584,7 +584,7 @@ impl Proj {
     /// ```rust
     /// # use assert_approx_eq::assert_approx_eq;
     /// extern crate proj;
-    /// use proj::{Proj, Point};
+    /// use proj::{Proj, Coord};
     ///
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
@@ -598,9 +598,9 @@ impl Proj {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn convert<P, F>(&self, point: P) -> Result<P, ProjError>
+    pub fn convert<C, F>(&self, point: C) -> Result<C, ProjError>
     where
-        P: Point<F>,
+        C: Coord<F>,
         F: Float,
     {
         let c_x: c_double = point.x().to_f64().ok_or(ProjError::FloatConversion)?;
@@ -617,7 +617,7 @@ impl Proj {
             err = proj_errno(self.c_proj);
         }
         if err == 0 {
-            Ok(P::from_xy(
+            Ok(C::from_xy(
                 F::from(new_x).ok_or(ProjError::FloatConversion)?,
                 F::from(new_y).ok_or(ProjError::FloatConversion)?,
             ))
@@ -626,7 +626,7 @@ impl Proj {
         }
     }
 
-    /// Convert a mutable slice (or anything that can deref into a mutable slice) of `Point`s
+    /// Convert a mutable slice (or anything that can deref into a mutable slice) of `Coord`s
     ///
     /// The following example converts from NAD83 US Survey Feet (EPSG 2230) to NAD83 Metres (EPSG 26946)
     ///
@@ -638,7 +638,7 @@ impl Proj {
     /// to Longitude, Latitude / Easting, Northing.
     ///
     /// ```rust
-    /// use proj::{Proj, Point};
+    /// use proj::{Proj, Coord};
     ///
     /// # use assert_approx_eq::assert_approx_eq;
     /// let from = "EPSG:2230";
@@ -656,10 +656,10 @@ impl Proj {
     /// # Safety
     /// This method contains unsafe code.
     // TODO: there may be a way of avoiding some allocations, but transmute won't work because
-    // PJ_COORD and Point<T> are different sizes
-    pub fn convert_array<'a, P, F>(&self, points: &'a mut [P]) -> Result<&'a mut [P], ProjError>
+    // PJ_COORD and Coord<T> are different sizes
+    pub fn convert_array<'a, C, F>(&self, points: &'a mut [C]) -> Result<&'a mut [C], ProjError>
     where
-        P: Point<F>,
+        C: Coord<F>,
         F: Float,
     {
         self.array_general(points, Transformation::Conversion, false)
@@ -671,7 +671,7 @@ impl Proj {
     /// (in radians) from the projection specified by `definition`.
     ///
     /// ```rust
-    /// use proj::{Proj, Point};
+    /// use proj::{Proj, Coord};
     ///
     /// # use assert_approx_eq::assert_approx_eq;
     /// let stereo70 = Proj::new(
@@ -689,14 +689,14 @@ impl Proj {
     /// # Safety
     /// This method contains unsafe code.
     // TODO: there may be a way of avoiding some allocations, but transmute won't work because
-    // PJ_COORD and Point<T> are different sizes
-    pub fn project_array<'a, P, F>(
+    // PJ_COORD and Coord<T> are different sizes
+    pub fn project_array<'a, C, F>(
         &self,
-        points: &'a mut [P],
+        points: &'a mut [C],
         inverse: bool,
-    ) -> Result<&'a mut [P], ProjError>
+    ) -> Result<&'a mut [C], ProjError>
     where
-        P: Point<F>,
+        C: Coord<F>,
         F: Float,
     {
         self.array_general(points, Transformation::Projection, inverse)
@@ -705,14 +705,14 @@ impl Proj {
     // array conversion and projection logic is almost identical;
     // transform points in input array into PJ_COORD, transform them, error-check, then re-fill
     // input slice with points. Only the actual transformation ops vary slightly.
-    fn array_general<'a, P, F>(
+    fn array_general<'a, C, F>(
         &self,
-        points: &'a mut [P],
+        points: &'a mut [C],
         op: Transformation,
         inverse: bool,
-    ) -> Result<&'a mut [P], ProjError>
+    ) -> Result<&'a mut [C], ProjError>
     where
-        P: Point<F>,
+        C: Coord<F>,
         F: Float,
     {
         let err;
@@ -749,11 +749,11 @@ impl Proj {
             },
         }
         if err == 0 && trans == 0 {
-            // re-fill original slice with Points
+            // re-fill original slice with Coords
             // feels a bit clunky, but we're guaranteed that pj and points have the same length
             unsafe {
                 for (i, coord) in pj.iter().enumerate() {
-                    points[i] = Point::from_xy(
+                    points[i] = Coord::from_xy(
                         F::from(coord.xy.x).ok_or(ProjError::FloatConversion)?,
                         F::from(coord.xy.y).ok_or(ProjError::FloatConversion)?,
                     )
@@ -806,7 +806,7 @@ mod test {
         }
     }
 
-    impl Point<f64> for MyPoint {
+    impl Coord<f64> for MyPoint {
         fn x(&self) -> f64 {
             self.x
         }

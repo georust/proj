@@ -13,7 +13,7 @@
 /// assert_approx_eq!(result.x, 1450880.29f64, 1.0e-2);
 /// assert_approx_eq!(result.y, 1141263.01f64, 1.0e-2);
 /// ```
-impl<T: crate::proj::CoordinateType> crate::Point<T> for geo_types::Coordinate<T> {
+impl<T: crate::proj::CoordinateType> crate::Coord<T> for geo_types::Coordinate<T> {
     fn x(&self) -> T {
         self.x
     }
@@ -40,7 +40,7 @@ impl<T: crate::proj::CoordinateType> crate::Point<T> for geo_types::Coordinate<T
 /// assert_approx_eq!(result.x(), 1450880.29f64, 1.0e-2);
 /// assert_approx_eq!(result.y(), 1141263.01f64, 1.0e-2);
 /// ```
-impl<T: crate::proj::CoordinateType> crate::Point<T> for geo_types::Point<T> {
+impl<T: crate::proj::CoordinateType> crate::Coord<T> for geo_types::Point<T> {
     fn x(&self) -> T {
         geo_types::Point::x(*self)
     }
