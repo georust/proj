@@ -16,14 +16,14 @@ fn main() {} // Skip the build script on docs.rs
 #[cfg(not(feature = "nobuild"))]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let include_path = if cfg!(feature = "bundled_proj") {
-        println!("feature flags specified source build");
+        eprintln!("feature flags specified source build");
         build_from_source()?
     } else {
         pkg_config::Config::new()
         .atleast_version(MINIMUM_PROJ_VERSION)
         .probe("proj")
         .and_then(|pk| {
-            println!("found acceptable libproj already installed at: {:?}", pk.link_paths[0]);
+            eprintln!("found acceptable libproj already installed at: {:?}", pk.link_paths[0]);
             if let Ok(val) = &env::var("_PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC") {
                 if val != "0" {
                     panic!("for testing purposes: existing package was found, but should not have been");
@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(pk.include_paths[0].clone())
         })
         .or_else(|err| {
-            println!("pkg-config unable to find existing libproj installation: {}", err);
+            eprintln!("pkg-config unable to find existing libproj installation: {}", err);
             build_from_source()
         })?
     };
@@ -67,7 +67,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 // returns the path of "inlude" for the built proj
 fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
-    println!("building libproj from source");
+    eprintln!("building libproj from source");
     if let Ok(val) = &env::var("_PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC") {
         if val == "0" {
             panic!(
