@@ -1,26 +1,30 @@
 [![Build Status](https://travis-ci.org/georust/proj-sys.svg?branch=master)](https://travis-ci.org/georust/proj-sys)
 
 # Low-level bindings for PROJ v7.1.x
-**This is a [`*-sys`](https://doc.rust-lang.org/cargo/reference/build-scripts.html#a-sys-packages) crate; you shouldn't use its API directly.** The [`proj`](https://github.com/georust/proj) crate is designed for general use.
 
-A guide to the functions can be found here: https://proj.org/development/reference/functions.html. Run `cargo doc (optionally --open)` to generate the crate documentation.
+**This is a
+[`*-sys`](https://doc.rust-lang.org/cargo/reference/build-scripts.html#a-sys-packages)
+crate; you shouldn't use its API directly.** See the
+[`proj`](https://github.com/georust/proj) crate for general use.
 
-## Requirements
+A guide to the functions can be found here:
+https://proj.org/development/reference/functions.html. 
 
-By default, `libproj` (via `PROJ v7.1.x`) must be present on your system. While this crate may be backwards-compatible with older PROJ 7 and PROJ 6 versions, this is neither tested or supported.
+By default, the crate will search for an existing `libproj` (via `PROJ v7.1.x`)
+installation on your system using
+[pkg-config](https://www.freedesktop.org/wiki/Software/pkg-config/). 
 
-## Optional Features
-Enable these in your `Cargo.toml` like so:
+If an acceptable installation is not found, proj-sys will attempt to build
+libproj from source bundled in the crate.
 
-`proj-sys = { version = "0.18.1", features = ["bundled_proj"] }`  
-`proj-sys = { version = "0.18.1", features = ["pkg_config"] }`  
+## Features
 
-Note that these features are **mutually exclusive**.
-
-1. `bundled_proj` (Linux and macOS targets):
-    - allow the crate to internally build and depend on a bundled `libproj`. Note that SQLite3 and `libtiff` must be present on your system if you wish to use this feature, and that it builds `libproj` **without** its native network functionality; you will have to implement your own set of callbacks if you wish to make use of them (see the [`proj`](https://crates.io/crates/proj) crate for an example).
-2. `pkg_config` (Linux and macOS targets)
-    - uses [`pkg-config`](https://en.wikipedia.org/wiki/Pkg-config) to add search paths to the build script. Requires `pkg-config` to be installed (available on Homebrew, Macports, apt etc.)
+`bundled_proj` - forces building libproj from source even if an acceptable
+version could be found on your system.  Note that SQLite3 and `libtiff` must be
+present on your system if you wish to use this feature, and that it builds
+`libproj` **without** its native network functionality; you will have to
+implement your own set of callbacks if you wish to make use of them (see the
+[`proj`](https://crates.io/crates/proj) crate for an example).
 
 ## License
 
