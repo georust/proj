@@ -23,6 +23,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .probe("proj")
         .and_then(|pk| {
             println!("found acceptable libproj already installed at: {:?}", pk.link_paths[0]);
+            if let Ok(val) = &env::var("_PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC") {
+                if val != "0" {
+                    panic!("for testing purposes: existing package was found, but should not have been");
+                }
+            }
 
             // Tell cargo to tell rustc to link the system proj
             // shared library.
@@ -62,6 +67,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 // returns the path of "inlude" for the built proj
 fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
     println!("building libproj from source");
+    if let Ok(val) = &env::var("_PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC") {
+        if val == "0" {
+            panic!(
+                "for testing purposes: package was building from source but should not have been"
+            );
+        }
+    }
 
     // NOTE: The PROJ build expects Sqlite3 to be present on the system.
     let path = "PROJSRC/proj-7.1.0.tar.gz";

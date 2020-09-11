@@ -10,33 +10,40 @@ rust:
 os:
   - linux
   - osx
-# by default, test vanilla setup on all three channels
 env:
   global:
-    - PROJ_FEATURES=""
+    - INSTALL_PROJ_FIRST=1 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC=0
 
 # test both features on Linux stable, but only pkg_config on macOS stable
 jobs:
   include:
     - os: linux
-      env: PROJ_FEATURES="--features bundled_proj"
+      env: INSTALL_PROJ_FIRST=0 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC=1
     - os: osx
-      env: PROJ_FEATURES="--features bundled_proj"
+      env: INSTALL_PROJ_FIRST=0 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC=1
+    # verify we can build from src even if its already installed
+    - os: linux
+      env: INSTALL_PROJ_FIRST=1 PROJ_FEATURES="--features bundled_proj" _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC=1
+    - os: osx
+      env: INSTALL_PROJ_FIRST=1 PROJ_FEATURES="--features bundled_proj" _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC=1
 
 before_install:
   - |
-    if [ "$TRAVIS_OS_NAME" == "linux" ] && [ "$PROJ_FEATURES" != "--features bundled_proj" ]; then
-      sudo apt-get update
-      sudo apt-get -y install pkg-config
-      wget https://download.osgeo.org/proj/proj-7.1.0.tar.gz
-      tar -xzvf proj-7.1.0.tar.gz
-      pushd proj-7.1.0 && ./configure --prefix=/usr && make && sudo make install && popd
-    fi
-  - |
-    if [ "$TRAVIS_OS_NAME" == "osx" ] && [ "$PROJ_FEATURES" != "--features bundled_proj" ]; then
-      brew update
-      brew upgrade pkg-config
-      brew upgrade proj
+    if [[ $INSTALL_PROJ_FIRST == "1" ]]; then
+      case $TRAVIS_OS_NAME in
+      "linux")
+        sudo apt-get update
+        sudo apt-get -y install pkg-config
+        wget https://download.osgeo.org/proj/proj-7.1.0.tar.gz
+        tar -xzvf proj-7.1.0.tar.gz
+        pushd proj-7.1.0 && ./configure --prefix=/usr && make && sudo make install && popd
+        ;;
+      "osx")
+        brew update
+        brew upgrade pkg-config
+        brew upgrade proj
+        ;;
+      esac
     fi
 
 script:
