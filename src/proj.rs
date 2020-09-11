@@ -24,6 +24,13 @@ use thiserror::Error;
 pub trait CoordinateType: Num + Copy + NumCast + PartialOrd {}
 impl<T: Num + Copy + NumCast + PartialOrd> CoordinateType for T {}
 
+/// A point in two dimensional space. The primary unit of input/output for proj.
+///
+/// By default, any numeric `(x, y)` tuple implements `Point`, but you can conform your type to
+/// `Point` to pass it directly into proj.
+///
+/// See the [`geo-types` feature](#feature-flags) for interop with the [`geo-types`
+/// crate](https://docs.rs/crate/geo-types)
 pub trait Point<T>
 where
     T: CoordinateType,

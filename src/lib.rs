@@ -1,5 +1,5 @@
 #![doc(html_logo_url = "https://raw.githubusercontent.com/georust/meta/master/logo/logo.png")]
-//! `proj` provides bindings to the [PROJ](https://proj.org) v7.1.x API
+//! Provides coordinate transformation via bindings to the [PROJ](https://proj.org) v7.1.x API.
 //!
 //! Two coordinate transformation operations are currently provided: _projection_
 //! (and inverse projection) and _conversion_.
@@ -9,19 +9,28 @@
 //! coordinate systems. The PROJ [documentation](https://proj.org/operations/index.html)
 //! explains the distinction between these operations in more detail.
 //!
-//! Anything that can be converted into a [`geo-types`](https://docs.rs/geo-types) [`Point`](https://docs.rs/geo-types/*/geo_types/struct.Point.html) via the `Into`
-//! trait can be used as input for the projection and conversion functions, and methods
-//! for [conversion](struct.Proj.html#method.convert_array) and [projection](struct.Proj.html#method.project_array)
-//! of slices of `Point`s are available.
+//! Out of the box, any `(x, y)` numeric tuple can be provided as input to proj. You can [conform
+//! your own types](#conform-your-own-types) to the [Point](proj/trait.Point.html) trait to pass
+//! them in directly and avoid intermediate allocations. There is a [`geo-types`
+//! feature](#feature-flags) to enable such impl's for users of the the [`geo-types`
+//! crate](https://docs.rs/geo-types).
+//!
+//! Methods for [conversion](struct.Proj.html#method.convert_array) and
+//! [projection](struct.Proj.html#method.project_array) of slices of `Point`s are also available.
 //!
 //! # Usage
+//!
 //! There are two options for creating a transformation:
 //!
 //! 1. If you don't require additional grids or other customisation:
 //!     - Call `Proj::new` or `Proj::new_known_crs`. This creates a transformation instance ([`Proj`](proj/struct.Proj.html))
 //! 2. If you require a grid for the transformation you wish to carry out, or you need to customise the search path or the grid endpoint:
-//!     - Create a new [`ProjBuilder`](proj/struct.ProjBuilder.html) by calling `ProjBuilder::new()`. It may be modified to enable network downloads, disable the grid, cache or modify search paths;
-//!     - Call [`ProjBuilder.proj()`](proj/struct.ProjBuilder.html#method.proj) or [`ProjBuilder.proj_known_crs()`](proj/struct.ProjBuilder.html#method.proj_known_crs). This creates a transformation instance (`Proj`)
+//!     - Create a new [`ProjBuilder`](proj/struct.ProjBuilder.html) by calling
+//!     `ProjBuilder::new()`. It may be modified to enable network downloads, disable the grid,
+//!     cache or modify search paths; - Call
+//!     [`ProjBuilder.proj()`](proj/struct.ProjBuilder.html#method.proj) or
+//!     [`ProjBuilder.proj_known_crs()`](proj/struct.ProjBuilder.html#method.proj_known_crs). This
+//!     creates a transformation instance (`Proj`)
 //!
 //! **Note**:
 //!
@@ -52,6 +61,9 @@
 //!
 //!## Feature Flags
 //!
+//! - `geo-types`: include [trait impls for
+//! `geo-types`](proj/trait.Point.html#impl-Point%3CT%3E-for-Coordinate%3CT%3E). See
+//!   [example](#integration-with-geo-types).
 //! - `pkg_config`: enables the use of `pkg-config` when linking against `libproj` —
 //!   note that `pkg-config` must be available on your system.
 //! - `bundled_proj`: builds `libproj` from source bundled in the `proj-sys` crate.
@@ -61,22 +73,91 @@
 //!   projection accuracy. See [`enable_network`](struct.ProjBuilder.html#method.enable_network) for
 //!   details.
 //!
-//! # Example
+//! # Examples
+//!
+//! Out of the box, `proj` works with numeric `(x, y)` tuples.
 //!
 //! ```
-//! use assert_approx_eq::assert_approx_eq;
-//! extern crate proj;
+//! # use assert_approx_eq::assert_approx_eq;
 //! use proj::{Proj, Point};
+//!
+//! let my_point = (4760096.421921f64, 3744293.729449f64);
 //!
 //! let from = "EPSG:2230";
 //! let to = "EPSG:26946";
 //! let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+//!
 //! let result = nad_ft_to_m
-//!     .convert((4760096.421921f64, 3744293.729449f64))
+//!     .convert(my_point)
 //!     .unwrap();
+//!
 //! assert_approx_eq!(result.x(), 1450880.29f64, 1.0e-2);
 //! assert_approx_eq!(result.y(), 1141263.01f64, 1.0e-2);
 //! ```
+//!
+//! ## Conform your own types
+//!
+//! If you have your own geometric types, you can conform them to the `Point` trait and use `proj`
+//! without any intermediate allocation.
+//!
+//! ```
+//! # use assert_approx_eq::assert_approx_eq;
+//! use proj::{Proj, Point};
+//!
+//! struct MyPointOfIntereset {
+//!     lat: f64,
+//!     lon: f64,
+//! }
+//!
+//! impl Point<f64> for MyPointOfIntereset {
+//!     fn x(&self) -> f64 {
+//!         self.lon
+//!     }
+//!     fn y(&self) -> f64 {
+//!         self.lat
+//!     }
+//!     fn from_xy(x: f64, y: f64) -> Self {
+//!         Self { lon: x, lat: y }
+//!     }
+//! }
+//!
+//! let donut_shop = MyPointOfIntereset { lat: 34.095620, lon: -118.283555 };
+//!
+//! let from = "EPSG:4326";
+//! let to = "EPSG:3309";
+//! let proj = Proj::new_known_crs(&from, &to, None).unwrap();
+//!
+//! let result = proj.convert(donut_shop).unwrap();
+//!
+//! assert_approx_eq!(result.x(), 158458.67251293268, 1.0e-2);
+//! assert_approx_eq!(result.y(), -434296.8803996085, 1.0e-2);
+//! ```
+#![cfg_attr(
+    feature = "geo-types",
+    doc = r##"
+## Integration with `geo-types`
+
+If you've enabled the `geo-types` feature, you can skip allocating an intermediate representation,
+and pass the [`geo-types`](https://crates.io/crates/geo-types) directly.
+
+```
+# use assert_approx_eq::assert_approx_eq;
+use proj::Proj;
+use geo_types::Point;
+
+let my_point = Point::new(4760096.421921f64, 3744293.729449f64);
+
+let from = "EPSG:2230";
+let to = "EPSG:26946";
+let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+
+let result = nad_ft_to_m.convert(my_point).unwrap();
+
+assert_approx_eq!(result.x(), 1450880.29f64, 1.0e-2);
+assert_approx_eq!(result.y(), 1141263.01f64, 1.0e-2);
+```
+"##
+)]
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
