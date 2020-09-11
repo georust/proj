@@ -3,7 +3,7 @@
 # Low-level bindings for PROJ v7.1.x
 
 **This is a
-[`*-sys`](https://doc.rust-lang.org/cargo/reference/build-scripts.html#a-sys-packages)
+[`*-sys`](https://doc.rust-lang.org/cargo/reference/build-scripts.html#-sys-packages)
 crate; you shouldn't use its API directly.** See the
 [`proj`](https://github.com/georust/proj) crate for general use.
 
