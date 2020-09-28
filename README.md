@@ -4,7 +4,7 @@ High-level Rust bindings for the latest stable version of [PROJ](https://github.
 
 # Requirements
 
-By default, this crate depends on a pre-built `libproj`, accessed by the [`proj-sys`](proj-sys) crate, so PROJ v7.1.x must be present on your system. While this crate may be backwards-compatible with older PROJ 7 and PROJ 6 versions, this is neither tested nor supported.
+By default, this crate depends on a pre-built `libproj`, accessed by the [`proj-sys`](proj-sys) crate: if PROJ v7.1.x is present on your system and can be located by the build script, it will be used. As a fallback, `libproj` will be built from source. While this crate may be backwards-compatible with older PROJ 7 and PROJ 6 versions, this is neither tested nor supported.
 
 ## Feature Flags
 
