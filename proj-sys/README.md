@@ -1,11 +1,9 @@
-[![Build Status](https://travis-ci.org/georust/proj-sys.svg?branch=master)](https://travis-ci.org/georust/proj-sys)
-
 # Low-level bindings for PROJ v7.1.x
 
 **This is a
 [`*-sys`](https://doc.rust-lang.org/cargo/reference/build-scripts.html#-sys-packages)
 crate; you shouldn't use its API directly.** See the
-[`proj`](https://github.com/georust/proj) crate for general use.
+[`proj`](https://github.com/georust/proj/proj) crate for general use.
 
 A guide to the functions can be found here:
 https://proj.org/development/reference/functions.html. 
