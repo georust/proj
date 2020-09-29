@@ -1,0 +1,32 @@
+on: push
+name: Run tests
+jobs:
+  proj:
+    name: proj
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    container:
+      image: georust/geo-ci:latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - run: cmake --version
+      - run: cargo install cargo-all-features
+      - run: cargo build-all-features
+      - run: cargo test-all-features
+
+  proj-sys:
+    name: proj-sys
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    defaults:
+      run:
+        working-directory: proj-sys
+    container:
+      image: georust/geo-ci:latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - run: cargo install cargo-all-features
+      - run: cargo build-all-features
+      - run: cargo test-all-features
