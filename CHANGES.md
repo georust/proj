@@ -1,5 +1,9 @@
 # Changes
 
+## 0.20.4
+- Incorporate proj-sys repo
+- Switch to GH actions
+
 ## 0.20.3
 * Disable default features in Reqwest
 
