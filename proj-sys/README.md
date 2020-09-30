@@ -1,5 +1,3 @@
-[![Build Status](https://travis-ci.org/georust/proj-sys.svg?branch=master)](https://travis-ci.org/georust/proj-sys)
-
 # Low-level bindings for PROJ v7.1.x
 
 **This is a

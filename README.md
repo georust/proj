@@ -1,3 +1,5 @@
+![GitHub Workflow Status](https://img.shields.io/github/workflow/status/georust/proj/proj%20ci)
+
 # PROJ
 
 High-level Rust bindings for the latest stable version of [PROJ](https://github.com/OSGeo/proj) (7.1.x), compatible with the [Georust](https://crates.io/geo) ecosystem. Includes network grid download functionality.
