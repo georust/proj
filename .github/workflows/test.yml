@@ -65,7 +65,7 @@ jobs:
           - container:
               image: "georust/proj-ci:latest"
               env:
-                _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
+                _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
             features: ""
           - container:
               image: "georust/proj-ci:latest"
