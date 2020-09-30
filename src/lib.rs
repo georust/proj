@@ -3,6 +3,7 @@
 //!
 //! Two coordinate transformation operations are currently provided: _projection_
 //! (and inverse projection) and _conversion_.
+//!
 //! Projection is intended for transformations between geodetic and projected coordinates
 //! and vice versa (inverse projection), while conversion is intended for transformations between projected
 //! coordinate systems. The PROJ [documentation](https://proj.org/operations/index.html)
