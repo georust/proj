@@ -5,7 +5,7 @@
 crate; you shouldn't use its API directly.** See the
 [`proj`](https://github.com/georust/proj) crate for general use.
 
-A guide to the functions can be found here:
+A guide to PROJ functions can be found here:
 https://proj.org/development/reference/functions.html. 
 
 By default, the crate will search for an existing `libproj` (via `PROJ v7.1.x`)
