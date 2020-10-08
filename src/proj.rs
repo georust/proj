@@ -1,7 +1,6 @@
-use geo_types::Point;
 use libc::c_int;
 use libc::{c_char, c_double};
-use num_traits::Float;
+use num_traits::{Float, Num, NumCast};
 use proj_sys::{
     proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_cleanup, proj_context_create,
     proj_context_destroy, proj_context_get_url_endpoint, proj_context_is_network_enabled,
@@ -21,6 +20,37 @@ use std::ffi::CString;
 use std::path::Path;
 use std::str;
 use thiserror::Error;
+
+pub trait CoordinateType: Num + Copy + NumCast + PartialOrd {}
+impl<T: Num + Copy + NumCast + PartialOrd> CoordinateType for T {}
+
+/// A point in two dimensional space. The primary unit of input/output for proj.
+///
+/// By default, any numeric `(x, y)` tuple implements `Coord`, but you can conform your type to
+/// `Coord` to pass it directly into proj.
+///
+/// See the [`geo-types` feature](#feature-flags) for interop with the [`geo-types`
+/// crate](https://docs.rs/crate/geo-types)
+pub trait Coord<T>
+where
+    T: CoordinateType,
+{
+    fn x(&self) -> T;
+    fn y(&self) -> T;
+    fn from_xy(x: T, y: T) -> Self;
+}
+
+impl<T: CoordinateType> Coord<T> for (T, T) {
+    fn x(&self) -> T {
+        self.0
+    }
+    fn y(&self) -> T {
+        self.1
+    }
+    fn from_xy(x: T, y: T) -> Self {
+        (x, y)
+    }
+}
 
 /// Errors originating in PROJ which can occur during projection and conversion
 #[derive(Error, Debug)]
@@ -357,16 +387,13 @@ impl ProjBuilder {
     ///```rust
     /// # use assert_approx_eq::assert_approx_eq;
     /// extern crate proj;
-    /// use proj::Proj;
-    ///
-    /// extern crate geo_types;
-    /// use geo_types::Point;
+    /// use proj::{Proj, Coord};
     ///
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
     /// let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
     /// let result = nad_ft_to_m
-    ///     .convert(Point::new(4760096.421921f64, 3744293.729449f64))
+    ///     .convert((4760096.421921f64, 3744293.729449f64))
     ///     .unwrap();
     /// assert_approx_eq!(result.x(), 1450880.29f64, 1.0e-2);
     /// assert_approx_eq!(result.y(), 1141263.01f64, 1.0e-2);
@@ -438,16 +465,13 @@ impl Proj {
     ///```rust
     /// # use assert_approx_eq::assert_approx_eq;
     /// extern crate proj;
-    /// use proj::Proj;
-    ///
-    /// extern crate geo_types;
-    /// use geo_types::Point;
+    /// use proj::{Proj, Coord};
     ///
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
     /// let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
     /// let result = nad_ft_to_m
-    ///     .convert(Point::new(4760096.421921f64, 3744293.729449f64))
+    ///     .convert((4760096.421921f64, 3744293.729449f64))
     ///     .unwrap();
     /// assert_approx_eq!(result.x(), 1450880.29f64, 1.0e-2);
     /// assert_approx_eq!(result.y(), 1141263.01f64, 1.0e-2);
@@ -500,19 +524,18 @@ impl Proj {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn project<T, U>(&self, point: T, inverse: bool) -> Result<Point<U>, ProjError>
+    pub fn project<C, F>(&self, point: C, inverse: bool) -> Result<C, ProjError>
     where
-        T: Into<Point<U>>,
-        U: Float,
+        C: Coord<F>,
+        F: Float,
     {
         let inv = if inverse {
             PJ_DIRECTION_PJ_INV
         } else {
             PJ_DIRECTION_PJ_FWD
         };
-        let _point: Point<U> = point.into();
-        let c_x: c_double = _point.x().to_f64().ok_or(ProjError::FloatConversion)?;
-        let c_y: c_double = _point.y().to_f64().ok_or(ProjError::FloatConversion)?;
+        let c_x: c_double = point.x().to_f64().ok_or(ProjError::FloatConversion)?;
+        let c_y: c_double = point.y().to_f64().ok_or(ProjError::FloatConversion)?;
         let new_x;
         let new_y;
         let err;
@@ -531,9 +554,9 @@ impl Proj {
             err = proj_errno(self.c_proj);
         }
         if err == 0 {
-            Ok(Point::new(
-                U::from(new_x).ok_or(ProjError::FloatConversion)?,
-                U::from(new_y).ok_or(ProjError::FloatConversion)?,
+            Ok(Coord::from_xy(
+                F::from(new_x).ok_or(ProjError::FloatConversion)?,
+                F::from(new_y).ok_or(ProjError::FloatConversion)?,
             ))
         } else {
             Err(ProjError::Projection(error_message(err)?))
@@ -561,16 +584,13 @@ impl Proj {
     /// ```rust
     /// # use assert_approx_eq::assert_approx_eq;
     /// extern crate proj;
-    /// use proj::Proj;
-    ///
-    /// extern crate geo_types;
-    /// use geo_types::Point;
+    /// use proj::{Proj, Coord};
     ///
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
     /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
     /// let result = ft_to_m
-    ///     .convert(Point::new(4760096.421921, 3744293.729449))
+    ///     .convert((4760096.421921, 3744293.729449))
     ///     .unwrap();
     /// assert_approx_eq!(result.x() as f64, 1450880.2910605003);
     /// assert_approx_eq!(result.y() as f64, 1141263.0111604529);
@@ -578,14 +598,13 @@ impl Proj {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn convert<T, U>(&self, point: T) -> Result<Point<U>, ProjError>
+    pub fn convert<C, F>(&self, point: C) -> Result<C, ProjError>
     where
-        T: Into<Point<U>>,
-        U: Float,
+        C: Coord<F>,
+        F: Float,
     {
-        let _point: Point<U> = point.into();
-        let c_x: c_double = _point.x().to_f64().ok_or(ProjError::FloatConversion)?;
-        let c_y: c_double = _point.y().to_f64().ok_or(ProjError::FloatConversion)?;
+        let c_x: c_double = point.x().to_f64().ok_or(ProjError::FloatConversion)?;
+        let c_y: c_double = point.y().to_f64().ok_or(ProjError::FloatConversion)?;
         let new_x;
         let new_y;
         let err;
@@ -598,16 +617,16 @@ impl Proj {
             err = proj_errno(self.c_proj);
         }
         if err == 0 {
-            Ok(Point::new(
-                U::from(new_x).ok_or(ProjError::FloatConversion)?,
-                U::from(new_y).ok_or(ProjError::FloatConversion)?,
+            Ok(C::from_xy(
+                F::from(new_x).ok_or(ProjError::FloatConversion)?,
+                F::from(new_y).ok_or(ProjError::FloatConversion)?,
             ))
         } else {
             Err(ProjError::Conversion(error_message(err)?))
         }
     }
 
-    /// Convert a mutable slice (or anything that can deref into a mutable slice) of `Point`s
+    /// Convert a mutable slice (or anything that can deref into a mutable slice) of `Coord`s
     ///
     /// The following example converts from NAD83 US Survey Feet (EPSG 2230) to NAD83 Metres (EPSG 26946)
     ///
@@ -619,16 +638,15 @@ impl Proj {
     /// to Longitude, Latitude / Easting, Northing.
     ///
     /// ```rust
-    /// use proj::Proj;
-    /// extern crate geo_types;
-    /// use geo_types::Point;
+    /// use proj::{Proj, Coord};
+    ///
     /// # use assert_approx_eq::assert_approx_eq;
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
     /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
     /// let mut v = vec![
-    ///     Point::new(4760096.421921, 3744293.729449),
-    ///     Point::new(4760197.421921, 3744394.729449),
+    ///     (4760096.421921, 3744293.729449),
+    ///     (4760197.421921, 3744394.729449),
     /// ];
     /// ft_to_m.convert_array(&mut v);
     /// assert_approx_eq!(v[0].x(), 1450880.2910605003f64);
@@ -638,13 +656,11 @@ impl Proj {
     /// # Safety
     /// This method contains unsafe code.
     // TODO: there may be a way of avoiding some allocations, but transmute won't work because
-    // PJ_COORD and Point<T> are different sizes
-    pub fn convert_array<'a, T>(
-        &self,
-        points: &'a mut [Point<T>],
-    ) -> Result<&'a mut [Point<T>], ProjError>
+    // PJ_COORD and Coord<T> are different sizes
+    pub fn convert_array<'a, C, F>(&self, points: &'a mut [C]) -> Result<&'a mut [C], ProjError>
     where
-        T: Float,
+        C: Coord<F>,
+        F: Float,
     {
         self.array_general(points, Transformation::Conversion, false)
     }
@@ -655,9 +671,8 @@ impl Proj {
     /// (in radians) from the projection specified by `definition`.
     ///
     /// ```rust
-    /// use proj::Proj;
-    /// extern crate geo_types;
-    /// use geo_types::Point;
+    /// use proj::{Proj, Coord};
+    ///
     /// # use assert_approx_eq::assert_approx_eq;
     /// let stereo70 = Proj::new(
     ///     "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
@@ -665,7 +680,7 @@ impl Proj {
     /// )
     /// .unwrap();
     /// // Geodetic -> Pulkovo 1942(58) / Stereo70 (EPSG 3844)
-    /// let mut v = vec![Point::new(0.436332, 0.802851)];
+    /// let mut v = vec![(0.436332, 0.802851)];
     /// let t = stereo70.project_array(&mut v, false).unwrap();
     /// assert_approx_eq!(v[0].x(), 500119.7035366755f64);
     /// assert_approx_eq!(v[0].y(), 500027.77901023754f64);
@@ -674,14 +689,15 @@ impl Proj {
     /// # Safety
     /// This method contains unsafe code.
     // TODO: there may be a way of avoiding some allocations, but transmute won't work because
-    // PJ_COORD and Point<T> are different sizes
-    pub fn project_array<'a, T>(
+    // PJ_COORD and Coord<T> are different sizes
+    pub fn project_array<'a, C, F>(
         &self,
-        points: &'a mut [Point<T>],
+        points: &'a mut [C],
         inverse: bool,
-    ) -> Result<&'a mut [Point<T>], ProjError>
+    ) -> Result<&'a mut [C], ProjError>
     where
-        T: Float,
+        C: Coord<F>,
+        F: Float,
     {
         self.array_general(points, Transformation::Projection, inverse)
     }
@@ -689,14 +705,15 @@ impl Proj {
     // array conversion and projection logic is almost identical;
     // transform points in input array into PJ_COORD, transform them, error-check, then re-fill
     // input slice with points. Only the actual transformation ops vary slightly.
-    fn array_general<'a, T>(
+    fn array_general<'a, C, F>(
         &self,
-        points: &'a mut [Point<T>],
+        points: &'a mut [C],
         op: Transformation,
         inverse: bool,
-    ) -> Result<&'a mut [Point<T>], ProjError>
+    ) -> Result<&'a mut [C], ProjError>
     where
-        T: Float,
+        C: Coord<F>,
+        F: Float,
     {
         let err;
         let trans;
@@ -732,13 +749,13 @@ impl Proj {
             },
         }
         if err == 0 && trans == 0 {
-            // re-fill original slice with Points
+            // re-fill original slice with Coords
             // feels a bit clunky, but we're guaranteed that pj and points have the same length
             unsafe {
                 for (i, coord) in pj.iter().enumerate() {
-                    points[i] = Point::new(
-                        T::from(coord.xy.x).ok_or(ProjError::FloatConversion)?,
-                        T::from(coord.xy.y).ok_or(ProjError::FloatConversion)?,
+                    points[i] = Coord::from_xy(
+                        F::from(coord.xy.x).ok_or(ProjError::FloatConversion)?,
+                        F::from(coord.xy.y).ok_or(ProjError::FloatConversion)?,
                     )
                 }
             }
@@ -776,7 +793,32 @@ impl Drop for ProjBuilder {
 #[cfg(test)]
 mod test {
     use super::*;
-    use geo_types::Point;
+
+    #[derive(Debug)]
+    struct MyPoint {
+        x: f64,
+        y: f64,
+    }
+
+    impl MyPoint {
+        fn new(x: f64, y: f64) -> Self {
+            MyPoint { x, y }
+        }
+    }
+
+    impl Coord<f64> for MyPoint {
+        fn x(&self) -> f64 {
+            self.x
+        }
+
+        fn y(&self) -> f64 {
+            self.y
+        }
+
+        fn from_xy(x: f64, y: f64) -> Self {
+            MyPoint { x, y }
+        }
+    }
 
     fn assert_almost_eq(a: f64, b: f64) {
         let f: f64 = a / b;
@@ -784,7 +826,7 @@ mod test {
         assert!(f > 0.99999);
     }
 
-    #[cfg(feature="network")]
+    #[cfg(feature = "network")]
     #[test]
     fn test_network_enabled_conversion() {
         // OSGB 1936
@@ -802,7 +844,7 @@ mod test {
         assert_eq!(online_builder.network_enabled(), true);
         assert_eq!(offline_builder.network_enabled(), false);
 
-        // Disable caching to ensure we're accessing the network. 
+        // Disable caching to ensure we're accessing the network.
         // Cache is stored in proj's [user writeable directory](https://proj.org/resource_files.html#user-writable-directory)
         online_builder.grid_cache_enable(false);
 
@@ -812,8 +854,12 @@ mod test {
 
         // download begins here:
         // File to download: uk_os_OSTN15_NTv2_OSGBtoETRS.tif
-        let online_t = online_proj.convert(Point::new(0.001653, 52.267733)).unwrap();
-        let offline_t = offline_proj.convert(Point::new(0.001653, 52.267733)).unwrap();
+        let online_t = online_proj
+            .convert(MyPoint::new(0.001653, 52.267733))
+            .unwrap();
+        let offline_t = offline_proj
+            .convert(MyPoint::new(0.001653, 52.267733))
+            .unwrap();
 
         // Grid download results in a high-quality OSTN15 conversion
         assert_almost_eq(online_t.x(), 0.000026091248979289044);
@@ -863,7 +909,7 @@ mod test {
         let to = "EPSG:26946";
         let proj = Proj::new_known_crs(&from, &to, None).unwrap();
         let t = proj
-            .convert(Point::new(4760096.421921, 3744293.729449))
+            .convert(MyPoint::new(4760096.421921, 3744293.729449))
             .unwrap();
         assert_almost_eq(t.x(), 1450880.29);
         assert_almost_eq(t.y(), 1141263.01);
@@ -878,7 +924,7 @@ mod test {
         .unwrap();
         // Geodetic -> Pulkovo 1942(58) / Stereo70 (EPSG 3844)
         let t = stereo70
-            .project(Point::new(0.436332, 0.802851), false)
+            .project(MyPoint::new(0.436332, 0.802851), false)
             .unwrap();
         assert_almost_eq(t.x(), 500119.7035366755);
         assert_almost_eq(t.y(), 500027.77901023754);
@@ -893,7 +939,7 @@ mod test {
         .unwrap();
         // Pulkovo 1942(58) / Stereo70 (EPSG 3844) -> Geodetic
         let t = stereo70
-            .project(Point::new(500119.70352012233, 500027.77896348457), true)
+            .project(MyPoint::new(500119.70352012233, 500027.77896348457), true)
             .unwrap();
         assert_almost_eq(t.x(), 0.436332);
         assert_almost_eq(t.y(), 0.802851);
@@ -910,7 +956,7 @@ mod test {
         .unwrap();
         // OSGB36 (EPSG 27700) -> Geodetic
         let t = osgb36
-            .project(Point::new(548295.39, 182498.46), true)
+            .project(MyPoint::new(548295.39, 182498.46), true)
             .unwrap();
         assert_almost_eq(t.x(), 0.0023755864848281206);
         assert_almost_eq(t.y(), 0.8992274896304518);
@@ -930,7 +976,7 @@ mod test {
         ").unwrap();
         // Presidio, San Francisco
         let t = nad83_m
-            .convert(Point::new(4760096.421921, 3744293.729449))
+            .convert(MyPoint::new(4760096.421921, 3744293.729449))
             .unwrap();
         assert_almost_eq(t.x(), 1450880.29);
         assert_almost_eq(t.y(), 1141263.01);
@@ -948,7 +994,7 @@ mod test {
         )
         .unwrap();
         let err = nad83_m
-            .convert(Point::new(4760096.421921, 3744293.729449))
+            .convert(MyPoint::new(4760096.421921, 3744293.729449))
             .unwrap_err();
         assert_eq!(
             "The conversion failed with the following error: latitude or longitude exceeded limits",
@@ -965,17 +1011,17 @@ mod test {
 
         // we expect this first conversion to fail (copied from above test case)
         assert!(nad83_m
-            .convert(Point::new(4760096.421921, 3744293.729449))
+            .convert(MyPoint::new(4760096.421921, 3744293.729449))
             .is_err());
 
         // but a subsequent valid conversion should still be successful
-        assert!(nad83_m.convert(Point::new(0.0, 0.0)).is_ok());
+        assert!(nad83_m.convert(MyPoint::new(0.0, 0.0)).is_ok());
 
         // also test with project() function
         assert!(nad83_m
-            .project(Point::new(99999.0, 99999.0), false)
+            .project(MyPoint::new(99999.0, 99999.0), false)
             .is_err());
-        assert!(nad83_m.project(Point::new(0.0, 0.0), false).is_ok());
+        assert!(nad83_m.project(MyPoint::new(0.0, 0.0), false).is_ok());
     }
 
     #[test]
@@ -984,8 +1030,8 @@ mod test {
         let to = "EPSG:26946";
         let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
         let mut v = vec![
-            Point::new(4760096.421921, 3744293.729449),
-            Point::new(4760197.421921, 3744394.729449),
+            MyPoint::new(4760096.421921, 3744293.729449),
+            MyPoint::new(4760197.421921, 3744394.729449),
         ];
         ft_to_m.convert_array(&mut v).unwrap();
         assert_almost_eq(v[0].x(), 1450880.2910605003f64);
@@ -1000,7 +1046,7 @@ mod test {
         let to = "EPSG:2230";
         let to_feet = Proj::new_known_crs(&from, &to, None).unwrap();
         // 👽
-        let usa_m = Point::new(-115.797615, 37.2647978);
+        let usa_m = MyPoint::new(-115.797615, 37.2647978);
         let usa_ft = to_feet.convert(usa_m).unwrap();
         assert_eq!(6693625.67217475, usa_ft.x());
         assert_eq!(3497301.5918027186, usa_ft.y());

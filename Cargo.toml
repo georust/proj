@@ -14,7 +14,7 @@ edition = "2018"
 
 [dependencies]
 proj-sys = { version = "0.18.3", path = "proj-sys" }
-geo-types ="0.6.0"
+geo-types = { version = "0.6", optional = true }
 libc = "0.2.62"
 num-traits = "0.2.8"
 thiserror = "1.0.4"
@@ -32,5 +32,5 @@ network = ["reqwest"]
 assert_approx_eq = "1.1.0"
 
 [package.metadata.docs.rs]
-features = [ "proj-sys/nobuild", "network" ]
+features = [ "proj-sys/nobuild", "network", "geo-types" ]
 rustdoc-args = ["--cfg", "docsrs"]
