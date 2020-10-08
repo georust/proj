@@ -1,4 +1,4 @@
--![GitHub Workflow Status](https://img.shields.io/github/workflow/status/georust/proj/proj%20ci)
+![GitHub Workflow Status](https://img.shields.io/github/workflow/status/georust/proj/proj%20ci)
 
 # PROJ
 
