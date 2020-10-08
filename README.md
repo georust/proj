@@ -13,10 +13,10 @@ projected coordinate systems. The PROJ [documentation](https://proj.org/operatio
 explains the distinction between these operations in more detail.
 
 This crate depends on [`libproj v7.1.x`](https://proj.org), accessed via the
-[`proj-sys`](proj-sys) crate. By default, `proj-sys` will try to find a pre-existing
-installation of libproj on your system. If an appropriate version of libproj cannot be found,
-the build script will attempt to build `libproj` from source. You may specify a from-source
-build with the [`bundled_proj` feature](#feature-flags).
+[`proj-sys`](https://docs.rs/proj-sys) crate. By default, `proj-sys` will try to find a
+pre-existing installation of libproj on your system. If an appropriate version of libproj
+cannot be found, the build script will attempt to build libproj from source. You may specify a
+from-source build with the [`bundled_proj` feature](#feature-flags).
 
 Out of the box, any `(x, y)` numeric tuple can be provided as input to proj. You can [conform
 your own types](#conform-your-own-types) to the [Coord](proj/trait.Coord.html) trait to pass
