@@ -34,10 +34,10 @@ jobs:
           - "--features network"
           - "--features bundled_proj"
           - "--features geo-types"
-          - "--features \"network bundled_proj\"", 
-          - "--features \"network geo-types\"", 
-          - "--features \"bundled_proj geo-types\"", 
-          - "--features \"network bundled_proj geo-types\"", 
+          - "--features \"network bundled_proj\""
+          - "--features \"network geo-types\""
+          - "--features \"bundled_proj geo-types\""
+          - "--features \"network bundled_proj geo-types\""
     container:
       image: georust/proj-ci:latest
     steps:
