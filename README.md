@@ -191,7 +191,7 @@ assert_approx_eq!(result.x(), 158458.67251293268);
 assert_approx_eq!(result.y(), -434296.8803996085);
 ```
 
-## Integration with `geo-types`
+### Integration with `geo-types`
 
 If you've enabled the `geo-types` feature, you can skip allocating an intermediate representation,
 and pass the [`geo-types`](https://crates.io/crates/geo-types) directly.
@@ -209,8 +209,8 @@ let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
 
 let result = nad_ft_to_m.convert(my_point).unwrap();
 
-assert_approx_eq!(result.x(), 1450880.29f64);
-assert_approx_eq!(result.y(), 1141263.01f64);
+assert_approx_eq!(result.x(), 1450880.2910605003f64);
+assert_approx_eq!(result.y(), 1141263.0111604529f64);
 ```
 
 License: MIT/Apache-2.0
