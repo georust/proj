@@ -5,9 +5,10 @@ use proj_sys::{
     proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_cleanup, proj_context_create,
     proj_context_destroy, proj_context_get_url_endpoint, proj_context_is_network_enabled,
     proj_context_set_search_paths, proj_context_set_url_endpoint, proj_create,
-    proj_create_crs_to_crs, proj_destroy, proj_errno_string, proj_grid_cache_set_enable, proj_info,
-    proj_normalize_for_visualization, proj_pj_info, proj_trans, proj_trans_array, PJconsts,
-    PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LP, PJ_XY,
+    proj_create_crs_to_crs, proj_destroy, proj_errno_string, proj_get_area_of_use,
+    proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization, proj_pj_info,
+    proj_trans, proj_trans_array, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD,
+    PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LP, PJ_XY,
 };
 
 #[cfg(feature = "network")]
@@ -17,6 +18,7 @@ use proj_sys::{proj_errno, proj_errno_reset};
 
 use std::ffi::CStr;
 use std::ffi::CString;
+use std::mem::MaybeUninit;
 use std::path::Path;
 use std::str;
 use thiserror::Error;
@@ -64,6 +66,8 @@ pub enum ProjError {
     /// An error that occurs when a path string originating in PROJ can't be converted to a CString
     #[error("Couldn't create a raw pointer from the string")]
     Creation(#[from] std::ffi::NulError),
+    #[error("The projection area of use is unknown")]
+    UnknownAreaOfUse,
     /// An error that occurs if a user-supplied path can't be converted into a string slice
     #[error("Couldn't convert path to slice")]
     Path,
@@ -505,6 +509,59 @@ impl Proj {
                     new_bbox.north,
                 );
             }
+        }
+    }
+
+    /// Returns the area of use of a projection
+    ///
+    /// When multiple usages are available, the first one will be returned.
+    /// The bounding box coordinates are in degrees.
+    ///
+    /// According to upstream, both the area of use and the projection name
+    /// might have not been defined, so they are optional.
+    pub fn area_of_use(&self) -> Result<(Option<Area>, Option<String>), ProjError> {
+        let mut out_west_lon_degree = MaybeUninit::uninit();
+        let mut out_south_lat_degree = MaybeUninit::uninit();
+        let mut out_east_lon_degree = MaybeUninit::uninit();
+        let mut out_north_lat_degree = MaybeUninit::uninit();
+        let mut out_area_name = MaybeUninit::uninit();
+        let res = unsafe {
+            proj_get_area_of_use(
+                self.ctx,
+                self.c_proj,
+                out_west_lon_degree.as_mut_ptr(),
+                out_south_lat_degree.as_mut_ptr(),
+                out_east_lon_degree.as_mut_ptr(),
+                out_north_lat_degree.as_mut_ptr(),
+                out_area_name.as_mut_ptr(),
+            )
+        };
+        if res == 0 {
+            Err(ProjError::UnknownAreaOfUse)
+        } else {
+            let west = unsafe { out_west_lon_degree.assume_init() };
+            let south = unsafe { out_south_lat_degree.assume_init() };
+            let east = unsafe { out_east_lon_degree.assume_init() };
+            let north = unsafe { out_north_lat_degree.assume_init() };
+            let name = unsafe { out_area_name.assume_init() };
+
+            let area = if west != -1000.0 && south != -1000.0 && east != -1000.0 && north != -1000.0
+            {
+                Some(Area {
+                    west,
+                    south,
+                    east,
+                    north,
+                })
+            } else {
+                None
+            };
+            let name = if !name.is_null() {
+                Some(_string(name)?)
+            } else {
+                None
+            };
+            Ok((area, name))
         }
     }
 
@@ -1050,5 +1107,18 @@ mod test {
         let usa_ft = to_feet.convert(usa_m).unwrap();
         assert_eq!(6693625.67217475, usa_ft.x());
         assert_eq!(3497301.5918027186, usa_ft.y());
+    }
+
+    #[test]
+    fn test_area_of_use() {
+        let proj = Proj::new("EPSG:3035").unwrap();
+        let (area, name) = proj.area_of_use().unwrap();
+        let area = area.unwrap();
+        let name = name.unwrap();
+        assert_eq!(area.west, -35.58);
+        assert_eq!(area.south, 24.6);
+        assert_eq!(area.east, 44.83);
+        assert_eq!(area.north, 84.17);
+        assert_eq!(name, "Europe - LCC & LAEA");
     }
 }
