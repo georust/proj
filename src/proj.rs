@@ -16,6 +16,7 @@ use proj_sys::proj_context_set_enable_network;
 
 use proj_sys::{proj_errno, proj_errno_reset};
 
+use std::convert::TryFrom;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::mem::MaybeUninit;
@@ -792,16 +793,17 @@ impl Proj {
             .collect::<Result<Vec<_>, ProjError>>()?;
         pj.shrink_to_fit();
         // Transformation operations are slightly different
+        let pj_len = u64::try_from(pj.len()).unwrap();
         match op {
             Transformation::Conversion => unsafe {
                 proj_errno_reset(self.c_proj);
                 trans =
-                    proj_trans_array(self.c_proj, PJ_DIRECTION_PJ_FWD, pj.len(), pj.as_mut_ptr());
+                    proj_trans_array(self.c_proj, PJ_DIRECTION_PJ_FWD, pj_len, pj.as_mut_ptr());
                 err = proj_errno(self.c_proj);
             },
             Transformation::Projection => unsafe {
                 proj_errno_reset(self.c_proj);
-                trans = proj_trans_array(self.c_proj, inv, pj.len(), pj.as_mut_ptr());
+                trans = proj_trans_array(self.c_proj, inv, pj_len, pj.as_mut_ptr());
                 err = proj_errno(self.c_proj);
             },
         }
