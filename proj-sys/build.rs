@@ -49,6 +49,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bindings = bindgen::Builder::default()
         .clang_arg(format!("-I{}", include_path.to_string_lossy()))
         .trust_clang_mangling(false)
+        .size_t_is_usize(true)
         .blacklist_type("max_align_t")
         // The input header we would like to generate
         // bindings for.
