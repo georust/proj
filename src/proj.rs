@@ -16,7 +16,6 @@ use proj_sys::proj_context_set_enable_network;
 
 use proj_sys::{proj_errno, proj_errno_reset};
 
-use std::convert::TryFrom;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::mem::MaybeUninit;
