@@ -10,7 +10,7 @@
 //! [`proj`](https://github.com/georust/proj) crate for general use.
 //!
 //! A guide to the functions can be found here:
-//! https://proj.org/development/reference/functions.html.
+//! <https://proj.org/development/reference/functions.html>.
 //!
 //! By default, the crate will search for an existing `libproj` (via `PROJ v7.1.x`)
 //! installation on your system using
