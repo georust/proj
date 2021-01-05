@@ -40,8 +40,8 @@ let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
 let result = ft_to_m
     .convert((4760096.421921f64, 3744293.729449f64))
     .unwrap();
-assert_approx_eq!(result.0, 1450880.2910605003);
-assert_approx_eq!(result.1, 1141263.0111604529);
+assert_relative_eq!(result.0, 1450880.2910605003);
+assert_relative_eq!(result.1, 1141263.0111604529);
 ```
 
 ### Convert from [NAD 83 US Survey Feet](https://epsg.io/2230) to [NAD 83 Meters](https://epsg.io/26946) Using the `pipeline` Operator
@@ -71,8 +71,8 @@ let ft_to_m = Proj::new("
 
 // The Presidio, approximately
 let result = ft_to_m.convert((4760096.421921f64, 3744293.729449f64)).unwrap();
-assert_approx_eq!(result.0, 1450880.2910605003);
-assert_approx_eq!(result.1, 1141263.01116045);
+assert_relative_eq!(result.0, 1450880.2910605003);
+assert_relative_eq!(result.1, 1141263.01116045);
 ```
 
 ### Inverse Projection from [Stereo70](https://epsg.io/3844) to Geodetic
@@ -90,8 +90,8 @@ let stereo70 = Proj::new("
 let geodetic_radians_point = stereo70.project(
     (500119.70352012233f64, 500027.77896348457f64), true
 ).unwrap();
-assert_approx_eq!(geodetic_radians_point.0, 0.436332);
-assert_approx_eq!(geodetic_radians_point.1, 0.802851);
+assert_relative_eq!(geodetic_radians_point.0, 0.436332, epsilon=1e-5);
+assert_relative_eq!(geodetic_radians_point.1, 0.802851, epsiolon=1e-5);
 ```
 
 ## Usage
@@ -187,8 +187,8 @@ let proj = Proj::new_known_crs(&from, &to, None).unwrap();
 
 let result = proj.convert(donut_shop).unwrap();
 
-assert_approx_eq!(result.x(), 158458.67251293268);
-assert_approx_eq!(result.y(), -434296.8803996085);
+assert_relative_eq!(result.x(), 158458.67251293268);
+assert_relative_eq!(result.y(), -434296.8803996085);
 ```
 
 ### Integration with `geo-types`
@@ -197,7 +197,7 @@ If you've enabled the `geo-types` feature, you can skip allocating an intermedia
 and pass the [`geo-types`](https://crates.io/crates/geo-types) directly.
 
 ```rust
-# use assert_approx_eq::assert_approx_eq;
+# use approx::assert_relative_eq;
 use proj::Proj;
 use geo_types::Point;
 
@@ -209,8 +209,8 @@ let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
 
 let result = nad_ft_to_m.convert(my_point).unwrap();
 
-assert_approx_eq!(result.x(), 1450880.2910605003f64);
-assert_approx_eq!(result.y(), 1141263.0111604529f64);
+assert_relative_eq!(result.x(), 1450880.2910605003f64);
+assert_relative_eq!(result.y(), 1141263.0111604529f64);
 ```
 
 License: MIT/Apache-2.0

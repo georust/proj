@@ -29,7 +29,7 @@ pkg_config = [ "proj-sys/pkg_config" ]
 network = ["reqwest"]
 
 [dev-dependencies]
-assert_approx_eq = "1.1.0"
+approx = "0.3"
 
 [package.metadata.docs.rs]
 features = [ "proj-sys/nobuild", "network", "geo-types" ]
