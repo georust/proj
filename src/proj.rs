@@ -731,16 +731,16 @@ impl Proj {
     /// use proj::{Proj, Coord};
     ///
     /// # use assert_approx_eq::assert_approx_eq;
-    /// let stereo70 = Proj::new(
-    ///     "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
-    ///     +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs"
-    /// )
-    /// .unwrap();
-    /// // Geodetic -> Pulkovo 1942(58) / Stereo70 (EPSG 3844)
-    /// let mut v = vec![(0.436332, 0.802851)];
-    /// let t = stereo70.project_array(&mut v, false).unwrap();
-    /// assert_approx_eq!(v[0].x(), 500119.7035366755f64);
-    /// assert_approx_eq!(v[0].y(), 500027.77901023754f64);
+    /// let from = "EPSG:2230";
+    /// let to = "EPSG:26946";
+    /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+    /// let mut v = vec![
+    ///     (4760096.421921, 3744293.729449),
+    ///     (4760197.421921, 3744394.729449),
+    /// ];
+    /// ft_to_m.convert_array(&mut v).unwrap();
+    /// assert_approx_eq!(v[0].x(), 1450880.2910605003f64);
+    /// assert_approx_eq!(v[1].y(), 1141293.7960220212f64);
     /// ```
     ///
     /// # Safety
