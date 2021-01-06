@@ -698,16 +698,17 @@ impl Proj {
     /// use proj::{Proj, Coord};
     ///
     /// # use assert_approx_eq::assert_approx_eq;
-    /// let from = "EPSG:2230";
-    /// let to = "EPSG:26946";
-    /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+    /// // Convert from NAD83(NSRS2007) to NAD83(2011)
+    /// let from = "EPSG:4759";
+    /// let to = "EPSG:4317";
+    /// let NAD83_old_to_new = Proj::new_known_crs(&from, &to, None).unwrap();
     /// let mut v = vec![
-    ///     (4760096.421921, 3744293.729449),
-    ///     (4760197.421921, 3744394.729449),
+    ///     (-98.5421515000, 39.2240867222),
+    ///     (-98.3166503906, 38.7112325390),
     /// ];
-    /// ft_to_m.convert_array(&mut v);
-    /// assert_approx_eq!(v[0].x(), 1450880.2910605003f64);
-    /// assert_approx_eq!(v[1].y(), 1141293.7960220212f64);
+    /// NAD83_old_to_new.convert_array(&mut v);
+    /// assert_approx_eq!(v[0].x(), -98.5421513236f64);
+    /// assert_approx_eq!(v[1].y(), 38.7112325216f64);
     /// ```
     ///
     /// # Safety
@@ -731,16 +732,16 @@ impl Proj {
     /// use proj::{Proj, Coord};
     ///
     /// # use assert_approx_eq::assert_approx_eq;
-    /// let stereo70 = Proj::new(
-    ///     "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
-    ///     +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs"
-    /// )
-    /// .unwrap();
-    /// // Geodetic -> Pulkovo 1942(58) / Stereo70 (EPSG 3844)
-    /// let mut v = vec![(0.436332, 0.802851)];
-    /// let t = stereo70.project_array(&mut v, false).unwrap();
-    /// assert_approx_eq!(v[0].x(), 500119.7035366755f64);
-    /// assert_approx_eq!(v[0].y(), 500027.77901023754f64);
+    /// let from = "EPSG:2230";
+    /// let to = "EPSG:26946";
+    /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+    /// let mut v = vec![
+    ///     (4760096.421921, 3744293.729449),
+    ///     (4760197.421921, 3744394.729449),
+    /// ];
+    /// ft_to_m.convert_array(&mut v).unwrap();
+    /// assert_approx_eq!(v[0].x(), 1450880.2910605003f64);
+    /// assert_approx_eq!(v[1].y(), 1141293.7960220212f64);
     /// ```
     ///
     /// # Safety
@@ -791,17 +792,19 @@ impl Proj {
             })
             .collect::<Result<Vec<_>, ProjError>>()?;
         pj.shrink_to_fit();
+        // explicitly create the raw pointer to ensure it lives long enough
+        let mp = pj.as_mut_ptr();
         // Transformation operations are slightly different
         match op {
             Transformation::Conversion => unsafe {
                 proj_errno_reset(self.c_proj);
                 trans =
-                    proj_trans_array(self.c_proj, PJ_DIRECTION_PJ_FWD, pj.len(), pj.as_mut_ptr());
+                    proj_trans_array(self.c_proj, PJ_DIRECTION_PJ_FWD, pj.len(), mp);
                 err = proj_errno(self.c_proj);
             },
             Transformation::Projection => unsafe {
                 proj_errno_reset(self.c_proj);
-                trans = proj_trans_array(self.c_proj, inv, pj.len(), pj.as_mut_ptr());
+                trans = proj_trans_array(self.c_proj, inv, pj.len(), mp);
                 err = proj_errno(self.c_proj);
             },
         }
