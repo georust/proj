@@ -791,17 +791,19 @@ impl Proj {
             })
             .collect::<Result<Vec<_>, ProjError>>()?;
         pj.shrink_to_fit();
+        // explicitly create the raw pointer to ensure it lives long enough
+        let mp = pj.as_mut_ptr();
         // Transformation operations are slightly different
         match op {
             Transformation::Conversion => unsafe {
                 proj_errno_reset(self.c_proj);
                 trans =
-                    proj_trans_array(self.c_proj, PJ_DIRECTION_PJ_FWD, pj.len(), pj.as_mut_ptr());
+                    proj_trans_array(self.c_proj, PJ_DIRECTION_PJ_FWD, pj.len(), mp);
                 err = proj_errno(self.c_proj);
             },
             Transformation::Projection => unsafe {
                 proj_errno_reset(self.c_proj);
-                trans = proj_trans_array(self.c_proj, inv, pj.len(), pj.as_mut_ptr());
+                trans = proj_trans_array(self.c_proj, inv, pj.len(), mp);
                 err = proj_errno(self.c_proj);
             },
         }
