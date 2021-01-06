@@ -1,5 +1,5 @@
 ///```rust
-/// # use assert_approx_eq::assert_approx_eq;
+/// # use approx::assert_relative_eq;
 /// extern crate proj;
 /// use proj::Proj;
 /// use geo_types::Coordinate;
@@ -10,8 +10,8 @@
 /// let result = nad_ft_to_m
 ///     .convert(Coordinate { x: 4760096.421921f64, y: 3744293.729449f64 })
 ///     .unwrap();
-/// assert_approx_eq!(result.x, 1450880.29f64, 1.0e-2);
-/// assert_approx_eq!(result.y, 1141263.01f64, 1.0e-2);
+/// assert_relative_eq!(result.x, 1450880.29f64, epsilon=1.0e-2);
+/// assert_relative_eq!(result.y, 1141263.01f64, epsilon=1.0e-2);
 /// ```
 impl<T: crate::proj::CoordinateType> crate::Coord<T> for geo_types::Coordinate<T> {
     fn x(&self) -> T {
@@ -26,7 +26,7 @@ impl<T: crate::proj::CoordinateType> crate::Coord<T> for geo_types::Coordinate<T
 }
 
 ///```rust
-/// # use assert_approx_eq::assert_approx_eq;
+/// # use approx::assert_relative_eq;
 /// extern crate proj;
 /// use proj::Proj;
 /// use geo_types::Point;
@@ -37,8 +37,8 @@ impl<T: crate::proj::CoordinateType> crate::Coord<T> for geo_types::Coordinate<T
 /// let result = nad_ft_to_m
 ///     .convert(Point::new(4760096.421921f64, 3744293.729449f64))
 ///     .unwrap();
-/// assert_approx_eq!(result.x(), 1450880.29f64, 1.0e-2);
-/// assert_approx_eq!(result.y(), 1141263.01f64, 1.0e-2);
+/// assert_relative_eq!(result.x(), 1450880.29f64, epsilon=1.0e-2);
+/// assert_relative_eq!(result.y(), 1141263.01f64, epsilon=1.0e-2);
 /// ```
 impl<T: crate::proj::CoordinateType> crate::Coord<T> for geo_types::Point<T> {
     fn x(&self) -> T {

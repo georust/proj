@@ -389,7 +389,7 @@ impl ProjBuilder {
     /// return correct results.
     ///
     ///```rust
-    /// # use assert_approx_eq::assert_approx_eq;
+    /// # use approx::assert_relative_eq;
     /// extern crate proj;
     /// use proj::{Proj, Coord};
     ///
@@ -399,8 +399,8 @@ impl ProjBuilder {
     /// let result = nad_ft_to_m
     ///     .convert((4760096.421921f64, 3744293.729449f64))
     ///     .unwrap();
-    /// assert_approx_eq!(result.x(), 1450880.29f64, 1.0e-2);
-    /// assert_approx_eq!(result.y(), 1141263.01f64, 1.0e-2);
+    /// assert_relative_eq!(result.x(), 1450880.29, epsilon = 1.0e-2);
+    /// assert_relative_eq!(result.y(), 1141263.01, epsilon = 1.0e-2);
     /// ```
     ///
     /// # Safety
@@ -467,7 +467,7 @@ impl Proj {
     /// return correct results.
     ///
     ///```rust
-    /// # use assert_approx_eq::assert_approx_eq;
+    /// # use approx::assert_relative_eq;
     /// extern crate proj;
     /// use proj::{Proj, Coord};
     ///
@@ -477,8 +477,8 @@ impl Proj {
     /// let result = nad_ft_to_m
     ///     .convert((4760096.421921f64, 3744293.729449f64))
     ///     .unwrap();
-    /// assert_approx_eq!(result.x(), 1450880.29f64, 1.0e-2);
-    /// assert_approx_eq!(result.y(), 1141263.01f64, 1.0e-2);
+    /// assert_relative_eq!(result.x(), 1450880.29, epsilon=1.0e-2);
+    /// assert_relative_eq!(result.y(), 1141263.01, epsilon=1.0e-2);
     /// ```
     ///
     /// # Safety
@@ -639,7 +639,7 @@ impl Proj {
     /// The following example converts from NAD83 US Survey Feet (EPSG 2230) to NAD83 Metres (EPSG 26946)
     ///
     /// ```rust
-    /// # use assert_approx_eq::assert_approx_eq;
+    /// # use approx::assert_relative_eq;
     /// extern crate proj;
     /// use proj::{Proj, Coord};
     ///
@@ -649,8 +649,8 @@ impl Proj {
     /// let result = ft_to_m
     ///     .convert((4760096.421921, 3744293.729449))
     ///     .unwrap();
-    /// assert_approx_eq!(result.x() as f64, 1450880.2910605003);
-    /// assert_approx_eq!(result.y() as f64, 1141263.0111604529);
+    /// assert_relative_eq!(result.x() as f64, 1450880.29, epsilon=1e-2);
+    /// assert_relative_eq!(result.y() as f64, 1141263.01, epsilon=1e-2);
     /// ```
     ///
     /// # Safety
@@ -697,7 +697,7 @@ impl Proj {
     /// ```rust
     /// use proj::{Proj, Coord};
     ///
-    /// # use assert_approx_eq::assert_approx_eq;
+    /// # use approx::assert_relative_eq;
     /// // Convert from NAD83(NSRS2007) to NAD83(2011)
     /// let from = "EPSG:4759";
     /// let to = "EPSG:4317";
@@ -707,8 +707,8 @@ impl Proj {
     ///     (-98.3166503906, 38.7112325390),
     /// ];
     /// NAD83_old_to_new.convert_array(&mut v);
-    /// assert_approx_eq!(v[0].x(), -98.5421513236f64);
-    /// assert_approx_eq!(v[1].y(), 38.7112325216f64);
+    /// assert_relative_eq!(v[0].x(), -98.54, epsilon=1e-2);
+    /// assert_relative_eq!(v[1].y(), 38.71, epsilon=1e-2);
     /// ```
     ///
     /// # Safety
@@ -731,7 +731,7 @@ impl Proj {
     /// ```rust
     /// use proj::{Proj, Coord};
     ///
-    /// # use assert_approx_eq::assert_approx_eq;
+    /// # use approx::assert_relative_eq;
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
     /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
@@ -740,8 +740,8 @@ impl Proj {
     ///     (4760197.421921, 3744394.729449),
     /// ];
     /// ft_to_m.convert_array(&mut v).unwrap();
-    /// assert_approx_eq!(v[0].x(), 1450880.2910605003f64);
-    /// assert_approx_eq!(v[1].y(), 1141293.7960220212f64);
+    /// assert_relative_eq!(v[0].x(), 1450880.29, epsilon=1e-2);
+    /// assert_relative_eq!(v[1].y(), 1141293.79, epsilon=1e-2);
     /// ```
     ///
     /// # Safety
@@ -880,12 +880,6 @@ mod test {
         }
     }
 
-    fn assert_almost_eq(a: f64, b: f64) {
-        let f: f64 = a / b;
-        assert!(f < 1.00001);
-        assert!(f > 0.99999);
-    }
-
     #[cfg(feature = "network")]
     #[test]
     fn test_network_enabled_conversion() {
@@ -922,12 +916,12 @@ mod test {
             .unwrap();
 
         // Grid download results in a high-quality OSTN15 conversion
-        assert_almost_eq(online_t.x(), 0.000026091248979289044);
-        assert_almost_eq(online_t.y(), 52.26817146070213);
+        assert_relative_eq!(online_t.x(), 0.000026091248979289044);
+        assert_relative_eq!(online_t.y(), 52.26817146070213);
 
         // Without the grid download, it's a less precise conversion
-        assert_almost_eq(offline_t.x(), -0.00000014658182154077693);
-        assert_almost_eq(offline_t.y(), 52.26815719726976);
+        assert_relative_eq!(offline_t.x(), -0.00000014658182154077693);
+        assert_relative_eq!(offline_t.y(), 52.26815719726976);
     }
 
     #[test]
@@ -971,8 +965,8 @@ mod test {
         let t = proj
             .convert(MyPoint::new(4760096.421921, 3744293.729449))
             .unwrap();
-        assert_almost_eq(t.x(), 1450880.29);
-        assert_almost_eq(t.y(), 1141263.01);
+        assert_relative_eq!(t.x(), 1450880.2910605003);
+        assert_relative_eq!(t.y(), 1141263.0111604529);
     }
     #[test]
     // Carry out a projection from geodetic coordinates
@@ -986,8 +980,8 @@ mod test {
         let t = stereo70
             .project(MyPoint::new(0.436332, 0.802851), false)
             .unwrap();
-        assert_almost_eq(t.x(), 500119.7035366755);
-        assert_almost_eq(t.y(), 500027.77901023754);
+        assert_relative_eq!(t.x(), 500119.7035366755, epsilon=1e-5);
+        assert_relative_eq!(t.y(), 500027.77901023754, epsilon=1e-5);
     }
     #[test]
     // Carry out an inverse projection to geodetic coordinates
@@ -1001,8 +995,8 @@ mod test {
         let t = stereo70
             .project(MyPoint::new(500119.70352012233, 500027.77896348457), true)
             .unwrap();
-        assert_almost_eq(t.x(), 0.436332);
-        assert_almost_eq(t.y(), 0.802851);
+        assert_relative_eq!(t.x(), 0.43633200013698786);
+        assert_relative_eq!(t.y(), 0.8028510000110507);
     }
     #[test]
     // Carry out an inverse projection to geodetic coordinates
@@ -1018,8 +1012,8 @@ mod test {
         let t = osgb36
             .project(MyPoint::new(548295.39, 182498.46), true)
             .unwrap();
-        assert_almost_eq(t.x(), 0.0023755864848281206);
-        assert_almost_eq(t.y(), 0.8992274896304518);
+        assert_relative_eq!(t.x(), 0.0023755864830313977);
+        assert_relative_eq!(t.y(), 0.89922748952037);
     }
     #[test]
     // Carry out a conversion from NAD83 feet (EPSG 2230) to NAD83 metres (EPSG 26946)
@@ -1038,8 +1032,8 @@ mod test {
         let t = nad83_m
             .convert(MyPoint::new(4760096.421921, 3744293.729449))
             .unwrap();
-        assert_almost_eq(t.x(), 1450880.29);
-        assert_almost_eq(t.y(), 1141263.01);
+        assert_relative_eq!(t.x(), 1450880.2910605003);
+        assert_relative_eq!(t.y(), 1141263.01116045);
     }
     #[test]
     // Test that instantiation fails wth bad proj string input
@@ -1094,8 +1088,8 @@ mod test {
             MyPoint::new(4760197.421921, 3744394.729449),
         ];
         ft_to_m.convert_array(&mut v).unwrap();
-        assert_almost_eq(v[0].x(), 1450880.2910605003f64);
-        assert_almost_eq(v[1].y(), 1141293.7960220212f64);
+        assert_relative_eq!(v[0].x(), 1450880.2910605003f64);
+        assert_relative_eq!(v[1].y(), 1141293.7960220198);
     }
 
     #[test]
