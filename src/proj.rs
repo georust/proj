@@ -698,16 +698,17 @@ impl Proj {
     /// use proj::{Proj, Coord};
     ///
     /// # use assert_approx_eq::assert_approx_eq;
-    /// let from = "EPSG:2230";
-    /// let to = "EPSG:26946";
+    /// // Convert from NAD83(NSRS2007) to NAD83(2011)
+    /// let from = "EPSG:4759";
+    /// let to = "EPSG:4317";
     /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
     /// let mut v = vec![
-    ///     (4760096.421921, 3744293.729449),
-    ///     (4760197.421921, 3744394.729449),
+    ///     (-98.5421515000, 39.2240867222),
+    ///     (-98.3166503906, 38.7112325390),
     /// ];
     /// ft_to_m.convert_array(&mut v);
-    /// assert_approx_eq!(v[0].x(), 1450880.2910605003f64);
-    /// assert_approx_eq!(v[1].y(), 1141293.7960220212f64);
+    /// assert_approx_eq!(v[0].x(), -98.5421513236f64);
+    /// assert_approx_eq!(v[1].y(), 38.7112325216f64);
     /// ```
     ///
     /// # Safety
@@ -1088,13 +1089,15 @@ mod test {
         let from = "EPSG:2230";
         let to = "EPSG:26946";
         let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
-        let mut v = vec![
-            MyPoint::new(4760096.421921, 3744293.729449),
-            MyPoint::new(4760197.421921, 3744394.729449),
-        ];
-        ft_to_m.convert_array(&mut v).unwrap();
-        assert_almost_eq(v[0].x(), 1450880.2910605003f64);
-        assert_almost_eq(v[1].y(), 1141293.7960220212f64);
+        for _ in 0..100 {
+            let mut v = vec![
+                MyPoint::new(4760096.421921, 3744293.729449),
+                MyPoint::new(4760197.421921, 3744394.729449),
+            ];
+            ft_to_m.convert_array(&mut v).unwrap();
+            assert_almost_eq(v[0].x(), 1450880.2910605003f64);
+            assert_almost_eq(v[1].y(), 1141293.7960220212f64);
+        }
     }
 
     #[test]
