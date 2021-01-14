@@ -25,6 +25,7 @@ members = ["proj-sys"]
 
 [features]
 bundled_proj = [ "proj-sys/bundled_proj" ]
+tiff = [ "proj-sys/tiff" ]
 pkg_config = [ "proj-sys/pkg_config" ]
 network = ["reqwest"]
 
