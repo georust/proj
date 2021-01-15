@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use libc::c_int;
 use libc::{c_char, c_double};
 use num_traits::{Float, Num, NumCast};
@@ -23,8 +24,8 @@ use std::path::Path;
 use std::str;
 use thiserror::Error;
 
-pub trait CoordinateType: Num + Copy + NumCast + PartialOrd {}
-impl<T: Num + Copy + NumCast + PartialOrd> CoordinateType for T {}
+pub trait CoordinateType: Num + Copy + NumCast + PartialOrd + Debug {}
+impl<T: Num + Copy + NumCast + PartialOrd + Debug> CoordinateType for T {}
 
 /// A point in two dimensional space. The primary unit of input/output for proj.
 ///
@@ -584,7 +585,7 @@ impl Proj {
     pub fn project<C, F>(&self, point: C, inverse: bool) -> Result<C, ProjError>
     where
         C: Coord<F>,
-        F: Float,
+        F: Float + Debug,
     {
         let inv = if inverse {
             PJ_DIRECTION_PJ_INV
@@ -658,7 +659,7 @@ impl Proj {
     pub fn convert<C, F>(&self, point: C) -> Result<C, ProjError>
     where
         C: Coord<F>,
-        F: Float,
+        F: Float + Debug,
     {
         let c_x: c_double = point.x().to_f64().ok_or(ProjError::FloatConversion)?;
         let c_y: c_double = point.y().to_f64().ok_or(ProjError::FloatConversion)?;
@@ -718,7 +719,7 @@ impl Proj {
     pub fn convert_array<'a, C, F>(&self, points: &'a mut [C]) -> Result<&'a mut [C], ProjError>
     where
         C: Coord<F>,
-        F: Float,
+        F: Float + Debug,
     {
         self.array_general(points, Transformation::Conversion, false)
     }
@@ -755,7 +756,7 @@ impl Proj {
     ) -> Result<&'a mut [C], ProjError>
     where
         C: Coord<F>,
-        F: Float,
+        F: Float + Debug,
     {
         self.array_general(points, Transformation::Projection, inverse)
     }
@@ -771,7 +772,7 @@ impl Proj {
     ) -> Result<&'a mut [C], ProjError>
     where
         C: Coord<F>,
-        F: Float,
+        F: Float + Debug,
     {
         let err;
         let trans;
