@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 ///```rust
 /// # use approx::assert_relative_eq;
 /// extern crate proj;
@@ -13,7 +15,7 @@
 /// assert_relative_eq!(result.x, 1450880.29f64, epsilon=1.0e-2);
 /// assert_relative_eq!(result.y, 1141263.01f64, epsilon=1.0e-2);
 /// ```
-impl<T: crate::proj::CoordinateType> crate::Coord<T> for geo_types::Coordinate<T> {
+impl<T: crate::proj::CoordinateType + Debug> crate::Coord<T> for geo_types::Coordinate<T> {
     fn x(&self) -> T {
         self.x
     }
@@ -40,7 +42,7 @@ impl<T: crate::proj::CoordinateType> crate::Coord<T> for geo_types::Coordinate<T
 /// assert_relative_eq!(result.x(), 1450880.29f64, epsilon=1.0e-2);
 /// assert_relative_eq!(result.y(), 1141263.01f64, epsilon=1.0e-2);
 /// ```
-impl<T: crate::proj::CoordinateType> crate::Coord<T> for geo_types::Point<T> {
+impl<T: crate::proj::CoordinateType + Debug> crate::Coord<T> for geo_types::Point<T> {
     fn x(&self) -> T {
         geo_types::Point::x(*self)
     }
