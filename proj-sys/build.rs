@@ -95,7 +95,7 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
     config.define("BUILD_PROJINFO", "OFF");
     config.define("BUILD_PROJSYNC", "OFF");
     config.define("ENABLE_CURL", "OFF");
-    let tiff_support = cfg!(feature = "tiff");
+    let tiff_support = cfg!(feature = "bundled_proj_tiff");
     config.define("ENABLE_TIFF", if tiff_support { "ON" } else { "OFF" });
     let proj = config.build();
     // Tell cargo to tell rustc to link libproj, and where to find it

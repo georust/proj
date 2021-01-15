@@ -37,7 +37,7 @@ jobs:
           - "--features \"network bundled_proj\""
           - "--features \"network geo-types\""
           - "--features \"bundled_proj geo-types\""
-          - "--features \"bundled_proj tiff\""
+          - "--features \"bundled_proj bundled_proj_tiff \""
           - "--features \"network bundled_proj geo-types\""
     container:
       image: georust/proj-ci:latest
