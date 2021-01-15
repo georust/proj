@@ -27,25 +27,14 @@ jobs:
     name: proj ubuntu
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        features: 
-          - ""
-          - "--features network"
-          - "--features bundled_proj"
-          - "--features geo-types"
-          - "--features \"network bundled_proj\""
-          - "--features \"network geo-types\""
-          - "--features \"bundled_proj geo-types\""
-          - "--features \"bundled_proj bundled_proj_tiff \""
-          - "--features \"network bundled_proj geo-types\""
     container:
       image: georust/proj-ci:latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-      - run: cargo build ${{ matrix.features }}
-      - run: cargo test ${{ matrix.features }}
+      - run: cargo install cargo-all-features
+      - run: cargo build-all-features
+      - run: cargo test-all-features
 
   proj-macos:
     name: proj macos
@@ -57,8 +46,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-      - run: cargo build ${{ matrix.features }}
-      - run: cargo test ${{ matrix.features }}
+      - run: cargo install cargo-all-features
+      - run: cargo build-all-features
+      - run: cargo test-all-features
 
   proj-sys-ubuntu:
     name: proj-sys ubuntu
@@ -75,22 +65,20 @@ jobs:
               image: georust/proj-ci:latest
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
-            features: ""
           - container:
               image: georust/proj-ci:latest
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
-            features: "--features bundled_proj"
           - container:
               image: "georust/proj-ci-without-system-proj:latest"
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
-            features: ""
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-      - run: cargo build ${{ matrix.features }}
-      - run: cargo test ${{ matrix.features }}
+      - run: cargo install cargo-all-features
+      - run: cargo build-all-features
+      - run: cargo test-all-features
 
   proj-sys-macos:
     name: proj-sys macos
@@ -102,4 +90,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
       - run: brew install proj
-      - run: cargo test ${{ matrix.features }}
+      - run: cargo install cargo-all-features
+      - run: cargo build-all-features
+      - run: cargo test-all-features
