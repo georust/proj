@@ -1,6 +1,6 @@
 use libc::c_int;
 use libc::{c_char, c_double};
-use num_traits::{Float, Num, NumCast};
+use num_traits::Float;
 use proj_sys::{
     proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_cleanup, proj_context_create,
     proj_context_destroy, proj_context_get_url_endpoint, proj_context_is_network_enabled,
@@ -24,8 +24,8 @@ use std::path::Path;
 use std::str;
 use thiserror::Error;
 
-pub trait CoordinateType: Num + Copy + NumCast + PartialOrd + Debug {}
-impl<T: Num + Copy + NumCast + PartialOrd + Debug> CoordinateType for T {}
+pub trait CoordinateType: Float + Copy + PartialOrd + Debug {}
+impl<T: Float + Copy + PartialOrd + Debug> CoordinateType for T {}
 
 /// A point in two dimensional space. The primary unit of input/output for proj.
 ///
@@ -585,7 +585,7 @@ impl Proj {
     pub fn project<C, F>(&self, point: C, inverse: bool) -> Result<C, ProjError>
     where
         C: Coord<F>,
-        F: Float + Debug,
+        F: CoordinateType,
     {
         let inv = if inverse {
             PJ_DIRECTION_PJ_INV
@@ -659,7 +659,7 @@ impl Proj {
     pub fn convert<C, F>(&self, point: C) -> Result<C, ProjError>
     where
         C: Coord<F>,
-        F: Float + Debug,
+        F: CoordinateType,
     {
         let c_x: c_double = point.x().to_f64().ok_or(ProjError::FloatConversion)?;
         let c_y: c_double = point.y().to_f64().ok_or(ProjError::FloatConversion)?;
@@ -719,7 +719,7 @@ impl Proj {
     pub fn convert_array<'a, C, F>(&self, points: &'a mut [C]) -> Result<&'a mut [C], ProjError>
     where
         C: Coord<F>,
-        F: Float + Debug,
+        F: CoordinateType,
     {
         self.array_general(points, Transformation::Conversion, false)
     }
@@ -756,7 +756,7 @@ impl Proj {
     ) -> Result<&'a mut [C], ProjError>
     where
         C: Coord<F>,
-        F: Float + Debug,
+        F: CoordinateType,
     {
         self.array_general(points, Transformation::Projection, inverse)
     }
@@ -772,7 +772,7 @@ impl Proj {
     ) -> Result<&'a mut [C], ProjError>
     where
         C: Coord<F>,
-        F: Float + Debug,
+        F: CoordinateType,
     {
         let err;
         let trans;
