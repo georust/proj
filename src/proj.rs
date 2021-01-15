@@ -1,4 +1,3 @@
-use std::fmt::Debug;
 use libc::c_int;
 use libc::{c_char, c_double};
 use num_traits::{Float, Num, NumCast};
@@ -11,6 +10,7 @@ use proj_sys::{
     proj_trans, proj_trans_array, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD,
     PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LP, PJ_XY,
 };
+use std::fmt::Debug;
 
 #[cfg(feature = "network")]
 use proj_sys::proj_context_set_enable_network;
@@ -799,8 +799,7 @@ impl Proj {
         match op {
             Transformation::Conversion => unsafe {
                 proj_errno_reset(self.c_proj);
-                trans =
-                    proj_trans_array(self.c_proj, PJ_DIRECTION_PJ_FWD, pj.len(), mp);
+                trans = proj_trans_array(self.c_proj, PJ_DIRECTION_PJ_FWD, pj.len(), mp);
                 err = proj_errno(self.c_proj);
             },
             Transformation::Projection => unsafe {
@@ -981,8 +980,8 @@ mod test {
         let t = stereo70
             .project(MyPoint::new(0.436332, 0.802851), false)
             .unwrap();
-        assert_relative_eq!(t.x(), 500119.7035366755, epsilon=1e-5);
-        assert_relative_eq!(t.y(), 500027.77901023754, epsilon=1e-5);
+        assert_relative_eq!(t.x(), 500119.7035366755, epsilon = 1e-5);
+        assert_relative_eq!(t.y(), 500027.77901023754, epsilon = 1e-5);
     }
     #[test]
     // Carry out an inverse projection to geodetic coordinates
