@@ -24,11 +24,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .probe("proj")
         .and_then(|pk| {
             eprintln!("found acceptable libproj already installed at: {:?}", pk.link_paths[0]);
-            if let Ok(val) = &env::var("_PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC") {
-                if val != "0" {
-                    panic!("for testing purposes: existing package was found, but should not have been");
-                }
-            }
 
             // Tell cargo to tell rustc to link the system proj
             // shared library.
