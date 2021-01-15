@@ -17,12 +17,15 @@ libproj from source bundled in the crate.
 
 ## Features
 
-`bundled_proj` - forces building libproj from source even if an acceptable
-version could be found on your system.  Note that SQLite3 and `libtiff` must be
-present on your system if you wish to use this feature, and that it builds
-`libproj` **without** its native network functionality; you will have to
-implement your own set of callbacks if you wish to make use of them (see the
+- `bundled_proj` - forces building libproj from source even if an acceptable
+  version could be found on your system.  Note that SQLite3 must be
+  present on your system if you wish to use this feature, and that it builds
+  `libproj` **without** its native network functionality; you will have to
+  implement your own set of callbacks if you wish to make use of them (see the
 [`proj`](https://crates.io/crates/proj) crate for an example).
+- `bundled_proj_tiff` - If the `bundled_proj` feature is enabled, adding the
+  `bundled_proj_tiff` feature will build PROJ with TIFF support. Note that
+  libtiff must be present on your system if you wish to use this feature.
 
 ## License
 

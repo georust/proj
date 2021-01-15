@@ -25,8 +25,9 @@ members = ["proj-sys"]
 
 [features]
 bundled_proj = [ "proj-sys/bundled_proj" ]
+bundled_proj_tiff = [ "proj-sys/bundled_proj_tiff" ]
 pkg_config = [ "proj-sys/pkg_config" ]
-network = ["reqwest"]
+network = ["bundled_proj_tiff", "reqwest"]
 
 [dev-dependencies]
 approx = "0.3"

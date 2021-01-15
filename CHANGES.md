@@ -1,5 +1,10 @@
 # Changes
 
+## Unreleased
+
+- TIFF support is now opt-in when building PROJ via the `bundled_proj` feature
+    - <https://github.com/georust/proj/pull/58>
+
 ## 0.20.4
 - Incorporate proj-sys repo
 - Switch to GH actions
