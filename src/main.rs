@@ -56,25 +56,12 @@ impl Proj {
     }
 
     pub fn project(&self, point: Point) -> Result<Point, String> {
-        let c_x: c_double = point.x;
-        let c_y: c_double = point.y;
-        let new_x;
-        let new_y;
-        let err;
-        // Input coords are defined in terms of lambda & phi, using the PJ_LP struct.
-        // This signals that we wish to project geodetic coordinates.
-        // For conversion (i.e. between projected coordinates) you should use
-        // PJ_XY {x: , y: }
-        let coords = PJ_XY { x: c_x, y: c_y };
-        unsafe {
-            // proj_errno_reset(self.c_proj);
-            // PJ_DIRECTION_* determines a forward or inverse projection
+        let coords = PJ_XY { x: point.x, y: point.y };
+        let (new_x, new_y, err) = unsafe {
+            proj_errno_reset(self.c_proj);
             let trans = proj_trans(self.c_proj, PJ_DIRECTION_PJ_FWD, PJ_COORD { xy: coords });
-            // output of coordinates uses the PJ_XY struct
-            new_x = trans.xy.x;
-            new_y = trans.xy.y;
-            err = proj_errno(self.c_proj);
-        }
+            (trans.xy.x, trans.xy.y, proj_errno(self.c_proj))
+        };
         if err == 0 {
             Ok(Point { x: new_x, y: new_y })
         } else {
