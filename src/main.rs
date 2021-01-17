@@ -29,9 +29,6 @@ pub struct Point {
     pub y: f64,
 }
 
-fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Proj {
-}
-
 pub struct Proj {
     c_proj: *mut PJconsts,
     ctx: *mut PJ_CONTEXT,
