@@ -46,6 +46,7 @@ pub struct Proj {
 }
 
 impl Proj {
+    #[inline]
     pub fn new(definition: &str) -> Proj {
         let ctx = unsafe { proj_context_create() };
         transform_string(ctx, definition)
