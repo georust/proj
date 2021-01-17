@@ -19,19 +19,10 @@ libc = "0.2.62"
 num-traits = "0.2.8"
 thiserror = "1.0.4"
 reqwest = { version = "0.10.6", optional = true, default-features = false, features = ["blocking", "rustls-tls"] }
+approx = "0.3"
 
 [workspace]
 members = ["proj-sys"]
 
 [features]
 bundled_proj = [ "proj-sys/bundled_proj" ]
-bundled_proj_tiff = [ "proj-sys/bundled_proj_tiff" ]
-pkg_config = [ "proj-sys/pkg_config" ]
-network = ["bundled_proj_tiff", "reqwest"]
-
-[dev-dependencies]
-approx = "0.3"
-
-[package.metadata.docs.rs]
-features = [ "proj-sys/nobuild", "network", "geo-types" ]
-rustdoc-args = ["--cfg", "docsrs"]
