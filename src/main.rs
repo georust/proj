@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate approx;
 
-use libc::{c_char, c_double, c_int};
+use libc::{c_char, c_int};
 use proj_sys::{
     proj_area_destroy, proj_cleanup, proj_context_create, proj_context_destroy, proj_create,
     proj_destroy, proj_errno, proj_errno_reset, proj_errno_string, proj_trans, PJconsts, PJ_AREA,
@@ -85,21 +85,20 @@ impl Drop for Proj {
     }
 }
 
+fn project(definition: &str, point: Point) -> Result<Point, String> {
+    let p = Proj::new(definition).unwrap();
+    p.project(point)
+}
+
 fn main() {
-    let stereo70 = Proj::new(
+    let t = project(
         "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
         +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs",
-    )
-    .unwrap();
-    // Geodetic -> Pulkovo 1942(58) / Stereo70 (EPSG 3844)
-    let t = stereo70
-        .project(
-            Point {
-                x: 0.436332,
-                y: 0.802851,
-            },
-        )
-        .unwrap();
+        Point {
+            x: 0.436332,
+            y: 0.802851,
+        },
+    ).unwrap();
     assert_relative_eq!(t.x, 500119.7035366755, epsilon = 1e-5);
     assert_relative_eq!(t.y, 500027.77901023754, epsilon = 1e-5);
 }
