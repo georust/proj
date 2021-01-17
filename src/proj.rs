@@ -18,34 +18,17 @@ use proj_sys::{proj_errno, proj_errno_reset};
 
 use std::ffi::CStr;
 use std::ffi::CString;
-use std::mem::MaybeUninit;
-use std::path::Path;
+
 use std::str;
 use thiserror::Error;
 
 /// Errors originating in PROJ which can occur during projection and conversion
 #[derive(Error, Debug)]
 pub enum ProjError {
-    /// A projection error
-    #[error("The projection failed with the following error: {0}")]
-    Projection(String),
-    /// A conversion error
-    #[error("The conversion failed with the following error: {0}")]
-    Conversion(String),
-    /// An error that occurs when a path string originating in PROJ can't be converted to a CString
     #[error("Couldn't create a raw pointer from the string")]
     Creation(#[from] std::ffi::NulError),
-    #[error("The projection area of use is unknown")]
-    UnknownAreaOfUse,
-    /// An error that occurs if a user-supplied path can't be converted into a string slice
-    #[error("Couldn't convert path to slice")]
-    Path,
     #[error("Couldn't convert bytes from PROJ to UTF-8")]
     Utf8Error(#[from] std::str::Utf8Error),
-    #[error("Couldn't convert number to f64")]
-    FloatConversion,
-    #[error("Network download functionality could not be enabled")]
-    Network,
     #[error("Could not set remote grid download callbacks")]
     RemoteCallbacks,
     #[error("Couldn't build request")]
@@ -60,8 +43,10 @@ pub enum ProjError {
     #[cfg(feature = "network")]
     #[error("Couldn't convert header value to str")]
     HeaderConversion(#[from] reqwest::header::ToStrError),
-    #[error("A {0} error occurred for url {1} after {2} retries")]
-    DownloadError(String, String, u8),
+    #[error("Couldn't convert number to f64")]
+    FloatConversion,
+    #[error("The projection failed with the following error: {0}")]
+    Projection(String),
 }
 
 /// Look up an error message using the error code
@@ -625,69 +610,6 @@ impl Proj {
         }
     }
 
-    /// Convert projected coordinates between coordinate reference systems.
-    ///
-    /// Input and output CRS may be specified in two ways:
-    /// 1. Using the PROJ `pipeline` operator. This method makes use of the [`pipeline`](http://proj4.org/operations/pipeline.html)
-    /// functionality available since `PROJ` 5.
-    /// This has the advantage of being able to chain an arbitrary combination of projection, conversion,
-    /// and transformation steps, allowing for extremely complex operations ([`new`](#method.new))
-    /// 2. Using EPSG codes or `PROJ` strings to define input and output CRS ([`new_known_crs`](#method.new_known_crs))
-    ///
-    /// ## A Note on Coordinate Order
-    /// Depending on the method used to instantiate the `Proj` object, coordinate input and output order may vary:
-    /// - If you have used [`new`](#method.new), it is assumed that you've specified the order using the input string,
-    /// or that you are aware of the required input order and expected output order.
-    /// - If you have used [`new_known_crs`](#method.new_known_crs), input and output order are **normalised**
-    /// to Longitude, Latitude / Easting, Northing.
-    ///
-    /// The following example converts from NAD83 US Survey Feet (EPSG 2230) to NAD83 Metres (EPSG 26946)
-    ///
-    /// ```rust
-    /// # use approx::assert_relative_eq;
-    /// extern crate proj;
-    /// use proj::{Proj, Coord};
-    ///
-    /// let from = "EPSG:2230";
-    /// let to = "EPSG:26946";
-    /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
-    /// let result = ft_to_m
-    ///     .convert((4760096.421921, 3744293.729449))
-    ///     .unwrap();
-    /// assert_relative_eq!(result.x() as f64, 1450880.29, epsilon=1e-2);
-    /// assert_relative_eq!(result.y() as f64, 1141263.01, epsilon=1e-2);
-    /// ```
-    ///
-    /// # Safety
-    /// This method contains unsafe code.
-    pub fn convert<C, F>(&self, point: C) -> Result<C, ProjError>
-    where
-        C: Coord<F>,
-        F: Float,
-    {
-        let c_x: c_double = point.x().to_f64().ok_or(ProjError::FloatConversion)?;
-        let c_y: c_double = point.y().to_f64().ok_or(ProjError::FloatConversion)?;
-        let new_x;
-        let new_y;
-        let err;
-        let coords = PJ_XY { x: c_x, y: c_y };
-        unsafe {
-            proj_errno_reset(self.c_proj);
-            let trans = proj_trans(self.c_proj, PJ_DIRECTION_PJ_FWD, PJ_COORD { xy: coords });
-            new_x = trans.xy.x;
-            new_y = trans.xy.y;
-            err = proj_errno(self.c_proj);
-        }
-        if err == 0 {
-            Ok(C::from_xy(
-                F::from(new_x).ok_or(ProjError::FloatConversion)?,
-                F::from(new_y).ok_or(ProjError::FloatConversion)?,
-            ))
-        } else {
-            Err(ProjError::Conversion(error_message(err)?))
-        }
-    }
-
     // TODO: there may be a way of avoiding some allocations, but transmute won't work because
     // PJ_COORD and Coord<T> are different sizes
     /*
@@ -851,7 +773,7 @@ mod test {
         let t = stereo70
             .project(MyPoint::new(0.436332, 0.802851), false)
             .unwrap();
-        assert_relative_eq!(t.x(), 500119.7035366755, epsilon=1e-5);
-        assert_relative_eq!(t.y(), 500027.77901023754, epsilon=1e-5);
+        assert_relative_eq!(t.x(), 500119.7035366755, epsilon = 1e-5);
+        assert_relative_eq!(t.y(), 500027.77901023754, epsilon = 1e-5);
     }
 }
