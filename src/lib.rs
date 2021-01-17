@@ -48,47 +48,9 @@ pub(crate) fn _string(raw_ptr: *const c_char) -> Result<String, ProjError> {
     Ok(str::from_utf8(c_str.to_bytes())?.to_string())
 }
 
-pub trait CoordinateType: Num + Copy + NumCast + PartialOrd {}
-impl<T: Num + Copy + NumCast + PartialOrd> CoordinateType for T {}
-
-struct MyPoint {
+pub struct Point {
     pub x: f64,
     pub y: f64,
-}
-
-impl Coord<f64> for MyPoint {
-    fn x(&self) -> f64 {
-        self.x
-    }
-
-    fn y(&self) -> f64 {
-        self.y
-    }
-
-    fn from_xy(x: f64, y: f64) -> Self {
-        MyPoint { x, y }
-    }
-}
-
-pub trait Coord<T>
-where
-    T: CoordinateType,
-{
-    fn x(&self) -> T;
-    fn y(&self) -> T;
-    fn from_xy(x: T, y: T) -> Self;
-}
-
-impl<T: CoordinateType> Coord<T> for (T, T) {
-    fn x(&self) -> T {
-        self.0
-    }
-    fn y(&self) -> T {
-        self.1
-    }
-    fn from_xy(x: T, y: T) -> Self {
-        (x, y)
-    }
 }
 
 fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Option<Proj> {
@@ -117,19 +79,14 @@ impl Proj {
         Some(transform_string(ctx, definition)?)
     }
 
-
-    pub fn project<C, F>(&self, point: C, inverse: bool) -> Result<C, ProjError>
-    where
-        C: Coord<F>,
-        F: Float,
-    {
+    pub fn project(&self, point: Point, inverse: bool) -> Result<Point, ProjError> {
         let inv = if inverse {
             PJ_DIRECTION_PJ_INV
         } else {
             PJ_DIRECTION_PJ_FWD
         };
-        let c_x: c_double = point.x().to_f64().ok_or(ProjError::FloatConversion)?;
-        let c_y: c_double = point.y().to_f64().ok_or(ProjError::FloatConversion)?;
+        let c_x: c_double = point.x;
+        let c_y: c_double = point.y;
         let new_x;
         let new_y;
         let err;
@@ -148,10 +105,7 @@ impl Proj {
             err = proj_errno(self.c_proj);
         }
         if err == 0 {
-            Ok(Coord::from_xy(
-                F::from(new_x).ok_or(ProjError::FloatConversion)?,
-                F::from(new_y).ok_or(ProjError::FloatConversion)?,
-            ))
+            Ok(Point { x: new_x, y: new_y })
         } else {
             Err(ProjError::Projection(error_message(err)?))
         }
@@ -182,8 +136,14 @@ fn test_projection() {
     .unwrap();
     // Geodetic -> Pulkovo 1942(58) / Stereo70 (EPSG 3844)
     let t = stereo70
-        .project(MyPoint { x: 0.436332, y: 0.802851 }, false)
+        .project(
+            Point {
+                x: 0.436332,
+                y: 0.802851,
+            },
+            false,
+        )
         .unwrap();
-    assert_relative_eq!(t.x(), 500119.7035366755, epsilon = 1e-5);
-    assert_relative_eq!(t.y(), 500027.77901023754, epsilon = 1e-5);
+    assert_relative_eq!(t.x, 500119.7035366755, epsilon = 1e-5);
+    assert_relative_eq!(t.y, 500027.77901023754, epsilon = 1e-5);
 }
