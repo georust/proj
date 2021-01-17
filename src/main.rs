@@ -29,17 +29,13 @@ pub struct Point {
     pub y: f64,
 }
 
-fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Option<Proj> {
-    let c_definition = CString::new(definition).ok()?;
+fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Proj {
+    let c_definition = CString::new(definition).unwrap();
     let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
-    if new_c_proj.is_null() {
-        None
-    } else {
-        Some(Proj {
-            c_proj: new_c_proj,
-            ctx,
-            area: None,
-        })
+    Proj {
+        c_proj: new_c_proj,
+        ctx,
+        area: None,
     }
 }
 
@@ -50,9 +46,9 @@ pub struct Proj {
 }
 
 impl Proj {
-    pub fn new(definition: &str) -> Option<Proj> {
+    pub fn new(definition: &str) -> Proj {
         let ctx = unsafe { proj_context_create() };
-        Some(transform_string(ctx, definition)?)
+        transform_string(ctx, definition)
     }
 
     pub fn project(&self, point: Point) -> Result<Point, String> {
@@ -85,9 +81,9 @@ impl Drop for Proj {
     }
 }
 
-fn project(definition: &str, point: Point) -> Result<Point, String> {
-    let p = Proj::new(definition).unwrap();
-    p.project(point)
+fn project(definition: &str, point: Point) -> Point {
+    let p = Proj::new(definition);
+    p.project(point).unwrap()
 }
 
 fn main() {
@@ -98,7 +94,7 @@ fn main() {
             x: 0.436332,
             y: 0.802851,
         },
-    ).unwrap();
+    );
     assert_relative_eq!(t.x, 500119.7035366755, epsilon = 1e-5);
     assert_relative_eq!(t.y, 500027.77901023754, epsilon = 1e-5);
 }
