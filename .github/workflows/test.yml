@@ -40,7 +40,7 @@ jobs:
           - "--features \"bundled_proj bundled_proj_tiff \""
           - "--features \"network bundled_proj geo-types\""
     container:
-      image: georust/proj-ci:latest
+      image: georust/proj-ci:rust-1.49
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -72,12 +72,12 @@ jobs:
       matrix:
         include:
           - container:
-              image: georust/proj-ci:latest
+              image: georust/proj-ci:rust-1.49
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
             features: ""
           - container:
-              image: georust/proj-ci:latest
+              image: georust/proj-ci:rust-1.49
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: "--features bundled_proj"
