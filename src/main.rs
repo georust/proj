@@ -35,22 +35,6 @@ pub struct Proj {
     area: Option<*mut PJ_AREA>,
 }
 
-impl Proj {
-    pub fn project(&self, point: Point) -> Result<Point, String> {
-        let coords = PJ_XY { x: point.x, y: point.y };
-        let (new_x, new_y, err) = unsafe {
-            proj_errno_reset(self.c_proj);
-            let trans = proj_trans(self.c_proj, PJ_DIRECTION_PJ_FWD, PJ_COORD { xy: coords });
-            (trans.xy.x, trans.xy.y, proj_errno(self.c_proj))
-        };
-        if err == 0 {
-            Ok(Point { x: new_x, y: new_y })
-        } else {
-            Err(error_message(err)?)
-        }
-    }
-}
-
 impl Drop for Proj {
     fn drop(&mut self) {
         unsafe {
@@ -75,7 +59,17 @@ fn project(definition: &str, point: Point) -> Point {
         ctx,
         area: None,
     };
-    proj.project(point).unwrap()
+    let coords = PJ_XY { x: point.x, y: point.y };
+    let (new_x, new_y, err) = unsafe {
+        proj_errno_reset(proj.c_proj);
+        let trans = proj_trans(proj.c_proj, PJ_DIRECTION_PJ_FWD, PJ_COORD { xy: coords });
+        (trans.xy.x, trans.xy.y, proj_errno(proj.c_proj))
+    };
+    if err == 0 {
+        Point { x: new_x, y: new_y }
+    } else {
+        panic!("{}", error_message(err).unwrap())
+    }
 }
 
 fn main() {
