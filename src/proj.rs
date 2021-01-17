@@ -23,37 +23,6 @@ use std::path::Path;
 use std::str;
 use thiserror::Error;
 
-pub trait CoordinateType: Num + Copy + NumCast + PartialOrd {}
-impl<T: Num + Copy + NumCast + PartialOrd> CoordinateType for T {}
-
-/// A point in two dimensional space. The primary unit of input/output for proj.
-///
-/// By default, any numeric `(x, y)` tuple implements `Coord`, but you can conform your type to
-/// `Coord` to pass it directly into proj.
-///
-/// See the [`geo-types` feature](#feature-flags) for interop with the [`geo-types`
-/// crate](https://docs.rs/crate/geo-types)
-pub trait Coord<T>
-where
-    T: CoordinateType,
-{
-    fn x(&self) -> T;
-    fn y(&self) -> T;
-    fn from_xy(x: T, y: T) -> Self;
-}
-
-impl<T: CoordinateType> Coord<T> for (T, T) {
-    fn x(&self) -> T {
-        self.0
-    }
-    fn y(&self) -> T {
-        self.1
-    }
-    fn from_xy(x: T, y: T) -> Self {
-        (x, y)
-    }
-}
-
 /// Errors originating in PROJ which can occur during projection and conversion
 #[derive(Error, Debug)]
 pub enum ProjError {
@@ -95,6 +64,58 @@ pub enum ProjError {
     DownloadError(String, String, u8),
 }
 
+/// Look up an error message using the error code
+fn error_message(code: c_int) -> Result<String, ProjError> {
+    let rv = unsafe { proj_errno_string(code) };
+    _string(rv)
+}
+
+/// Easily get a String from the external library
+pub(crate) fn _string(raw_ptr: *const c_char) -> Result<String, ProjError> {
+    let c_str = unsafe { CStr::from_ptr(raw_ptr) };
+    Ok(str::from_utf8(c_str.to_bytes())?.to_string())
+}
+
+pub trait CoordinateType: Num + Copy + NumCast + PartialOrd {}
+impl<T: Num + Copy + NumCast + PartialOrd> CoordinateType for T {}
+
+pub trait Coord<T>
+where
+    T: CoordinateType,
+{
+    fn x(&self) -> T;
+    fn y(&self) -> T;
+    fn from_xy(x: T, y: T) -> Self;
+}
+
+impl<T: CoordinateType> Coord<T> for (T, T) {
+    fn x(&self) -> T {
+        self.0
+    }
+    fn y(&self) -> T {
+        self.1
+    }
+    fn from_xy(x: T, y: T) -> Self {
+        (x, y)
+    }
+}
+
+fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Option<Proj> {
+    let c_definition = CString::new(definition).ok()?;
+    let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
+    if new_c_proj.is_null() {
+        None
+    } else {
+        Some(Proj {
+            c_proj: new_c_proj,
+            ctx,
+            area: None,
+        })
+    }
+}
+/*
+
+
 /// The bounding box of an area of use
 ///
 /// In the case of an area of use crossing the antimeridian (longitude +/- 180 degrees),
@@ -122,18 +143,6 @@ impl Area {
     }
 }
 
-/// Easily get a String from the external library
-pub(crate) fn _string(raw_ptr: *const c_char) -> Result<String, ProjError> {
-    let c_str = unsafe { CStr::from_ptr(raw_ptr) };
-    Ok(str::from_utf8(c_str.to_bytes())?.to_string())
-}
-
-/// Look up an error message using the error code
-fn error_message(code: c_int) -> Result<String, ProjError> {
-    let rv = unsafe { proj_errno_string(code) };
-    _string(rv)
-}
-
 /// Set the bounding box of the area of use
 fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
     // if a bounding box has been passed, modify the proj area object
@@ -145,19 +154,6 @@ fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
 }
 
 /// called by Proj::new and ProjBuilder::transform_new_crs
-fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Option<Proj> {
-    let c_definition = CString::new(definition).ok()?;
-    let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
-    if new_c_proj.is_null() {
-        None
-    } else {
-        Some(Proj {
-            c_proj: new_c_proj,
-            ctx,
-            area: None,
-        })
-    }
-}
 
 /// Called by new_known_crs and proj_known_crs
 fn transform_epsg(ctx: *mut PJ_CONTEXT, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
@@ -416,6 +412,7 @@ impl Default for ProjBuilder {
         Self::new()
     }
 }
+*/
 
 /// A coordinate transformation object
 pub struct Proj {
@@ -483,10 +480,12 @@ impl Proj {
     ///
     /// # Safety
     /// This method contains unsafe code.
+    /*
     pub fn new_known_crs(from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
         let ctx = unsafe { proj_context_create() };
         Some(transform_epsg(ctx, from, to, area)?)
     }
+    */
 
     /// Set the bounding box of the area of use
     ///
@@ -498,6 +497,7 @@ impl Proj {
     /// # Safety
     /// This method contains unsafe code.
     // calling this on a non-CRS-to-CRS instance of Proj will be harmless, because self.area will be None
+    /*
     pub fn area_set_bbox(&mut self, new_bbox: Area) {
         if let Some(new_area) = self.area {
             unsafe {
@@ -511,6 +511,7 @@ impl Proj {
             }
         }
     }
+    */
 
     /// Returns the area of use of a projection
     ///
@@ -519,6 +520,7 @@ impl Proj {
     ///
     /// According to upstream, both the area of use and the projection name
     /// might have not been defined, so they are optional.
+    /*
     pub fn area_of_use(&self) -> Result<(Option<Area>, Option<String>), ProjError> {
         let mut out_west_lon_degree = MaybeUninit::uninit();
         let mut out_south_lat_degree = MaybeUninit::uninit();
@@ -564,15 +566,18 @@ impl Proj {
             Ok((area, name))
         }
     }
+    */
 
     /// Get the current definition from `PROJ`
     ///
     /// # Safety
     /// This method contains unsafe code.
+    /*
     pub fn def(&self) -> Result<String, ProjError> {
         let rv = unsafe { proj_pj_info(self.c_proj) };
         _string(rv.definition)
     }
+    */
 
     /// Project geodetic coordinates (in radians) into the projection specified by `definition`
     ///
@@ -683,38 +688,9 @@ impl Proj {
         }
     }
 
-    /// Convert a mutable slice (or anything that can deref into a mutable slice) of `Coord`s
-    ///
-    /// The following example converts from NAD83 US Survey Feet (EPSG 2230) to NAD83 Metres (EPSG 26946)
-    ///
-    /// ## A Note on Coordinate Order
-    /// Depending on the method used to instantiate the `Proj` object, coordinate input and output order may vary:
-    /// - If you have used [`new`](#method.new), it is assumed that you've specified the order using the input string,
-    /// or that you are aware of the required input order and expected output order.
-    /// - If you have used [`new_known_crs`](#method.new_known_crs), input and output order are **normalised**
-    /// to Longitude, Latitude / Easting, Northing.
-    ///
-    /// ```rust
-    /// use proj::{Proj, Coord};
-    ///
-    /// # use approx::assert_relative_eq;
-    /// // Convert from NAD83(NSRS2007) to NAD83(2011)
-    /// let from = "EPSG:4759";
-    /// let to = "EPSG:4317";
-    /// let NAD83_old_to_new = Proj::new_known_crs(&from, &to, None).unwrap();
-    /// let mut v = vec![
-    ///     (-98.5421515000, 39.2240867222),
-    ///     (-98.3166503906, 38.7112325390),
-    /// ];
-    /// NAD83_old_to_new.convert_array(&mut v);
-    /// assert_relative_eq!(v[0].x(), -98.54, epsilon=1e-2);
-    /// assert_relative_eq!(v[1].y(), 38.71, epsilon=1e-2);
-    /// ```
-    ///
-    /// # Safety
-    /// This method contains unsafe code.
     // TODO: there may be a way of avoiding some allocations, but transmute won't work because
     // PJ_COORD and Coord<T> are different sizes
+    /*
     pub fn convert_array<'a, C, F>(&self, points: &'a mut [C]) -> Result<&'a mut [C], ProjError>
     where
         C: Coord<F>,
@@ -722,32 +698,11 @@ impl Proj {
     {
         self.array_general(points, Transformation::Conversion, false)
     }
+    */
 
-    /// Project an array of geodetic coordinates (in radians) into the projection specified by `definition`
-    ///
-    /// **Note:** specifying `inverse` as `true` carries out an inverse projection *to* geodetic coordinates
-    /// (in radians) from the projection specified by `definition`.
-    ///
-    /// ```rust
-    /// use proj::{Proj, Coord};
-    ///
-    /// # use approx::assert_relative_eq;
-    /// let from = "EPSG:2230";
-    /// let to = "EPSG:26946";
-    /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
-    /// let mut v = vec![
-    ///     (4760096.421921, 3744293.729449),
-    ///     (4760197.421921, 3744394.729449),
-    /// ];
-    /// ft_to_m.convert_array(&mut v).unwrap();
-    /// assert_relative_eq!(v[0].x(), 1450880.29, epsilon=1e-2);
-    /// assert_relative_eq!(v[1].y(), 1141293.79, epsilon=1e-2);
-    /// ```
-    ///
-    /// # Safety
-    /// This method contains unsafe code.
     // TODO: there may be a way of avoiding some allocations, but transmute won't work because
     // PJ_COORD and Coord<T> are different sizes
+    /*
     pub fn project_array<'a, C, F>(
         &self,
         points: &'a mut [C],
@@ -759,10 +714,12 @@ impl Proj {
     {
         self.array_general(points, Transformation::Projection, inverse)
     }
+    */
 
     // array conversion and projection logic is almost identical;
     // transform points in input array into PJ_COORD, transform them, error-check, then re-fill
     // input slice with points. Only the actual transformation ops vary slightly.
+    /*
     fn array_general<'a, C, F>(
         &self,
         points: &'a mut [C],
@@ -824,6 +781,7 @@ impl Proj {
             Err(ProjError::Projection(error_message(err)?))
         }
     }
+    */
 }
 
 impl Drop for Proj {
@@ -841,6 +799,7 @@ impl Drop for Proj {
     }
 }
 
+/*
 impl Drop for ProjBuilder {
     fn drop(&mut self) {
         unsafe {
@@ -849,12 +808,12 @@ impl Drop for ProjBuilder {
         }
     }
 }
+*/
 
 #[cfg(test)]
 mod test {
     use super::*;
 
-    #[derive(Debug)]
     struct MyPoint {
         x: f64,
         y: f64,
@@ -880,94 +839,6 @@ mod test {
         }
     }
 
-    #[cfg(feature = "network")]
-    #[test]
-    fn test_network_enabled_conversion() {
-        // OSGB 1936
-        let from = "EPSG:4277";
-        // ETRS89
-        let to = "EPSG:4258";
-
-        let online_builder = ProjBuilder::new();
-        let offline_builder = ProjBuilder::new();
-
-        assert_eq!(online_builder.network_enabled(), false);
-        assert_eq!(offline_builder.network_enabled(), false);
-
-        online_builder.enable_network(true).unwrap();
-        assert_eq!(online_builder.network_enabled(), true);
-        assert_eq!(offline_builder.network_enabled(), false);
-
-        // Disable caching to ensure we're accessing the network.
-        // Cache is stored in proj's [user writeable directory](https://proj.org/resource_files.html#user-writable-directory)
-        online_builder.grid_cache_enable(false);
-
-        // I expected the following call to trigger a download, but it doesn't!
-        let online_proj = online_builder.proj_known_crs(&from, &to, None).unwrap();
-        let offline_proj = offline_builder.proj_known_crs(&from, &to, None).unwrap();
-
-        // download begins here:
-        // File to download: uk_os_OSTN15_NTv2_OSGBtoETRS.tif
-        let online_t = online_proj
-            .convert(MyPoint::new(0.001653, 52.267733))
-            .unwrap();
-        let offline_t = offline_proj
-            .convert(MyPoint::new(0.001653, 52.267733))
-            .unwrap();
-
-        // Grid download results in a high-quality OSTN15 conversion
-        assert_relative_eq!(online_t.x(), 0.000026091248979289044);
-        assert_relative_eq!(online_t.y(), 52.26817146070213);
-
-        // Without the grid download, it's a less precise conversion
-        assert_relative_eq!(offline_t.x(), -0.00000014658182154077693);
-        assert_relative_eq!(offline_t.y(), 52.26815719726976);
-    }
-
-    #[test]
-    fn test_definition() {
-        let wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
-        let proj = Proj::new(wgs84).unwrap();
-        assert_eq!(
-            proj.def().unwrap(),
-            "proj=longlat datum=WGS84 no_defs ellps=WGS84 towgs84=0,0,0"
-        );
-    }
-    #[test]
-    #[should_panic]
-    // This failure is a bug in libproj
-    fn test_searchpath() {
-        let tf = ProjBuilder::new();
-        tf.set_search_paths(&"/foo").unwrap();
-        let ipath = tf.info().unwrap().searchpath;
-        let pathsep = if cfg!(windows) { ";" } else { ":" };
-        let individual: Vec<&str> = ipath.split(pathsep).collect();
-        assert_eq!(&individual.last().unwrap(), &&"/foo")
-    }
-    #[test]
-    fn test_set_endpoint() {
-        let from = "EPSG:4326";
-        let to = "EPSG:4326+3855";
-        let tf = ProjBuilder::new();
-        let ep = tf.get_url_endpoint().unwrap();
-        assert_eq!(&ep, "https://cdn.proj.org");
-        tf.set_url_endpoint("https://github.com/georust").unwrap();
-        let proj = tf.proj_known_crs(&from, &to, None).unwrap();
-        let ep = proj.get_url_endpoint().unwrap();
-        // Has the new endpoint propagated to the Proj instance?
-        assert_eq!(&ep, "https://github.com/georust");
-    }
-    #[test]
-    fn test_from_crs() {
-        let from = "EPSG:2230";
-        let to = "EPSG:26946";
-        let proj = Proj::new_known_crs(&from, &to, None).unwrap();
-        let t = proj
-            .convert(MyPoint::new(4760096.421921, 3744293.729449))
-            .unwrap();
-        assert_relative_eq!(t.x(), 1450880.2910605003);
-        assert_relative_eq!(t.y(), 1141263.0111604529);
-    }
     #[test]
     // Carry out a projection from geodetic coordinates
     fn test_projection() {
@@ -982,140 +853,5 @@ mod test {
             .unwrap();
         assert_relative_eq!(t.x(), 500119.7035366755, epsilon=1e-5);
         assert_relative_eq!(t.y(), 500027.77901023754, epsilon=1e-5);
-    }
-    #[test]
-    // Carry out an inverse projection to geodetic coordinates
-    fn test_inverse_projection() {
-        let stereo70 = Proj::new(
-            "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
-            +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs",
-        )
-        .unwrap();
-        // Pulkovo 1942(58) / Stereo70 (EPSG 3844) -> Geodetic
-        let t = stereo70
-            .project(MyPoint::new(500119.70352012233, 500027.77896348457), true)
-            .unwrap();
-        assert_relative_eq!(t.x(), 0.43633200013698786);
-        assert_relative_eq!(t.y(), 0.8028510000110507);
-    }
-    #[test]
-    // Carry out an inverse projection to geodetic coordinates
-    fn test_london_inverse() {
-        let osgb36 = Proj::new(
-            "
-            +proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy
-            +towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 +units=m +no_defs
-            ",
-        )
-        .unwrap();
-        // OSGB36 (EPSG 27700) -> Geodetic
-        let t = osgb36
-            .project(MyPoint::new(548295.39, 182498.46), true)
-            .unwrap();
-        assert_relative_eq!(t.x(), 0.0023755864830313977);
-        assert_relative_eq!(t.y(), 0.89922748952037);
-    }
-    #[test]
-    // Carry out a conversion from NAD83 feet (EPSG 2230) to NAD83 metres (EPSG 26946)
-    fn test_conversion() {
-        let nad83_m = Proj::new("
-            +proj=pipeline
-            +step +inv +proj=lcc +lat_1=33.88333333333333
-            +lat_2=32.78333333333333 +lat_0=32.16666666666666
-            +lon_0=-116.25 +x_0=2000000.0001016 +y_0=500000.0001016001 +ellps=GRS80
-            +towgs84=0,0,0,0,0,0,0 +units=us-ft +no_defs
-            +step +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666
-            +lon_0=-116.25 +x_0=2000000 +y_0=500000
-            +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs
-        ").unwrap();
-        // Presidio, San Francisco
-        let t = nad83_m
-            .convert(MyPoint::new(4760096.421921, 3744293.729449))
-            .unwrap();
-        assert_relative_eq!(t.x(), 1450880.2910605003);
-        assert_relative_eq!(t.y(), 1141263.01116045);
-    }
-    #[test]
-    // Test that instantiation fails wth bad proj string input
-    fn test_init_error() {
-        assert!(Proj::new("🦀").is_none());
-    }
-    #[test]
-    fn test_conversion_error() {
-        // because step 1 isn't an inverse conversion, it's expecting lon lat input
-        let nad83_m = Proj::new(
-            "+proj=geos +lon_0=0.00 +lat_0=0.00 +a=6378169.00 +b=6356583.80 +h=35785831.0",
-        )
-        .unwrap();
-        let err = nad83_m
-            .convert(MyPoint::new(4760096.421921, 3744293.729449))
-            .unwrap_err();
-        assert_eq!(
-            "The conversion failed with the following error: latitude or longitude exceeded limits",
-            err.to_string()
-        );
-    }
-
-    #[test]
-    fn test_error_recovery() {
-        let nad83_m = Proj::new(
-            "+proj=geos +lon_0=0.00 +lat_0=0.00 +a=6378169.00 +b=6356583.80 +h=35785831.0",
-        )
-        .unwrap();
-
-        // we expect this first conversion to fail (copied from above test case)
-        assert!(nad83_m
-            .convert(MyPoint::new(4760096.421921, 3744293.729449))
-            .is_err());
-
-        // but a subsequent valid conversion should still be successful
-        assert!(nad83_m.convert(MyPoint::new(0.0, 0.0)).is_ok());
-
-        // also test with project() function
-        assert!(nad83_m
-            .project(MyPoint::new(99999.0, 99999.0), false)
-            .is_err());
-        assert!(nad83_m.project(MyPoint::new(0.0, 0.0), false).is_ok());
-    }
-
-    #[test]
-    fn test_array_convert() {
-        let from = "EPSG:2230";
-        let to = "EPSG:26946";
-        let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
-        let mut v = vec![
-            MyPoint::new(4760096.421921, 3744293.729449),
-            MyPoint::new(4760197.421921, 3744394.729449),
-        ];
-        ft_to_m.convert_array(&mut v).unwrap();
-        assert_relative_eq!(v[0].x(), 1450880.2910605003f64);
-        assert_relative_eq!(v[1].y(), 1141293.7960220198);
-    }
-
-    #[test]
-    // Ensure that input and output order are normalised to Lon, Lat / Easting Northing
-    // Without normalisation this test would fail, as EPSG:4326 expects Lat, Lon input order.
-    fn test_input_order() {
-        let from = "EPSG:4326";
-        let to = "EPSG:2230";
-        let to_feet = Proj::new_known_crs(&from, &to, None).unwrap();
-        // 👽
-        let usa_m = MyPoint::new(-115.797615, 37.2647978);
-        let usa_ft = to_feet.convert(usa_m).unwrap();
-        assert_eq!(6693625.67217475, usa_ft.x());
-        assert_eq!(3497301.5918027186, usa_ft.y());
-    }
-
-    #[test]
-    fn test_area_of_use() {
-        let proj = Proj::new("EPSG:3035").unwrap();
-        let (area, name) = proj.area_of_use().unwrap();
-        let area = area.unwrap();
-        let name = name.unwrap();
-        assert_eq!(area.west, -35.58);
-        assert_eq!(area.south, 24.6);
-        assert_eq!(area.east, 44.83);
-        assert_eq!(area.north, 84.17);
-        assert!(name.contains("Europe"));
     }
 }
