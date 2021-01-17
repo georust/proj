@@ -46,12 +46,6 @@ pub struct Proj {
 }
 
 impl Proj {
-    #[inline]
-    pub fn new(definition: &str) -> Proj {
-        let ctx = unsafe { proj_context_create() };
-        transform_string(ctx, definition)
-    }
-
     pub fn project(&self, point: Point) -> Result<Point, String> {
         let coords = PJ_XY { x: point.x, y: point.y };
         let (new_x, new_y, err) = unsafe {
@@ -83,7 +77,8 @@ impl Drop for Proj {
 }
 
 fn project(definition: &str, point: Point) -> Point {
-    let p = Proj::new(definition);
+    let ctx = unsafe { proj_context_create() };
+    let p = transform_string(ctx, definition);
     p.project(point).unwrap()
 }
 
