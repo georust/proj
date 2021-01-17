@@ -5,7 +5,7 @@ use libc::{c_char, c_double, c_int};
 use proj_sys::{
     proj_area_destroy, proj_cleanup, proj_context_create, proj_context_destroy, proj_create,
     proj_destroy, proj_errno, proj_errno_reset, proj_errno_string, proj_trans, PJconsts, PJ_AREA,
-    PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_LP,
+    PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_XY,
 };
 use std::ffi::{CStr, CString};
 use std::str;
@@ -65,11 +65,11 @@ impl Proj {
         // This signals that we wish to project geodetic coordinates.
         // For conversion (i.e. between projected coordinates) you should use
         // PJ_XY {x: , y: }
-        let coords = PJ_LP { lam: c_x, phi: c_y };
+        let coords = PJ_XY { x: c_x, y: c_y };
         unsafe {
             proj_errno_reset(self.c_proj);
             // PJ_DIRECTION_* determines a forward or inverse projection
-            let trans = proj_trans(self.c_proj, PJ_DIRECTION_PJ_FWD, PJ_COORD { lp: coords });
+            let trans = proj_trans(self.c_proj, PJ_DIRECTION_PJ_FWD, PJ_COORD { xy: coords });
             // output of coordinates uses the PJ_XY struct
             new_x = trans.xy.x;
             new_y = trans.xy.y;
