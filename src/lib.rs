@@ -30,15 +30,9 @@ pub enum ProjError {
     Creation(#[from] std::ffi::NulError),
     #[error("Couldn't convert bytes from PROJ to UTF-8")]
     Utf8Error(#[from] std::str::Utf8Error),
-    #[error("Couldn't build request")]
-    #[cfg(feature = "network")]
-    BuilderError(#[from] reqwest::Error),
-    #[cfg(feature = "network")]
-    #[error("Couldn't convert header value to str")]
-    HeaderConversion(#[from] reqwest::header::ToStrError),
-    #[error("Couldn't convert number to f64")]
+    #[error("")]
     FloatConversion,
-    #[error("The projection failed with the following error: {0}")]
+    #[error("")]
     Projection(String),
 }
 
@@ -56,6 +50,25 @@ pub(crate) fn _string(raw_ptr: *const c_char) -> Result<String, ProjError> {
 
 pub trait CoordinateType: Num + Copy + NumCast + PartialOrd {}
 impl<T: Num + Copy + NumCast + PartialOrd> CoordinateType for T {}
+
+struct MyPoint {
+    pub x: f64,
+    pub y: f64,
+}
+
+impl Coord<f64> for MyPoint {
+    fn x(&self) -> f64 {
+        self.x
+    }
+
+    fn y(&self) -> f64 {
+        self.y
+    }
+
+    fn from_xy(x: f64, y: f64) -> Self {
+        MyPoint { x, y }
+    }
+}
 
 pub trait Coord<T>
 where
@@ -157,25 +170,6 @@ impl Drop for Proj {
             // https://proj.org/development/reference/functions.html#c.proj_cleanup
             proj_cleanup()
         }
-    }
-}
-
-struct MyPoint {
-    pub x: f64,
-    pub y: f64,
-}
-
-impl Coord<f64> for MyPoint {
-    fn x(&self) -> f64 {
-        self.x
-    }
-
-    fn y(&self) -> f64 {
-        self.y
-    }
-
-    fn from_xy(x: f64, y: f64) -> Self {
-        MyPoint { x, y }
     }
 }
 
