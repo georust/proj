@@ -1,28 +1,13 @@
 #[macro_use]
 extern crate approx;
 
-use libc::{c_char, c_int};
 use proj_sys::{
     proj_area_destroy, proj_cleanup, proj_context_create, proj_context_destroy, proj_create,
-    proj_destroy, proj_errno, proj_errno_reset, proj_errno_string, proj_trans, PJconsts, PJ_AREA,
+    proj_destroy, proj_errno, proj_errno_reset, proj_trans, PJconsts, PJ_AREA,
     PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_XY,
 };
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::str;
-
-fn error_message(code: c_int) -> Result<String, String> {
-    unsafe {
-        let ptr = proj_errno_string(code);
-        _string(ptr)
-    }
-}
-
-unsafe fn _string(raw_ptr: *const c_char) -> Result<String, String> {
-    let c_str = CStr::from_ptr(raw_ptr);
-    Ok(str::from_utf8(c_str.to_bytes())
-        .map_err(|e| e.to_string())?
-        .to_string())
-}
 
 pub struct Point {
     pub x: f64,
@@ -65,7 +50,7 @@ fn project(definition: &str, point: Point) -> Point {
         let trans = proj_trans(proj.c_proj, PJ_DIRECTION_PJ_FWD, PJ_COORD { xy: coords });
         (trans.xy.x, trans.xy.y, proj_errno(proj.c_proj))
     };
-    assert_eq!(err, 0, "{}", error_message(err).unwrap());
+    assert_eq!(err, 0, "error: {}", err);
     Point { x: new_x, y: new_y }
 }
 
