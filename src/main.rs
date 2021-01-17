@@ -55,12 +55,8 @@ impl Proj {
         Some(transform_string(ctx, definition)?)
     }
 
-    pub fn project(&self, point: Point, inverse: bool) -> Result<Point, String> {
-        let inv = if inverse {
-            PJ_DIRECTION_PJ_INV
-        } else {
-            PJ_DIRECTION_PJ_FWD
-        };
+    pub fn project(&self, point: Point) -> Result<Point, String> {
+        let inv = PJ_DIRECTION_PJ_FWD;
         let c_x: c_double = point.x;
         let c_y: c_double = point.y;
         let new_x;
@@ -116,7 +112,6 @@ fn main() {
                 x: 0.436332,
                 y: 0.802851,
             },
-            false,
         )
         .unwrap();
     assert_relative_eq!(t.x, 500119.7035366755, epsilon = 1e-5);
