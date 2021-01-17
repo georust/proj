@@ -67,7 +67,7 @@ impl Proj {
         // PJ_XY {x: , y: }
         let coords = PJ_XY { x: c_x, y: c_y };
         unsafe {
-            proj_errno_reset(self.c_proj);
+            // proj_errno_reset(self.c_proj);
             // PJ_DIRECTION_* determines a forward or inverse projection
             let trans = proj_trans(self.c_proj, PJ_DIRECTION_PJ_FWD, PJ_COORD { xy: coords });
             // output of coordinates uses the PJ_XY struct
