@@ -161,14 +161,8 @@ impl Drop for Proj {
 }
 
 struct MyPoint {
-    x: f64,
-    y: f64,
-}
-
-impl MyPoint {
-    fn new(x: f64, y: f64) -> Self {
-        MyPoint { x, y }
-    }
+    pub x: f64,
+    pub y: f64,
 }
 
 impl Coord<f64> for MyPoint {
@@ -194,7 +188,7 @@ fn test_projection() {
     .unwrap();
     // Geodetic -> Pulkovo 1942(58) / Stereo70 (EPSG 3844)
     let t = stereo70
-        .project(MyPoint::new(0.436332, 0.802851), false)
+        .project(MyPoint { x: 0.436332, y: 0.802851 }, false)
         .unwrap();
     assert_relative_eq!(t.x(), 500119.7035366755, epsilon = 1e-5);
     assert_relative_eq!(t.y(), 500027.77901023754, epsilon = 1e-5);
