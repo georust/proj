@@ -65,11 +65,8 @@ fn project(definition: &str, point: Point) -> Point {
         let trans = proj_trans(proj.c_proj, PJ_DIRECTION_PJ_FWD, PJ_COORD { xy: coords });
         (trans.xy.x, trans.xy.y, proj_errno(proj.c_proj))
     };
-    if err == 0 {
-        Point { x: new_x, y: new_y }
-    } else {
-        panic!("{}", error_message(err).unwrap())
-    }
+    assert_eq!(err, 0, "{}", error_message(err).unwrap());
+    Point { x: new_x, y: new_y }
 }
 
 fn main() {
