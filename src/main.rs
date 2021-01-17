@@ -5,7 +5,7 @@ use libc::{c_char, c_double, c_int};
 use proj_sys::{
     proj_area_destroy, proj_cleanup, proj_context_create, proj_context_destroy, proj_create,
     proj_destroy, proj_errno, proj_errno_reset, proj_errno_string, proj_trans, PJconsts, PJ_AREA,
-    PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_LP,
+    PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_LP,
 };
 use std::ffi::{CStr, CString};
 use std::str;
@@ -56,7 +56,6 @@ impl Proj {
     }
 
     pub fn project(&self, point: Point) -> Result<Point, String> {
-        let inv = PJ_DIRECTION_PJ_FWD;
         let c_x: c_double = point.x;
         let c_y: c_double = point.y;
         let new_x;
@@ -70,7 +69,7 @@ impl Proj {
         unsafe {
             proj_errno_reset(self.c_proj);
             // PJ_DIRECTION_* determines a forward or inverse projection
-            let trans = proj_trans(self.c_proj, inv, PJ_COORD { lp: coords });
+            let trans = proj_trans(self.c_proj, PJ_DIRECTION_PJ_FWD, PJ_COORD { lp: coords });
             // output of coordinates uses the PJ_XY struct
             new_x = trans.xy.x;
             new_y = trans.xy.y;
