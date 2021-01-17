@@ -1,35 +1,27 @@
 #[macro_use]
 extern crate approx;
 
-use libc::{c_int, c_char, c_double};
-use proj_sys::{proj_cleanup, proj_errno, PJ_COORD, proj_trans, proj_errno_reset, proj_context_destroy, PJ_DIRECTION_PJ_INV, PJ_DIRECTION_PJ_FWD, proj_context_create, PJ_AREA, PJ_CONTEXT, PJconsts, proj_create, proj_destroy, proj_area_destroy, PJ_LP, proj_errno_string};
-use std::ffi::{CString, CStr};
+use libc::{c_char, c_double, c_int};
+use proj_sys::{
+    proj_area_destroy, proj_cleanup, proj_context_create, proj_context_destroy, proj_create,
+    proj_destroy, proj_errno, proj_errno_reset, proj_errno_string, proj_trans, PJconsts, PJ_AREA,
+    PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_LP,
+};
+use std::ffi::{CStr, CString};
 use std::str;
-use thiserror::Error;
 
-/// Errors originating in PROJ which can occur during projection and conversion
-#[derive(Error, Debug)]
-pub enum ProjError {
-    #[error("Couldn't create a raw pointer from the string")]
-    Creation(#[from] std::ffi::NulError),
-    #[error("Couldn't convert bytes from PROJ to UTF-8")]
-    Utf8Error(#[from] std::str::Utf8Error),
-    #[error("")]
-    FloatConversion,
-    #[error("")]
-    Projection(String),
-}
-
-fn error_message(code: c_int) -> Result<String, ProjError> {
+fn error_message(code: c_int) -> Result<String, String> {
     unsafe {
         let ptr = proj_errno_string(code);
         _string(ptr)
     }
 }
 
-unsafe fn _string(raw_ptr: *const c_char) -> Result<String, ProjError> {
+unsafe fn _string(raw_ptr: *const c_char) -> Result<String, String> {
     let c_str = CStr::from_ptr(raw_ptr);
-    Ok(str::from_utf8(c_str.to_bytes())?.to_string())
+    Ok(str::from_utf8(c_str.to_bytes())
+        .map_err(|e| e.to_string())?
+        .to_string())
 }
 
 pub struct Point {
@@ -63,7 +55,7 @@ impl Proj {
         Some(transform_string(ctx, definition)?)
     }
 
-    pub fn project(&self, point: Point, inverse: bool) -> Result<Point, ProjError> {
+    pub fn project(&self, point: Point, inverse: bool) -> Result<Point, String> {
         let inv = if inverse {
             PJ_DIRECTION_PJ_INV
         } else {
@@ -91,7 +83,7 @@ impl Proj {
         if err == 0 {
             Ok(Point { x: new_x, y: new_y })
         } else {
-            Err(ProjError::Projection(error_message(err)?))
+            Err(error_message(err)?)
         }
     }
 }
