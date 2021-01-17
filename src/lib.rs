@@ -92,7 +92,6 @@ fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Option<Proj> {
     }
 }
 
-/// A coordinate transformation object
 pub struct Proj {
     c_proj: *mut PJconsts,
     ctx: *mut PJ_CONTEXT,
@@ -100,34 +99,12 @@ pub struct Proj {
 }
 
 impl Proj {
-    /// Try to create a new transformation object
-    ///
-    /// **Note:** for projection operations, `definition` specifies
-    /// the **output** projection; input coordinates
-    /// are assumed to be geodetic in radians, unless an inverse projection is intended.
-    ///
-    /// For conversion operations, `definition` defines input, output, and
-    /// any intermediate steps that are required. See the `convert` example for more details.
-    ///
-    /// # Safety
-    /// This method contains unsafe code.
-    // In contrast to proj v4.x, the type of transformation
-    // is signalled by the choice of enum used as input to the PJ_COORD union
-    // PJ_LP signals projection of geodetic coordinates, with output being PJ_XY
-    // and vice versa, or using PJ_XY for conversion operations
     pub fn new(definition: &str) -> Option<Proj> {
         let ctx = unsafe { proj_context_create() };
         Some(transform_string(ctx, definition)?)
     }
 
 
-    /// Project geodetic coordinates (in radians) into the projection specified by `definition`
-    ///
-    /// **Note:** specifying `inverse` as `true` carries out an inverse projection *to* geodetic coordinates
-    /// (in radians) from the projection specified by `definition`.
-    ///
-    /// # Safety
-    /// This method contains unsafe code.
     pub fn project<C, F>(&self, point: C, inverse: bool) -> Result<C, ProjError>
     where
         C: Coord<F>,
@@ -183,48 +160,42 @@ impl Drop for Proj {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
+struct MyPoint {
+    x: f64,
+    y: f64,
+}
 
-    struct MyPoint {
-        x: f64,
-        y: f64,
+impl MyPoint {
+    fn new(x: f64, y: f64) -> Self {
+        MyPoint { x, y }
+    }
+}
+
+impl Coord<f64> for MyPoint {
+    fn x(&self) -> f64 {
+        self.x
     }
 
-    impl MyPoint {
-        fn new(x: f64, y: f64) -> Self {
-            MyPoint { x, y }
-        }
+    fn y(&self) -> f64 {
+        self.y
     }
 
-    impl Coord<f64> for MyPoint {
-        fn x(&self) -> f64 {
-            self.x
-        }
-
-        fn y(&self) -> f64 {
-            self.y
-        }
-
-        fn from_xy(x: f64, y: f64) -> Self {
-            MyPoint { x, y }
-        }
+    fn from_xy(x: f64, y: f64) -> Self {
+        MyPoint { x, y }
     }
+}
 
-    #[test]
-    // Carry out a projection from geodetic coordinates
-    fn test_projection() {
-        let stereo70 = Proj::new(
-            "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
-            +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs",
-        )
+#[test]
+fn test_projection() {
+    let stereo70 = Proj::new(
+        "+proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
+        +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84 +units=m +no_defs",
+    )
+    .unwrap();
+    // Geodetic -> Pulkovo 1942(58) / Stereo70 (EPSG 3844)
+    let t = stereo70
+        .project(MyPoint::new(0.436332, 0.802851), false)
         .unwrap();
-        // Geodetic -> Pulkovo 1942(58) / Stereo70 (EPSG 3844)
-        let t = stereo70
-            .project(MyPoint::new(0.436332, 0.802851), false)
-            .unwrap();
-        assert_relative_eq!(t.x(), 500119.7035366755, epsilon = 1e-5);
-        assert_relative_eq!(t.y(), 500027.77901023754, epsilon = 1e-5);
-    }
+    assert_relative_eq!(t.x(), 500119.7035366755, epsilon = 1e-5);
+    assert_relative_eq!(t.y(), 500027.77901023754, epsilon = 1e-5);
 }
