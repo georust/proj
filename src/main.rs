@@ -30,13 +30,6 @@ pub struct Point {
 }
 
 fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Proj {
-    let c_definition = CString::new(definition).unwrap();
-    let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
-    Proj {
-        c_proj: new_c_proj,
-        ctx,
-        area: None,
-    }
 }
 
 pub struct Proj {
@@ -78,8 +71,14 @@ impl Drop for Proj {
 
 fn project(definition: &str, point: Point) -> Point {
     let ctx = unsafe { proj_context_create() };
-    let p = transform_string(ctx, definition);
-    p.project(point).unwrap()
+    let c_definition = CString::new(definition).unwrap();
+    let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
+    let proj = Proj {
+        c_proj: new_c_proj,
+        ctx,
+        area: None,
+    };
+    proj.project(point).unwrap()
 }
 
 fn main() {
