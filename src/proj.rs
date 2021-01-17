@@ -29,17 +29,9 @@ pub enum ProjError {
     Creation(#[from] std::ffi::NulError),
     #[error("Couldn't convert bytes from PROJ to UTF-8")]
     Utf8Error(#[from] std::str::Utf8Error),
-    #[error("Could not set remote grid download callbacks")]
-    RemoteCallbacks,
     #[error("Couldn't build request")]
     #[cfg(feature = "network")]
     BuilderError(#[from] reqwest::Error),
-    #[error("Couldn't clone request")]
-    RequestCloneError,
-    #[error("Could not retrieve content length")]
-    ContentLength,
-    #[error("Couldn't retrieve header for key {0}")]
-    HeaderError(String),
     #[cfg(feature = "network")]
     #[error("Couldn't convert header value to str")]
     HeaderConversion(#[from] reqwest::header::ToStrError),
