@@ -1,6 +1,7 @@
 # Changes
 
-## Unreleased
+## 0.21.0
+- Updated to `geo-types` v0.7.0 and `reqwest` v0.11.0
 
 - TIFF support is now opt-in when building PROJ via the `bundled_proj` feature
     - <https://github.com/georust/proj/pull/58>
