@@ -33,3 +33,40 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 #[cfg(feature = "nobuild")]
 include!("bindings_docs-rs.rs");
+
+extern "C" {
+    #[allow(clashing_extern_declarations)]
+    #[link_name = "proj_coord"]
+    pub fn proj_coord_2(x: f64, y: f64, z: f64, t: f64) -> PJ_COORD_2;
+
+    #[allow(clashing_extern_declarations)]
+    #[link_name = "proj_trans"]
+    pub fn proj_trans_2(P: *mut PJ, direction: PJ_DIRECTION, coord: PJ_COORD_2) -> PJ_COORD_2;
+
+    #[allow(clashing_extern_declarations)]
+    #[link_name = "proj_trans_array"]
+    pub fn proj_trans_array_2(
+        P: *mut PJ,
+        direction: PJ_DIRECTION,
+        n: usize,
+        coord: *mut PJ_COORD_2,
+    ) -> ::std::os::raw::c_int;
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union PJ_COORD_2 {
+    pub v: [f64; 4usize],
+    pub xyzt: PJ_XYZT,
+    pub uvwt: PJ_UVWT,
+    pub lpzt: PJ_LPZT,
+    pub geod: PJ_GEOD,
+    pub opk: PJ_OPK,
+    pub enu: PJ_ENU,
+    pub xyz: PJ_XYZ,
+    pub uvw: PJ_UVW,
+    pub lpz: PJ_LPZ,
+    pub xy: PJ_XY,
+    pub uv: PJ_UV,
+    pub lp: PJ_LP,
+}

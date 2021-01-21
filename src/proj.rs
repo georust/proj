@@ -7,8 +7,7 @@ use proj_sys::{
     proj_context_set_search_paths, proj_context_set_url_endpoint, proj_create,
     proj_create_crs_to_crs, proj_destroy, proj_errno_string, proj_get_area_of_use,
     proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization, proj_pj_info,
-    proj_trans, proj_trans_array, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD,
-    PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LP, PJ_XY,
+    PJconsts, PJ_AREA, PJ_CONTEXT, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO,
 };
 use std::fmt::Debug;
 
@@ -601,11 +600,11 @@ impl Proj {
         // This signals that we wish to project geodetic coordinates.
         // For conversion (i.e. between projected coordinates) you should use
         // PJ_XY {x: , y: }
-        let coords = PJ_LP { lam: c_x, phi: c_y };
+        let coords = proj_coord(c_x, c_y);
         unsafe {
             proj_errno_reset(self.c_proj);
             // PJ_DIRECTION_* determines a forward or inverse projection
-            let trans = proj_trans(self.c_proj, inv, PJ_COORD { lp: coords });
+            let trans = proj_sys::proj_trans_2(self.c_proj, inv, coords);
             // output of coordinates uses the PJ_XY struct
             new_x = trans.xy.x;
             new_y = trans.xy.y;
@@ -666,10 +665,10 @@ impl Proj {
         let new_x;
         let new_y;
         let err;
-        let coords = PJ_XY { x: c_x, y: c_y };
+        let coords = proj_coord(c_x, c_y);
         unsafe {
             proj_errno_reset(self.c_proj);
-            let trans = proj_trans(self.c_proj, PJ_DIRECTION_PJ_FWD, PJ_COORD { xy: coords });
+            let trans = proj_sys::proj_trans_2(self.c_proj, PJ_DIRECTION_PJ_FWD, coords);
             new_x = trans.xy.x;
             new_y = trans.xy.y;
             err = proj_errno(self.c_proj);
@@ -787,9 +786,8 @@ impl Proj {
             .map(|point| {
                 let c_x: c_double = point.x().to_f64().ok_or(ProjError::FloatConversion)?;
                 let c_y: c_double = point.y().to_f64().ok_or(ProjError::FloatConversion)?;
-                Ok(PJ_COORD {
-                    xy: PJ_XY { x: c_x, y: c_y },
-                })
+
+                Ok(proj_coord(c_x, c_y))
             })
             .collect::<Result<Vec<_>, ProjError>>()?;
         pj.shrink_to_fit();
@@ -799,12 +797,13 @@ impl Proj {
         match op {
             Transformation::Conversion => unsafe {
                 proj_errno_reset(self.c_proj);
-                trans = proj_trans_array(self.c_proj, PJ_DIRECTION_PJ_FWD, pj.len(), mp);
+                trans =
+                    proj_sys::proj_trans_array_2(self.c_proj, PJ_DIRECTION_PJ_FWD, pj.len(), mp);
                 err = proj_errno(self.c_proj);
             },
             Transformation::Projection => unsafe {
                 proj_errno_reset(self.c_proj);
-                trans = proj_trans_array(self.c_proj, inv, pj.len(), mp);
+                trans = proj_sys::proj_trans_array_2(self.c_proj, inv, pj.len(), mp);
                 err = proj_errno(self.c_proj);
             },
         }
@@ -848,6 +847,10 @@ impl Drop for ProjBuilder {
             proj_cleanup()
         }
     }
+}
+
+fn proj_coord(x: f64, y: f64) -> proj_sys::PJ_COORD_2 {
+    unsafe { proj_sys::proj_coord_2(x, y, 0., 0.) }
 }
 
 #[cfg(test)]
