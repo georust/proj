@@ -35,22 +35,57 @@ impl Drop for Proj {
     }
 }
 
+unsafe fn _string(raw_ptr: *const libc::c_char) -> String {
+    let c_str = unsafe { std::ffi::CStr::from_ptr(raw_ptr) };
+    str::from_utf8(c_str.to_bytes()).expect("Proj gave us invalid string").to_string()
+}
+
+/// Look up an error message using the error code
+fn error_message(code: libc::c_int) -> String {
+    unsafe {
+        let ptr = proj_sys::proj_errno_string(code);
+        _string(ptr)
+    }
+}
+
 fn project(definition: &str, point: Point) -> Point {
     let ctx = unsafe { proj_context_create() };
     let c_definition = CString::new(definition).unwrap();
     let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
+
+    unsafe {
+        let pj_proj_info = proj_sys::proj_pj_info(new_c_proj);
+        println!("id: {}", _string(pj_proj_info.id));
+        println!("description: {}", _string(pj_proj_info.description));
+        println!("definition: {}", _string(pj_proj_info.definition));
+        println!("has_inverse: {}", pj_proj_info.has_inverse == 1);
+        println!("accuracy: {}", pj_proj_info.accuracy);
+    }
+
     let proj = Proj {
         c_proj: new_c_proj,
         ctx,
         area: None,
     };
-    let coords = PJ_XY { x: point.x, y: point.y };
+
+    // let coords = PJ_XY { x: point.x, y: point.y };
+    let coords = proj_sys::PJ_XYZT { x: 0.436332, y: 0.802851, z: 0., t: 0. };
+    // let coords = unsafe { proj_sys::proj_coord(0.436332, 0.802851, 0., 0.) };
+
+    unsafe {
+        println!("point: {:?}", PJ_COORD { xyzt: coords }.v);
+        // println!("point: {:?}", coords.v);
+    }
+
     let (new_x, new_y, err) = unsafe {
         proj_errno_reset(proj.c_proj);
-        let trans = proj_trans(proj.c_proj, PJ_DIRECTION_PJ_FWD, PJ_COORD { xy: coords });
-        (trans.xy.x, trans.xy.y, proj_errno(proj.c_proj))
+        let trans = proj_trans(proj.c_proj, PJ_DIRECTION_PJ_FWD, PJ_COORD { xyzt: coords });
+        // let trans = proj_trans(proj.c_proj, PJ_DIRECTION_PJ_FWD, coords);
+        (trans.xyzt.x, trans.xyzt.y, proj_errno(proj.c_proj))
     };
-    assert_eq!(err, 0, "error: {}", err);
+    if err != 0 {
+        panic!("ERROR: {}",error_message(err));
+    }
     Point { x: new_x, y: new_y }
 }
 
