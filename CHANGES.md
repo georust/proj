@@ -1,6 +1,11 @@
 # Changes
 
 ## 0.21.0
+
+- geo-types integration is now optional, but enabled by default.  If you are
+  not using the geo-types feature, instead of a `geo_types::Point`, you can
+  project `(f64, f64)`, or anything conforming to the new `proj::Coord` trait.
+
 - Updated to `geo-types` v0.7.0 and `reqwest` v0.11.0
 
 - TIFF support is now opt-in when building PROJ via the `bundled_proj` feature
