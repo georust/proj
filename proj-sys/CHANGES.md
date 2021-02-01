@@ -1,3 +1,6 @@
+# 0.18.4
+- add `bundled_proj_tiff` feature
+
 # 0.18.3
 - Unify repo with proj repo
 - Switch to GH actions
