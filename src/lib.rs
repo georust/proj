@@ -18,8 +18,8 @@
 //! Out of the box, any `(x, y)` numeric tuple can be provided as input to proj. You can [conform
 //! your own types](#conform-your-own-types) to the [Coord](proj/trait.Coord.html) trait to pass
 //! them in directly and avoid intermediate allocations. There is a [`geo-types`
-//! feature](#feature-flags) to enable such impl's for users of the the [`geo-types`
-//! crate](https://docs.rs/geo-types).
+//! feature](#feature-flags), enabled by default, which implements this trait for types in
+//! the [`geo-types` crate](https://docs.rs/geo-types).
 //!
 //! Methods for [conversion](struct.Proj.html#method.convert_array) and
 //! [projection](struct.Proj.html#method.project_array) of slices of `Coord`s are also available.

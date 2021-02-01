@@ -24,6 +24,7 @@ reqwest = { version = "0.11.0", optional = true, default-features = false, featu
 members = ["proj-sys"]
 
 [features]
+default = ["geo-types"]
 bundled_proj = [ "proj-sys/bundled_proj" ]
 bundled_proj_tiff = [ "proj-sys/bundled_proj_tiff" ]
 pkg_config = [ "proj-sys/pkg_config" ]
