@@ -2,7 +2,7 @@
 name = "proj-sys"
 description = "Rust bindings for PROJ v7.1.x"
 repository = "https://github.com/georust/proj"
-version = "0.18.3"
+version = "0.18.4"
 readme = "README.md"
 authors = ["The Georust developers <mods@georust.org>"]
 keywords = ["proj", "projection", "osgeo", "geo", "geospatial"]
