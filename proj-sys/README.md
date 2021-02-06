@@ -1,4 +1,4 @@
-# Low-level bindings for PROJ v7.1.x
+# Low-level bindings for PROJ v7.2.1
 
 **This is a
 [`*-sys`](https://doc.rust-lang.org/cargo/reference/build-scripts.html#-sys-packages)
@@ -8,7 +8,7 @@ crate; you shouldn't use its API directly.** See the
 A guide to PROJ functions can be found here:
 https://proj.org/development/reference/functions.html. 
 
-By default, the crate will search for an existing `libproj` (via `PROJ v7.1.x`)
+By default, the crate will search for an existing `libproj` (via `PROJ v7.2.1`)
 installation on your system using
 [pkg-config](https://www.freedesktop.org/wiki/Software/pkg-config/). 
 

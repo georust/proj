@@ -2,7 +2,7 @@
 
 # PROJ
 
-Coordinate transformation via bindings to the [PROJ](https://proj.org) v7.1.x API.
+Coordinate transformation via bindings to the [PROJ](https://proj.org) v7.2.1 API.
 
 Two coordinate transformation operations are currently provided: _projection_ (and inverse
 projection) and _conversion_.
