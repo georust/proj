@@ -1,3 +1,6 @@
+# 0.19.0
+- Update to PROJ 7.2.1
+
 # 0.18.4
 - add `bundled_proj_tiff` feature
 

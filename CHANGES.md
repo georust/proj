@@ -1,5 +1,8 @@
 # Changes
 
+## 0.22.0
+- Update PROJ to 7.2.1 via proj-sys 0.19.0
+
 ## 0.21.0
 
 - geo-types integration is now optional, but enabled by default.  If you are
