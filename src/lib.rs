@@ -74,26 +74,6 @@
 //! assert_relative_eq!(result.1, 1141263.01, epsilon=1e-2);
 //! ```
 //!
-//! ## Inverse Projection from [Stereo70](https://epsg.io/3844) to Geodetic
-//!
-//! ```rust
-//! # use approx::assert_relative_eq;
-//! use proj::Proj;
-//!
-//! // Carry out an inverse projection from Pulkovo 1942(58) / Stereo70 (EPSG 3844)
-//! // into geodetic lon and lat coordinates (in radians)
-//! let stereo70 = Proj::new("
-//!     +proj=sterea +lat_0=46 +lon_0=25 +k=0.99975 +x_0=500000 +y_0=500000
-//!     +ellps=krass +towgs84=33.4,-146.6,-76.3,-0.359,-0.053,0.844,-0.84
-//!     +units=m +no_defs
-//!     ").unwrap();
-//! let geodetic_radians_point = stereo70.project(
-//!     (500119.70352012233f64, 500027.77896348457f64), true
-//! ).unwrap();
-//! assert_relative_eq!(geodetic_radians_point.0, 0.436332, epsilon=1e-5);
-//! assert_relative_eq!(geodetic_radians_point.1, 0.802851, epsilon=1e-5);
-//! ```
-//!
 //! # Usage
 //!
 //! There are two options for creating a transformation:
