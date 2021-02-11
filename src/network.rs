@@ -142,7 +142,7 @@ pub(crate) unsafe extern "C" fn network_open(
 }
 
 /// Where the ACTUAL work happens, taking advantage of Rust error-handling etc
-fn _network_open(
+unsafe fn _network_open(
     _: *mut PJ_CONTEXT,
     url: *const c_char,
     offset: c_ulonglong,
@@ -173,14 +173,12 @@ fn _network_open(
     error_handler(&mut res, eh_rb)?;
     // Write the initial read length value into the pointer
     let contentlength = res.content_length().ok_or(ProjError::ContentLength)? as usize;
-    unsafe { out_size_read.write(contentlength) };
+    out_size_read.write(contentlength);
     let headers = res.headers().clone();
     // Copy the downloaded bytes into the buffer so it can be passed around
-    unsafe {
-        &res.bytes()?
-            .as_ptr()
-            .copy_to_nonoverlapping(buffer as *mut u8, contentlength.min(size_to_read))
-    };
+    &res.bytes()?
+        .as_ptr()
+        .copy_to_nonoverlapping(buffer as *mut u8, contentlength.min(size_to_read));
     // Store req into the handle so new ranges can be queried
     let hd = HandleData::new(req, headers, None);
     // heap-allocate the struct and cast it to a void pointer so it can be passed around to PROJ
@@ -189,10 +187,8 @@ fn _network_open(
     let opaque: *mut PROJ_NETWORK_HANDLE = void as *mut PROJ_NETWORK_HANDLE;
     // If everything's OK, set the error string to empty
     let err_string = "";
-    unsafe {
-        out_error_string.copy_from_nonoverlapping(err_string.as_ptr().cast(), err_string.len());
-        out_error_string.add(err_string.len()).write(0);
-    }
+    out_error_string.copy_from_nonoverlapping(err_string.as_ptr().cast(), err_string.len());
+    out_error_string.add(err_string.len()).write(0);
     Ok(opaque)
 }
 
@@ -237,14 +233,14 @@ pub(crate) unsafe extern "C" fn network_get_header_value(
 }
 
 /// Network callback: get header value
-fn _network_get_header_value(
+unsafe fn _network_get_header_value(
     _: *mut PJ_CONTEXT,
     handle: *mut PROJ_NETWORK_HANDLE,
     header_name: *const c_char,
     _: *mut c_void,
 ) -> Result<*const c_char, ProjError> {
     let lookup = _string(header_name)?.to_lowercase();
-    let mut hd = unsafe { &mut *(handle as *mut c_void as *mut HandleData) };
+    let mut hd = &mut *(handle as *mut c_void as *mut HandleData);
     let hvalue = hd
         .headers
         .get(&lookup)

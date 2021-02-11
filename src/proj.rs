@@ -10,7 +10,7 @@ use proj_sys::{
     proj_trans, proj_trans_array, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD,
     PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LP, PJ_XY,
 };
-use std::fmt::Debug;
+use std::fmt::{self, Debug};
 
 #[cfg(feature = "network")]
 use proj_sys::proj_context_set_enable_network;
@@ -124,15 +124,18 @@ impl Area {
 }
 
 /// Easily get a String from the external library
-pub(crate) fn _string(raw_ptr: *const c_char) -> Result<String, ProjError> {
-    let c_str = unsafe { CStr::from_ptr(raw_ptr) };
+pub(crate) unsafe fn _string(raw_ptr: *const c_char) -> Result<String, ProjError> {
+    assert!(!raw_ptr.is_null());
+    let c_str = CStr::from_ptr(raw_ptr);
     Ok(str::from_utf8(c_str.to_bytes())?.to_string())
 }
 
 /// Look up an error message using the error code
 fn error_message(code: c_int) -> Result<String, ProjError> {
-    let rv = unsafe { proj_errno_string(code) };
-    _string(rv)
+    unsafe {
+        let rv = proj_errno_string(code);
+        _string(rv)
+    }
 }
 
 /// Set the bounding box of the area of use
@@ -196,15 +199,17 @@ pub trait Info {
     /// # Safety
     /// This method contains unsafe code.
     fn info(&self) -> Result<Projinfo, ProjError> {
-        let pinfo: PJ_INFO = unsafe { proj_info() };
-        Ok(Projinfo {
-            major: pinfo.major,
-            minor: pinfo.minor,
-            patch: pinfo.patch,
-            release: _string(pinfo.release)?,
-            version: _string(pinfo.version)?,
-            searchpath: _string(pinfo.searchpath)?,
-        })
+        unsafe {
+            let pinfo: PJ_INFO = proj_info();
+            Ok(Projinfo {
+                major: pinfo.major,
+                minor: pinfo.minor,
+                patch: pinfo.patch,
+                release: _string(pinfo.release)?,
+                version: _string(pinfo.version)?,
+                searchpath: _string(pinfo.searchpath)?,
+            })
+        }
     }
 
     /// Check whether network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for) is currently enabled or disabled.
@@ -544,7 +549,14 @@ impl Proj {
             let south = unsafe { out_south_lat_degree.assume_init() };
             let east = unsafe { out_east_lon_degree.assume_init() };
             let north = unsafe { out_north_lat_degree.assume_init() };
-            let name = unsafe { out_area_name.assume_init() };
+            let name = unsafe {
+                let name = out_area_name.assume_init();
+                if !name.is_null() {
+                    Some(_string(name)?)
+                } else {
+                    None
+                }
+            };
 
             let area = if west != -1000.0 && south != -1000.0 && east != -1000.0 && north != -1000.0
             {
@@ -557,12 +569,36 @@ impl Proj {
             } else {
                 None
             };
-            let name = if !name.is_null() {
-                Some(_string(name)?)
-            } else {
-                None
-            };
             Ok((area, name))
+        }
+    }
+
+    fn pj_info(&self) -> PjInfo {
+        unsafe {
+            let pj_info = proj_pj_info(self.c_proj);
+            let id = if pj_info.id.is_null() {
+                None
+            } else {
+                Some(_string(pj_info.id).expect("PROJ built an invalid string"))
+            };
+            let description = if pj_info.description.is_null() {
+                None
+            } else {
+                Some(_string(pj_info.description).expect("PROJ built an invalid string"))
+            };
+            let definition = if pj_info.definition.is_null() {
+                None
+            } else {
+                Some(_string(pj_info.definition).expect("PROJ built an invalid string"))
+            };
+            let has_inverse = pj_info.has_inverse == 1;
+            PjInfo {
+                id,
+                description,
+                definition,
+                has_inverse,
+                accuracy: pj_info.accuracy,
+            }
         }
     }
 
@@ -571,8 +607,7 @@ impl Proj {
     /// # Safety
     /// This method contains unsafe code.
     pub fn def(&self) -> Result<String, ProjError> {
-        let rv = unsafe { proj_pj_info(self.c_proj) };
-        _string(rv.definition)
+        Ok(self.pj_info().definition.expect("proj_pj_info did not provide a definition"))
     }
 
     /// Project geodetic coordinates (in radians) into the projection specified by `definition`
@@ -826,6 +861,27 @@ impl Proj {
     }
 }
 
+struct PjInfo {
+    id: Option<String>,
+    description: Option<String>,
+    definition: Option<String>,
+    has_inverse: bool,
+    accuracy: f64,
+}
+
+impl fmt::Debug for Proj {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let pj_info = self.pj_info();
+        f.debug_struct("Proj")
+            .field("id", &pj_info.id)
+            .field("description", &pj_info.description)
+            .field("definition", &pj_info.definition)
+            .field("has_inverse", &pj_info.has_inverse)
+            .field("accuracy", &pj_info.accuracy)
+            .finish()
+    }
+}
+
 impl Drop for Proj {
     fn drop(&mut self) {
         unsafe {
@@ -933,6 +989,18 @@ mod test {
             "proj=longlat datum=WGS84 no_defs ellps=WGS84 towgs84=0,0,0"
         );
     }
+
+    #[test]
+    fn test_debug() {
+        let wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
+        let proj = Proj::new(wgs84).unwrap();
+        let debug_string = format!("{:?}", proj);
+        assert_eq!(
+            "Proj { id: Some(\"longlat\"), description: Some(\"PROJ-based coordinate operation\"), definition: Some(\"proj=longlat datum=WGS84 no_defs ellps=WGS84 towgs84=0,0,0\"), has_inverse: true, accuracy: -1.0 }",
+            debug_string
+        );
+    }
+
     #[test]
     #[should_panic]
     // This failure is a bug in libproj
