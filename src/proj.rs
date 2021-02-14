@@ -1,14 +1,14 @@
+use crate::context::ThreadContext;
 use libc::c_int;
 use libc::{c_char, c_double};
 use num_traits::Float;
 use proj_sys::{
-    proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_cleanup, proj_context_create,
-    proj_context_destroy, proj_context_get_url_endpoint, proj_context_is_network_enabled,
-    proj_context_set_search_paths, proj_context_set_url_endpoint, proj_create,
-    proj_create_crs_to_crs, proj_destroy, proj_errno_string, proj_get_area_of_use,
-    proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization, proj_pj_info,
-    proj_trans, proj_trans_array, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD,
-    PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LP, PJ_XY,
+    proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_cleanup,
+    proj_context_get_url_endpoint, proj_context_is_network_enabled, proj_context_set_search_paths,
+    proj_context_set_url_endpoint, proj_create, proj_create_crs_to_crs, proj_destroy,
+    proj_errno_string, proj_get_area_of_use, proj_grid_cache_set_enable, proj_info,
+    proj_normalize_for_visualization, proj_pj_info, proj_trans, proj_trans_array, PJconsts,
+    PJ_AREA, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LP, PJ_XY,
 };
 use std::fmt::{self, Debug};
 
@@ -149,9 +149,9 @@ fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
 }
 
 /// called by Proj::new and ProjBuilder::transform_new_crs
-fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Option<Proj> {
+fn transform_string(ctx: ThreadContext, definition: &str) -> Option<Proj> {
     let c_definition = CString::new(definition).ok()?;
-    let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
+    let new_c_proj = unsafe { proj_create(ctx.as_ptr(), c_definition.as_ptr()) };
     if new_c_proj.is_null() {
         None
     } else {
@@ -164,20 +164,20 @@ fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Option<Proj> {
 }
 
 /// Called by new_known_crs and proj_known_crs
-fn transform_epsg(ctx: *mut PJ_CONTEXT, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
+fn transform_epsg(ctx: ThreadContext, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
     let from_c = CString::new(from).ok()?;
     let to_c = CString::new(to).ok()?;
     let proj_area = unsafe { proj_area_create() };
     area_set_bbox(proj_area, area);
     let new_c_proj =
-        unsafe { proj_create_crs_to_crs(ctx, from_c.as_ptr(), to_c.as_ptr(), proj_area) };
+        unsafe { proj_create_crs_to_crs(ctx.as_ptr(), from_c.as_ptr(), to_c.as_ptr(), proj_area) };
     if new_c_proj.is_null() {
         None
     } else {
         // Normalise input and output order to Lon, Lat / Easting Northing by inserting
         // An axis swap operation if necessary
         let normalised = unsafe {
-            let normalised = proj_normalize_for_visualization(ctx, new_c_proj);
+            let normalised = proj_normalize_for_visualization(ctx.as_ptr(), new_c_proj);
             // deallocate stale PJ pointer
             proj_destroy(new_c_proj);
             normalised
@@ -193,7 +193,7 @@ fn transform_epsg(ctx: *mut PJ_CONTEXT, from: &str, to: &str, area: Option<Area>
 /// Read-only utility methods for providing information about the current PROJ instance
 pub trait Info {
     #[doc(hidden)]
-    fn ctx(&self) -> *mut PJ_CONTEXT;
+    fn ctx(&self) -> &ThreadContext;
 
     /// Return [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about the current PROJ context
     /// # Safety
@@ -217,7 +217,7 @@ pub trait Info {
     /// # Safety
     /// This method contains unsafe code.
     fn network_enabled(&self) -> bool {
-        let res = unsafe { proj_context_is_network_enabled(self.ctx()) };
+        let res = unsafe { proj_context_is_network_enabled(self.ctx().as_ptr()) };
         match res {
             1 => true,
             _ => false,
@@ -229,14 +229,14 @@ pub trait Info {
     /// # Safety
     /// This method contains unsafe code.
     fn get_url_endpoint(&self) -> Result<String, ProjError> {
-        unsafe { _string(proj_context_get_url_endpoint(self.ctx())) }
+        unsafe { _string(proj_context_get_url_endpoint(self.ctx().as_ptr())) }
     }
 }
 
 impl Info for ProjBuilder {
     #[doc(hidden)]
-    fn ctx(&self) -> *mut PJ_CONTEXT {
-        self.ctx
+    fn ctx(&self) -> &ThreadContext {
+        &self.ctx
     }
 }
 
@@ -249,14 +249,14 @@ impl ProjBuilder {
     #[cfg(feature = "network")]
     pub fn enable_network(&self, enable: bool) -> Result<u8, ProjError> {
         if enable {
-            let _ = match crate::network::set_network_callbacks(self.ctx()) {
+            let _ = match crate::network::set_network_callbacks(self.ctx().as_ptr()) {
                 1 => Ok(1),
                 _ => Err(ProjError::Network),
             }?;
         }
         let enable = if enable { 1 } else { 0 };
         match (enable, unsafe {
-            proj_context_set_enable_network(self.ctx(), enable)
+            proj_context_set_enable_network(self.ctx().as_ptr(), enable)
         }) {
             // we asked to switch on: switched on
             (1, 1) => Ok(1),
@@ -290,7 +290,7 @@ impl ProjBuilder {
         // …then to raw pointers
         let paths_p: Vec<_> = paths_c.iter().map(|cstr| cstr.as_ptr()).collect();
         // …then pass the slice of raw pointers as a raw pointer (const char* const*)
-        unsafe { proj_context_set_search_paths(self.ctx(), newlength, paths_p.as_ptr()) }
+        unsafe { proj_context_set_search_paths(self.ctx().as_ptr(), newlength, paths_p.as_ptr()) }
         Ok(())
     }
 
@@ -306,7 +306,7 @@ impl ProjBuilder {
     /// This method contains unsafe code.
     pub fn grid_cache_enable(&self, enable: bool) {
         let enable = if enable { 1 } else { 0 };
-        let _ = unsafe { proj_grid_cache_set_enable(self.ctx(), enable) };
+        let _ = unsafe { proj_grid_cache_set_enable(self.ctx().as_ptr(), enable) };
     }
 
     /// Set the URL endpoint to query for remote grids
@@ -315,15 +315,15 @@ impl ProjBuilder {
     /// This method contains unsafe code.
     pub fn set_url_endpoint(&self, endpoint: &str) -> Result<(), ProjError> {
         let s = CString::new(endpoint)?;
-        unsafe { proj_context_set_url_endpoint(self.ctx(), s.as_ptr()) };
+        unsafe { proj_context_set_url_endpoint(self.ctx().as_ptr(), s.as_ptr()) };
         Ok(())
     }
 }
 
 impl Info for Proj {
     #[doc(hidden)]
-    fn ctx(&self) -> *mut PJ_CONTEXT {
-        self.ctx
+    fn ctx(&self) -> &ThreadContext {
+        &self.ctx
     }
 }
 
@@ -347,14 +347,15 @@ pub struct Projinfo {
 ///
 /// Create a transformation object by calling `proj` or `proj_known_crs`.
 pub struct ProjBuilder {
-    ctx: *mut PJ_CONTEXT,
+    ctx: ThreadContext,
 }
 
 impl ProjBuilder {
     /// Create a new `ProjBuilder`, allowing grid downloads and other customisation.
     pub fn new() -> Self {
-        let ctx = unsafe { proj_context_create() };
-        ProjBuilder { ctx }
+        ProjBuilder {
+            ctx: ThreadContext::new(),
+        }
     }
 
     /// Try to create a coordinate transformation object
@@ -368,9 +369,8 @@ impl ProjBuilder {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn proj(mut self, definition: &str) -> Option<Proj> {
-        let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
-        Some(transform_string(ctx, definition)?)
+    pub fn proj(self, definition: &str) -> Option<Proj> {
+        Some(transform_string(self.ctx.clone(), definition)?)
     }
 
     /// Try to create a transformation object that is a pipeline between two known coordinate reference systems.
@@ -411,9 +411,8 @@ impl ProjBuilder {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn proj_known_crs(mut self, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
-        let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
-        Some(transform_epsg(ctx, from, to, area)?)
+    pub fn proj_known_crs(self, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
+        Some(transform_epsg(self.ctx.clone(), from, to, area)?)
     }
 }
 
@@ -426,7 +425,7 @@ impl Default for ProjBuilder {
 /// A coordinate transformation object
 pub struct Proj {
     c_proj: *mut PJconsts,
-    ctx: *mut PJ_CONTEXT,
+    ctx: ThreadContext,
     area: Option<*mut PJ_AREA>,
 }
 
@@ -447,8 +446,7 @@ impl Proj {
     // PJ_LP signals projection of geodetic coordinates, with output being PJ_XY
     // and vice versa, or using PJ_XY for conversion operations
     pub fn new(definition: &str) -> Option<Proj> {
-        let ctx = unsafe { proj_context_create() };
-        Some(transform_string(ctx, definition)?)
+        Some(transform_string(ThreadContext::new(), definition)?)
     }
 
     /// Try to create a new transformation object that is a pipeline between two known coordinate reference systems.
@@ -490,8 +488,7 @@ impl Proj {
     /// # Safety
     /// This method contains unsafe code.
     pub fn new_known_crs(from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
-        let ctx = unsafe { proj_context_create() };
-        Some(transform_epsg(ctx, from, to, area)?)
+        Some(transform_epsg(ThreadContext::new(), from, to, area)?)
     }
 
     /// Set the bounding box of the area of use
@@ -533,7 +530,7 @@ impl Proj {
         let mut out_area_name = MaybeUninit::uninit();
         let res = unsafe {
             proj_get_area_of_use(
-                self.ctx,
+                self.ctx.as_ptr(),
                 self.c_proj,
                 out_west_lon_degree.as_mut_ptr(),
                 out_south_lat_degree.as_mut_ptr(),
@@ -892,7 +889,6 @@ impl Drop for Proj {
                 proj_area_destroy(area)
             }
             proj_destroy(self.c_proj);
-            proj_context_destroy(self.ctx);
             // NB do NOT call until proj_destroy and proj_context_destroy have both returned:
             // https://proj.org/development/reference/functions.html#c.proj_cleanup
             proj_cleanup()
@@ -902,10 +898,7 @@ impl Drop for Proj {
 
 impl Drop for ProjBuilder {
     fn drop(&mut self) {
-        unsafe {
-            proj_context_destroy(self.ctx);
-            proj_cleanup()
-        }
+        unsafe { proj_cleanup() }
     }
 }
 

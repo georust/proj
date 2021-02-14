@@ -210,6 +210,7 @@ mod geo_types;
 #[macro_use]
 extern crate approx;
 
+mod context;
 mod proj;
 
 pub use crate::proj::Area;
