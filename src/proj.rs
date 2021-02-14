@@ -607,7 +607,10 @@ impl Proj {
     /// # Safety
     /// This method contains unsafe code.
     pub fn def(&self) -> Result<String, ProjError> {
-        Ok(self.pj_info().definition.expect("proj_pj_info did not provide a definition"))
+        Ok(self
+            .pj_info()
+            .definition
+            .expect("proj_pj_info did not provide a definition"))
     }
 
     /// Project geodetic coordinates (in radians) into the projection specified by `definition`
