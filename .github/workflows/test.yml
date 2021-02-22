@@ -29,6 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
+        container_image: ["georust/proj-ci:rust-1.49", "georust/proj-ci:rust-1.50"]
         features: 
           - ""
           - "--features network"
@@ -40,7 +41,7 @@ jobs:
           - "--features \"bundled_proj bundled_proj_tiff \""
           - "--features \"network bundled_proj geo-types\""
     container:
-      image: georust/proj-ci:proj-7.2.1
+      image: ${{ matrix.container_image }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -72,17 +73,32 @@ jobs:
       matrix:
         include:
           - container:
-              image: georust/proj-ci:proj-7.2.1
+              image: georust/proj-ci:rust-1.50
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
             features: ""
           - container:
-              image: georust/proj-ci:proj-7.2.1
+              image: georust/proj-ci:rust-1.49
+              env:
+                _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
+            features: ""
+          - container:
+              image: georust/proj-ci:rust-1.50
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: "--features bundled_proj"
           - container:
-              image: "georust/proj-ci-without-system-proj:latest"
+              image: georust/proj-ci:rust-1.49
+              env:
+                _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
+            features: "--features bundled_proj"
+          - container:
+              image: georust/proj-ci-without-system-proj:rust-1.50
+              env:
+                _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
+            features: ""
+          - container:
+              image: georust/proj-ci-without-system-proj:rust-1.49
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: ""
