@@ -1036,8 +1036,8 @@ mod test {
         let t = proj
             .convert(MyPoint::new(4760096.421921, 3744293.729449))
             .unwrap();
-        assert_relative_eq!(t.x(), 1450880.2910605003);
-        assert_relative_eq!(t.y(), 1141263.0111604529);
+        assert_relative_eq!(t.x(), 1450880.2910605003, epsilon = 1e-8);
+        assert_relative_eq!(t.y(), 1141263.0111604529, epsilon = 1e-8);
     }
     #[test]
     // Carry out a projection from geodetic coordinates
@@ -1066,8 +1066,8 @@ mod test {
         let t = stereo70
             .project(MyPoint::new(500119.70352012233, 500027.77896348457), true)
             .unwrap();
-        assert_relative_eq!(t.x(), 0.43633200013698786);
-        assert_relative_eq!(t.y(), 0.8028510000110507);
+        assert_relative_eq!(t.x(), 0.43633200013698786, epsilon = 1e-14);
+        assert_relative_eq!(t.y(), 0.8028510000110507, epsilon = 1e-14);
     }
     #[test]
     // Carry out an inverse projection to geodetic coordinates
@@ -1159,8 +1159,8 @@ mod test {
             MyPoint::new(4760197.421921, 3744394.729449),
         ];
         ft_to_m.convert_array(&mut v).unwrap();
-        assert_relative_eq!(v[0].x(), 1450880.2910605003f64);
-        assert_relative_eq!(v[1].y(), 1141293.7960220198);
+        assert_relative_eq!(v[0].x(), 1450880.2910605003f64, epsilon = 1e-8);
+        assert_relative_eq!(v[1].y(), 1141293.7960220198, epsilon = 1e-8);
     }
 
     #[test]
@@ -1173,8 +1173,8 @@ mod test {
         // 👽
         let usa_m = MyPoint::new(-115.797615, 37.2647978);
         let usa_ft = to_feet.convert(usa_m).unwrap();
-        assert_eq!(6693625.67217475, usa_ft.x());
-        assert_eq!(3497301.5918027186, usa_ft.y());
+        assert_relative_eq!(6693625.67217475, usa_ft.x(),epsilon = 1e-8);
+        assert_relative_eq!(3497301.5918027186, usa_ft.y(), epsilon = 1e-8);
     }
 
     #[test]
