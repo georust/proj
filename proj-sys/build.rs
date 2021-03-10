@@ -23,6 +23,7 @@ fn try_vcpkg() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
     .find_package("proj");
 
     if let Err(_e) = lib {
+        eprintln!("vcpkg proj library not found, trying pkg_config");
         return try_pkg_config()
     }
 
