@@ -1,3 +1,7 @@
+# Unreleased
+
+- Update bindgen to fix proj-sys giving some incorrect results on Apple Silicon
+
 # 0.19.0
 - Update to PROJ 7.2.1
 
