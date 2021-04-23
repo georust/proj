@@ -171,8 +171,6 @@ jobs:
       - name: Install vcpkg
         run: |
           git clone https://github.com/Microsoft/vcpkg.git vcp
-          # PROJ version 7.2.1 - https://github.com/microsoft/vcpkg/search?q=proj4&type=commits
-          git -C vcp checkout 8fe4184c6a17e237d8b864b6d10e0b520334a093
           vcp\bootstrap-vcpkg.bat -disableMetrics
       - name: Set env
         shell: bash
