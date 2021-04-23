@@ -3,10 +3,6 @@ use cmake;
 use flate2::read::GzDecoder;
 use std::fs::File;
 
-#[cfg(target_env = "msvc")]
-use vcpkg;
-#[cfg(target_env = "msvc")]
-use build;
 use pkg_config;
 use std::env;
 use std::path::PathBuf;
@@ -14,29 +10,69 @@ use tar::Archive;
 
 const MINIMUM_PROJ_VERSION: &str = "7.2.1";
 
+#[cfg(feature = "nobuild")]
+fn main() {} // Skip the build script on docs.rs
+
+#[cfg(not(feature = "nobuild"))]
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let include_path = if cfg!(feature = "bundled_proj") {
+        eprintln!("feature flags specified source build");
+        build_from_source()?
+    } else {
+        configure_pkg()?
+    };
+
+    // The bindgen::Builder is the main entry point
+    // to bindgen, and lets you build up options for
+    // the resulting bindings.
+    let bindings = bindgen::Builder::default()
+        .clang_arg(format!("-I{}", include_path.to_string_lossy()))
+        .trust_clang_mangling(false)
+        .size_t_is_usize(true)
+        .blacklist_type("max_align_t")
+        // The input header we would like to generate
+        // bindings for.
+        .header("wrapper.h")
+        // Finish the builder and generate the bindings.
+        .generate()
+        // Unwrap the Result and panic on failure.
+        .expect("Unable to generate bindings");
+
+    // Write the bindings to the $OUT_DIR/bindings.rs file.
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+    bindings.write_to_file(out_path.join("bindings.rs"))?;
+
+    Ok(())
+}
+
+#[cfg(target_env = "msvc")]
+fn configure_pkg() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    try_vcpkg()
+}
+
+#[cfg(not(target_env = "msvc"))]
+fn configure_pkg() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    try_pkg_config()
+}
+
 #[cfg(target_env = "msvc")]
 fn try_vcpkg() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    use vcpkg;
+    use build;
+    
     build::link("shell32", true);
     build::link("ole32", true);
     let lib = vcpkg::Config::new()
     .emit_includes(true)
     .find_package("proj");
 
-    if let Err(_e) = lib {
-        eprintln!("vcpkg proj library not found, trying pkg_config");
-        return try_pkg_config()
+    match lib {
+        Ok(include_path) => Ok(include_path.include_paths[0].clone()),
+        Err(e) => {
+            eprintln!("vcpkg error: {}, trying pkg_config", e);
+            try_pkg_config()
+        }
     }
-
-    let include_path = lib.unwrap()
-        .include_paths[0]
-        .clone();
-
-    Ok(include_path)
-}
-
-#[cfg(not(target_env = "msvc"))]
-fn try_vcpkg() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
-    try_pkg_config()
 }
 
 fn try_pkg_config() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
@@ -62,41 +98,6 @@ fn try_pkg_config() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
         eprintln!("pkg-config unable to find existing libproj installation: {}", err);
         build_from_source()
     })
-}
-
-#[cfg(feature = "nobuild")]
-fn main() {} // Skip the build script on docs.rs
-
-#[cfg(not(feature = "nobuild"))]
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let include_path = if cfg!(feature = "bundled_proj") {
-        eprintln!("feature flags specified source build");
-        build_from_source()?
-    } else {
-        try_vcpkg()?
-    };
-
-    // The bindgen::Builder is the main entry point
-    // to bindgen, and lets you build up options for
-    // the resulting bindings.
-    let bindings = bindgen::Builder::default()
-        .clang_arg(format!("-I{}", include_path.to_string_lossy()))
-        .trust_clang_mangling(false)
-        .size_t_is_usize(true)
-        .blacklist_type("max_align_t")
-        // The input header we would like to generate
-        // bindings for.
-        .header("wrapper.h")
-        // Finish the builder and generate the bindings.
-        .generate()
-        // Unwrap the Result and panic on failure.
-        .expect("Unable to generate bindings");
-
-    // Write the bindings to the $OUT_DIR/bindings.rs file.
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
-    bindings.write_to_file(out_path.join("bindings.rs"))?;
-
-    Ok(())
 }
 
 // returns the path of "inlude" for the built proj
