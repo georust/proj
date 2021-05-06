@@ -100,7 +100,13 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
     let proj = config.build();
     // Tell cargo to tell rustc to link libproj, and where to find it
     // libproj will be built in $OUT_DIR/lib
-    println!("cargo:rustc-link-lib=static=proj");
+    
+    //proj likes to create proj_d when configured as debug and on MSVC, so link to that one if it exists
+    if proj.join("lib").join("proj_d.lib").exists() {
+      println!("cargo:rustc-link-lib=static=proj_d");
+    } else {
+      println!("cargo:rustc-link-lib=static=proj");
+    }
     println!(
         "cargo:rustc-link-search=native={}",
         proj.join("lib").display()
