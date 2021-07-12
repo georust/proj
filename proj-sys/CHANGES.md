@@ -1,6 +1,9 @@
-# Unreleased
+# 0.19.1
 
-- Update bindgen to fix proj-sys giving some incorrect results on Apple Silicon
+- Upgrade bindgen to fix incorrect results on aarch64 (e.g. Apple's M1)
+    - <https://github.com/georust/proj/pull/80>
+- Allow proj-sys to link to `proj_d.lib`. This prevents a linker error when building in debug mode with MSVC
+    - <https://github.com/georust/proj/pull/83>
 
 # 0.19.0
 - Update to PROJ 7.2.1

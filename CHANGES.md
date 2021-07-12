@@ -1,7 +1,9 @@
 # Changes
 
-## Unreleased
-- [Allow proj-sys to link to `proj_d.lib`. This prevents a linker error when building in debug mode with MSVC](https://github.com/georust/proj/pull/83)
+## 0.22.1
+
+- Update proj-sys to 0.19.1
+  - https://github.com/georust/proj/blob/proj-sys-0.19.1/proj-sys/CHANGES.md
 
 ## 0.22.0
 - Update PROJ to 7.2.1 via proj-sys 0.19.0
