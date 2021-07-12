@@ -1,5 +1,9 @@
 # Changes
 
+## Unreleased
+
+- Add new entries here.
+
 ## 0.22.1
 
 - Update proj-sys to 0.19.1

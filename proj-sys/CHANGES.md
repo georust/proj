@@ -1,3 +1,7 @@
+## Unreleased
+
+- Add new entries here.
+
 # 0.19.1
 
 - Upgrade bindgen to fix incorrect results on aarch64 (e.g. Apple's M1)
