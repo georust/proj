@@ -19,6 +19,10 @@ cmake = "0.1"
 flate2 = "1.0.14"
 tar = "0.4.26"
 
+[target.'cfg(target_env = "msvc")'.build-dependencies]
+vcpkg = "0.2.11"
+winapi-build = "0.1.1"
+
 [features]
 nobuild = []
 bundled_proj = []

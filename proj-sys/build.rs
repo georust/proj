@@ -19,28 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         eprintln!("feature flags specified source build");
         build_from_source()?
     } else {
-        pkg_config::Config::new()
-        .atleast_version(MINIMUM_PROJ_VERSION)
-        .probe("proj")
-        .and_then(|pk| {
-            eprintln!("found acceptable libproj already installed at: {:?}", pk.link_paths[0]);
-            if let Ok(val) = &env::var("_PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC") {
-                if val != "0" {
-                    panic!("for testing purposes: existing package was found, but should not have been");
-                }
-            }
-
-            // Tell cargo to tell rustc to link the system proj
-            // shared library.
-            println!("cargo:rustc-link-search=native={:?}", pk.link_paths[0]);
-            println!("cargo:rustc-link-lib=proj");
-
-            Ok(pk.include_paths[0].clone())
-        })
-        .or_else(|err| {
-            eprintln!("pkg-config unable to find existing libproj installation: {}", err);
-            build_from_source()
-        })?
+        configure_pkg()?
     };
 
     // The bindgen::Builder is the main entry point
@@ -64,6 +43,61 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     bindings.write_to_file(out_path.join("bindings.rs"))?;
 
     Ok(())
+}
+
+#[cfg(target_env = "msvc")]
+fn configure_pkg() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    try_vcpkg()
+}
+
+#[cfg(not(target_env = "msvc"))]
+fn configure_pkg() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    try_pkg_config()
+}
+
+#[cfg(target_env = "msvc")]
+fn try_vcpkg() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    use vcpkg;
+    use build;
+    
+    build::link("shell32", true);
+    build::link("ole32", true);
+    let lib = vcpkg::Config::new()
+    .emit_includes(true)
+    .find_package("proj");
+
+    match lib {
+        Ok(include_path) => Ok(include_path.include_paths[0].clone()),
+        Err(e) => {
+            eprintln!("vcpkg error: {}, trying pkg_config", e);
+            try_pkg_config()
+        }
+    }
+}
+
+fn try_pkg_config() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    pkg_config::Config::new()
+    .atleast_version(MINIMUM_PROJ_VERSION)
+    .probe("proj")
+    .and_then(|pk| {
+        eprintln!("found acceptable libproj already installed at: {:?}", pk.link_paths[0]);
+        if let Ok(val) = &env::var("_PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC") {
+            if val != "0" {
+                panic!("for testing purposes: existing package was found, but should not have been");
+            }
+        }
+
+        // Tell cargo to tell rustc to link the system proj
+        // shared library.
+        println!("cargo:rustc-link-search=native={:?}", pk.link_paths[0]);
+        println!("cargo:rustc-link-lib=proj");
+
+        Ok(pk.include_paths[0].clone())
+    })
+    .or_else(|err| {
+        eprintln!("pkg-config unable to find existing libproj installation: {}", err);
+        build_from_source()
+    })
 }
 
 // returns the path of "inlude" for the built proj
