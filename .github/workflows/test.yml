@@ -30,7 +30,7 @@ jobs:
     strategy:
       matrix:
         container_image: ["georust/proj-ci:rust-1.49", "georust/proj-ci:rust-1.50"]
-        features: 
+        features:
           - ""
           - "--features network"
           - "--features bundled_proj"
@@ -117,5 +117,5 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-      - run: brew install proj
+      - run: brew install proj@7 && brew link proj@7
       - run: cargo test ${{ matrix.features }}
