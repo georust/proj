@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        container_image: ["georust/proj-ci:rust-1.49", "georust/proj-ci:rust-1.50"]
+        container_image: ["georust/proj-ci:rust-1.49", "georust/proj-ci:rust-1.53"]
         features:
           - ""
           - "--features network"
@@ -73,7 +73,7 @@ jobs:
       matrix:
         include:
           - container:
-              image: georust/proj-ci:rust-1.50
+              image: georust/proj-ci:rust-1.53
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
             features: ""
@@ -83,7 +83,7 @@ jobs:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
             features: ""
           - container:
-              image: georust/proj-ci:rust-1.50
+              image: georust/proj-ci:rust-1.53
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: "--features bundled_proj"
@@ -93,7 +93,7 @@ jobs:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: "--features bundled_proj"
           - container:
-              image: georust/proj-ci-without-system-proj:rust-1.50
+              image: georust/proj-ci-without-system-proj:rust-1.53
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: ""
