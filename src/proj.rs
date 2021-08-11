@@ -218,10 +218,7 @@ pub trait Info {
     /// This method contains unsafe code.
     fn network_enabled(&self) -> bool {
         let res = unsafe { proj_context_is_network_enabled(self.ctx()) };
-        match res {
-            1 => true,
-            _ => false,
-        }
+        matches!(res, 1)
     }
 
     /// Get the URL endpoint to query for remote grids
@@ -370,7 +367,7 @@ impl ProjBuilder {
     /// This method contains unsafe code.
     pub fn proj(mut self, definition: &str) -> Option<Proj> {
         let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
-        Some(transform_string(ctx, definition)?)
+        transform_string(ctx, definition)
     }
 
     /// Try to create a transformation object that is a pipeline between two known coordinate reference systems.
@@ -413,7 +410,7 @@ impl ProjBuilder {
     /// This method contains unsafe code.
     pub fn proj_known_crs(mut self, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
         let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
-        Some(transform_epsg(ctx, from, to, area)?)
+        transform_epsg(ctx, from, to, area)
     }
 }
 
@@ -448,7 +445,7 @@ impl Proj {
     // and vice versa, or using PJ_XY for conversion operations
     pub fn new(definition: &str) -> Option<Proj> {
         let ctx = unsafe { proj_context_create() };
-        Some(transform_string(ctx, definition)?)
+        transform_string(ctx, definition)
     }
 
     /// Try to create a new transformation object that is a pipeline between two known coordinate reference systems.
@@ -491,7 +488,7 @@ impl Proj {
     /// This method contains unsafe code.
     pub fn new_known_crs(from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
         let ctx = unsafe { proj_context_create() };
-        Some(transform_epsg(ctx, from, to, area)?)
+        transform_epsg(ctx, from, to, area)
     }
 
     /// Set the bounding box of the area of use
