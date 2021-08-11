@@ -1036,8 +1036,8 @@ mod test {
         let t = proj
             .convert(MyPoint::new(4760096.421921, 3744293.729449))
             .unwrap();
-        assert_relative_eq!(t.x(), 1450880.2910605003);
-        assert_relative_eq!(t.y(), 1141263.0111604529);
+        assert_relative_eq!(t.x(), 1450880.2910605022);
+        assert_relative_eq!(t.y(), 1141263.0111604782);
     }
     #[test]
     // Carry out a projection from geodetic coordinates
@@ -1103,8 +1103,8 @@ mod test {
         let t = nad83_m
             .convert(MyPoint::new(4760096.421921, 3744293.729449))
             .unwrap();
-        assert_relative_eq!(t.x(), 1450880.2910605003);
-        assert_relative_eq!(t.y(), 1141263.01116045);
+        assert_relative_eq!(t.x(), 1450880.2910605017);
+        assert_relative_eq!(t.y(), 1141263.0111604754);
     }
     #[test]
     // Test that instantiation fails wth bad proj string input
@@ -1122,7 +1122,7 @@ mod test {
             .convert(MyPoint::new(4760096.421921, 3744293.729449))
             .unwrap_err();
         assert_eq!(
-            "The conversion failed with the following error: latitude or longitude exceeded limits",
+            "The conversion failed with the following error: Invalid coordinate",
             err.to_string()
         );
     }
@@ -1159,8 +1159,8 @@ mod test {
             MyPoint::new(4760197.421921, 3744394.729449),
         ];
         ft_to_m.convert_array(&mut v).unwrap();
-        assert_relative_eq!(v[0].x(), 1450880.2910605003f64);
-        assert_relative_eq!(v[1].y(), 1141293.7960220198);
+        assert_relative_eq!(v[0].x(), 1450880.2910605022f64);
+        assert_relative_eq!(v[1].y(), 1141293.7960220438);
     }
 
     #[test]
@@ -1174,7 +1174,7 @@ mod test {
         let usa_m = MyPoint::new(-115.797615, 37.2647978);
         let usa_ft = to_feet.convert(usa_m).unwrap();
         assert_eq!(6693625.67217475, usa_ft.x());
-        assert_eq!(3497301.5918027186, usa_ft.y());
+        assert_eq!(3497301.5918027232, usa_ft.y());
     }
 
     #[test]
@@ -1186,7 +1186,7 @@ mod test {
         assert_eq!(area.west, -35.58);
         assert_eq!(area.south, 24.6);
         assert_eq!(area.east, 44.83);
-        assert_eq!(area.north, 84.17);
+        assert_eq!(area.north, 84.73);
         assert!(name.contains("Europe"));
     }
 }
