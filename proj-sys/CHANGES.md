@@ -1,6 +1,5 @@
-## Unreleased
-
-- Add new entries here.
+# 0.20.0
+- Update to PROJ 8.1.0
 
 # 0.19.1
 
