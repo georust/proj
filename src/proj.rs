@@ -94,8 +94,6 @@ pub enum ProjError {
     HeaderConversion(#[from] reqwest::header::ToStrError),
     #[error("A {0} error occurred for url {1} after {2} retries")]
     DownloadError(String, String, u8),
-    #[error("Got a null pointer while attempting to build an error String")]
-    NullPointer
 }
 
 /// The bounding box of an area of use
@@ -127,15 +125,13 @@ impl Area {
 
 /// Easily get a String from the external library
 pub(crate) unsafe fn _string(raw_ptr: *const c_char) -> Result<String, ProjError> {
-    if raw_ptr.is_null() {
-        return Err(ProjError::NullPointer);
-    }
     let c_str = CStr::from_ptr(raw_ptr);
     Ok(str::from_utf8(c_str.to_bytes())?.to_string())
 }
 
 /// Look up an error message using the error code
 fn error_message(code: c_int) -> Result<String, ProjError> {
+    assert_ne!(code, 0);
     unsafe {
         let rv = proj_errno_string(code);
         _string(rv)
