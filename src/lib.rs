@@ -1,5 +1,5 @@
 #![doc(html_logo_url = "https://raw.githubusercontent.com/georust/meta/master/logo/logo.png")]
-//! Coordinate transformation via bindings to the [PROJ](https://proj.org) v7.1.x API.
+//! Coordinate transformation via bindings to the [PROJ](https://proj.org) v8.1.x API.
 //!
 //! Two coordinate transformation operations are currently provided: _projection_ (and inverse
 //! projection) and _conversion_.
@@ -9,7 +9,7 @@
 //! projected coordinate systems. The PROJ [documentation](https://proj.org/operations/index.html)
 //! explains the distinction between these operations in more detail.
 //!
-//! This crate depends on [`libproj v7.1.x`](https://proj.org), accessed via the
+//! This crate depends on [`libproj v8.1.x`](https://proj.org), accessed via the
 //! [`proj-sys`](https://docs.rs/proj-sys) crate. By default, `proj-sys` will try to find a
 //! pre-existing installation of libproj on your system. If an appropriate version of libproj
 //! cannot be found, the build script will attempt to build libproj from source. You may specify a
@@ -98,7 +98,7 @@
 //!
 //! # Requirements
 //!
-//! By default, the crate requires `libproj` 7.1.x to be present on your system. While it may be
+//! By default, the crate requires `libproj` 8.1.x to be present on your system. While it may be
 //! backwards-compatible with older PROJ 6 versions, this is neither tested nor supported.
 //!
 //! # Feature Flags

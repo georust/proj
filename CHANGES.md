@@ -1,5 +1,8 @@
 # Changes
 
+## 0.23.1
+- Update docs to refer to correct libproj version
+
 ## 0.23
 
 - Update to PROJ 8.1.0 via proj-sys 0.20.0

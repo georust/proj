@@ -1,3 +1,6 @@
+# 0.20.1
+- Fix docs to refer to correct libproj version
+
 # 0.20.0
 - Update to PROJ 8.1.0
 
