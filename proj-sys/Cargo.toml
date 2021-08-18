@@ -1,8 +1,8 @@
 [package]
 name = "proj-sys"
-description = "Rust bindings for PROJ v7.2.x"
+description = "Rust bindings for PROJ v8.1.x"
 repository = "https://github.com/georust/proj"
-version = "0.19.1"
+version = "0.20.0"
 readme = "README.md"
 authors = ["The Georust developers <mods@georust.org>"]
 keywords = ["proj", "projection", "osgeo", "geo", "geospatial"]
@@ -13,8 +13,8 @@ links = "proj"
 [dependencies]
 
 [build-dependencies]
-bindgen = "0.58.0"
-pkg-config = "0.3.17"
+bindgen = "0.59.1"
+pkg-config = "0.3.19"
 cmake = "0.1"
 flate2 = "1.0.14"
 tar = "0.4.26"
