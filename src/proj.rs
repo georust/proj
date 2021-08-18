@@ -1086,22 +1086,15 @@ mod test {
     #[test]
     // Carry out a conversion from NAD83 feet (EPSG 2230) to NAD83 metres (EPSG 26946)
     fn test_conversion() {
-        let nad83_m = Proj::new("
-            +proj=pipeline
-            +step +inv +proj=lcc +lat_1=33.88333333333333
-            +lat_2=32.78333333333333 +lat_0=32.16666666666666
-            +lon_0=-116.25 +x_0=2000000.0001016 +y_0=500000.0001016001 +ellps=GRS80
-            +towgs84=0,0,0,0,0,0,0 +units=us-ft +no_defs
-            +step +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666
-            +lon_0=-116.25 +x_0=2000000 +y_0=500000
-            +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs
-        ").unwrap();
+        let from = "EPSG:2230";
+        let to = "EPSG:26946";
+        let nad83_m = Proj::new_known_crs(&from, &to, None).unwrap();
         // Presidio, San Francisco
         let t = nad83_m
             .convert(MyPoint::new(4760096.421921, 3744293.729449))
             .unwrap();
-        assert_relative_eq!(t.x(), 1450880.2910605017);
-        assert_relative_eq!(t.y(), 1141263.0111604754);
+        assert_relative_eq!(t.x(), 1450880.2910605022);
+        assert_relative_eq!(t.y(), 1141263.0111604782);
     }
     #[test]
     // Test that instantiation fails wth bad proj string input
