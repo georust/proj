@@ -1,6 +1,7 @@
 # Changes
 
-## Unreleased
+## 0.23
+
 - Update to PROJ 8.1.0 via proj-sys 0.20.0
 - Add Debug impl for proj::Proj
 
