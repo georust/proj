@@ -95,17 +95,15 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
     config.define("BUILD_PROJINFO", "OFF");
     config.define("BUILD_PROJSYNC", "OFF");
     config.define("ENABLE_CURL", "OFF");
-    let tiff_support = cfg!(feature = "bundled_proj_tiff");
-    config.define("ENABLE_TIFF", if tiff_support { "ON" } else { "OFF" });
     let proj = config.build();
     // Tell cargo to tell rustc to link libproj, and where to find it
     // libproj will be built in $OUT_DIR/lib
-    
+
     //proj likes to create proj_d when configured as debug and on MSVC, so link to that one if it exists
     if proj.join("lib").join("proj_d.lib").exists() {
-      println!("cargo:rustc-link-lib=static=proj_d");
+        println!("cargo:rustc-link-lib=static=proj_d");
     } else {
-      println!("cargo:rustc-link-lib=static=proj");
+        println!("cargo:rustc-link-lib=static=proj");
     }
     println!(
         "cargo:rustc-link-search=native={}",
@@ -121,9 +119,7 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
     );
     // The PROJ library needs SQLite and the C++ standard library.
     println!("cargo:rustc-link-lib=dylib=sqlite3");
-    if tiff_support {
-        println!("cargo:rustc-link-lib=dylib=tiff");
-    }
+    println!("cargo:rustc-link-lib=dylib=tiff");
     if cfg!(target_os = "linux") {
         println!("cargo:rustc-link-lib=dylib=stdc++");
     } else if cfg!(target_os = "macos") {
