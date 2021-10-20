@@ -1,9 +1,5 @@
-use bindgen;
-use cmake;
 use flate2::read::GzDecoder;
 use std::fs::File;
-
-use pkg_config;
 use std::env;
 use std::path::PathBuf;
 use tar::Archive;
@@ -22,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         pkg_config::Config::new()
         .atleast_version(MINIMUM_PROJ_VERSION)
         .probe("proj")
-        .and_then(|pk| {
+        .map(|pk| {
             eprintln!("found acceptable libproj already installed at: {:?}", pk.link_paths[0]);
             if let Ok(val) = &env::var("_PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC") {
                 if val != "0" {
@@ -35,7 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("cargo:rustc-link-search=native={:?}", pk.link_paths[0]);
             println!("cargo:rustc-link-lib=proj");
 
-            Ok(pk.include_paths[0].clone())
+            pk.include_paths[0].clone()
         })
         .or_else(|err| {
             eprintln!("pkg-config unable to find existing libproj installation: {}", err);

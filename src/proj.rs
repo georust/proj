@@ -555,6 +555,9 @@ impl Proj {
                 }
             };
 
+            // comparing against float point sentinel values is a reasonable usage of exact
+            // floating point comparison
+            #[allow(clippy::float_cmp)]
             let area = if west != -1000.0 && south != -1000.0 && east != -1000.0 && north != -1000.0
             {
                 Some(Area {
@@ -908,8 +911,6 @@ impl Drop for ProjBuilder {
 
 #[cfg(test)]
 mod test {
-    use crate::proj;
-
     use super::*;
 
     #[derive(Debug)]
