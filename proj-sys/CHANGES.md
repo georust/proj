@@ -1,4 +1,4 @@
-# UNRELEASED
+# 0.21.0
 
 - BREAKING: Remove `bundled_proj_tiff` feature and assume system libproj has
   the default enabled tiff support. Otherwise, the current setup would
