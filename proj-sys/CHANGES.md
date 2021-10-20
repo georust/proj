@@ -1,3 +1,11 @@
+# UNRELEASED
+
+- BREAKING: Remove `bundled_proj_tiff` feature and assume system libproj has
+  the default enabled tiff support. Otherwise, the current setup would
+  unnecessarily build libproj from source in some cases, e.g. the geo crate's
+  proj network integration would compile libproj from source.
+    - <https://github.com/georust/proj/pull/92>
+
 # 0.20.1
 - Fix docs to refer to correct libproj version
 
