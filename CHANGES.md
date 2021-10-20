@@ -1,5 +1,8 @@
 # Changes
 
+## 0.24.0
+- update to proj-sys 0.21.0
+
 ## 0.23.1
 - Update docs to refer to correct libproj version
 
