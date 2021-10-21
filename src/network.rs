@@ -25,6 +25,7 @@ const MAX_RETRIES: u8 = 8;
 const RETRY_CODES: [u16; 4] = [429, 500, 502, 504];
 
 /// This struct is cast to `c_void`, then to `PROJ_NETWORK_HANDLE` so it can be passed around
+#[repr(C)]
 struct HandleData {
     request: reqwest::blocking::RequestBuilder,
     headers: reqwest::header::HeaderMap,
@@ -46,6 +47,14 @@ impl HandleData {
             request,
             headers,
             hptr,
+        }
+    }
+}
+
+impl Drop for HandleData {
+    fn drop(&mut self) {
+        if let Some(header) = self.hptr {
+            let _ = unsafe { CString::from_raw(header as *mut i8) };
         }
     }
 }
@@ -176,7 +185,7 @@ unsafe fn _network_open(
     out_size_read.write(contentlength);
     let headers = res.headers().clone();
     // Copy the downloaded bytes into the buffer so it can be passed around
-    &res.bytes()?
+    res.bytes()?
         .as_ptr()
         .copy_to_nonoverlapping(buffer as *mut u8, contentlength.min(size_to_read));
     // Store req into the handle so new ranges can be queried
@@ -202,9 +211,6 @@ pub(crate) unsafe extern "C" fn network_close(
     let hd = &*(handle as *const c_void as *mut HandleData);
     // Reconstitute and drop the header value returned by network_get_header_value,
     // since PROJ never explicitly returns it to us
-    if let Some(header) = hd.hptr {
-        let _ = CString::from_raw(header as *mut i8);
-    }
     let _ = *hd;
 }
 
@@ -217,7 +223,7 @@ pub(crate) unsafe extern "C" fn network_get_header_value(
     header_name: *const c_char,
     ud: *mut c_void,
 ) -> *const c_char {
-    let mut hd = &mut *(handle as *const c_void as *mut HandleData);
+    let hd = &mut *(handle as *const c_void as *mut HandleData);
     match _network_get_header_value(pc, handle, header_name, ud) {
         Ok(res) => res,
         Err(_) => {
@@ -240,7 +246,7 @@ unsafe fn _network_get_header_value(
     _: *mut c_void,
 ) -> Result<*const c_char, ProjError> {
     let lookup = _string(header_name)?.to_lowercase();
-    let mut hd = &mut *(handle as *mut c_void as *mut HandleData);
+    let hd = &mut *(handle as *mut c_void as *mut HandleData);
     let hvalue = hd
         .headers
         .get(&lookup)
@@ -248,12 +254,13 @@ unsafe fn _network_get_header_value(
         .to_str()?;
     let cstr = CString::new(hvalue).unwrap();
     let header = cstr.into_raw();
-    // Raw pointers are Copy: the pointer returned by this function is never returned by libproj,so
+    // Raw pointers are Copy: the pointer returned by this function is never returned by libproj so
     // in order to avoid a memory leak, the pointer is copied and stored in the HandleData struct,
     // which is dropped in close_network. As part of that, the pointer in hptr is returned to Rust
     hd.hptr = Some(header);
     Ok(header)
 }
+
 /// Network: read range
 ///
 /// Read size_to_read bytes from handle, starting at `offset`, into `buffer`. During this read,
@@ -311,7 +318,7 @@ fn _network_read_range(
     // - 1 is used because the HTTP convention is to use inclusive start and end offsets
     let end = offset as usize + size_to_read - 1;
     let hvalue = format!("bytes={}-{}", offset, end);
-    let mut hd = unsafe { &mut *(handle as *const c_void as *mut HandleData) };
+    let hd = unsafe { &mut *(handle as *const c_void as *mut HandleData) };
     let initial = hd.request.try_clone().ok_or(ProjError::RequestCloneError)?;
     let with_headers = initial.header("Range", &hvalue).header("Client", CLIENT);
     let mut res = with_headers.send()?;
