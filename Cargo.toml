@@ -27,7 +27,7 @@ members = ["proj-sys"]
 default = ["geo-types"]
 bundled_proj = [ "proj-sys/bundled_proj" ]
 pkg_config = [ "proj-sys/pkg_config" ]
-network = ["reqwest"]
+network = ["reqwest", "proj-sys/network"]
 
 [dev-dependencies]
 approx = "0.3"
