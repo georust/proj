@@ -20,6 +20,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .probe("proj")
         .map(|pk| {
             eprintln!("found acceptable libproj already installed at: {:?}", pk.link_paths[0]);
+            if cfg!(feature = "network") {
+                // Generally, system proj installations have been built with tiff support
+                // allowing for network grid interaction. If this proves to be untrue
+                // could we try to determine some kind of runtime check and fall back
+                // to building from source?
+                eprintln!("assuming existing system libproj installation has network (tiff) support");
+            }
             if let Ok(val) = &env::var("_PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC") {
                 if val != "0" {
                     panic!("for testing purposes: existing package was found, but should not have been");
@@ -91,6 +98,16 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
     config.define("BUILD_PROJINFO", "OFF");
     config.define("BUILD_PROJSYNC", "OFF");
     config.define("ENABLE_CURL", "OFF");
+
+    let enable_tiff = cfg!(feature="network");
+    if enable_tiff {
+        eprintln!("enabling tiff support");
+        config.define("ENABLE_TIFF", "ON");
+    } else {
+        eprintln!("disabling tiff support");
+        config.define("ENABLE_TIFF", "OFF");
+    }
+
     let proj = config.build();
     // Tell cargo to tell rustc to link libproj, and where to find it
     // libproj will be built in $OUT_DIR/lib
@@ -119,27 +136,29 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
     // The PROJ library needs SQLite and the C++ standard library.
     println!("cargo:rustc-link-lib=dylib=sqlite3");
 
-    // On platforms like apples aarch64, users are likely to have installed libtiff with homebrew,
-    // which isn't in the default search path, so try to determine path from pkg-config
-    match pkg_config::Config::new()
-        .atleast_version("4.0")
-        .probe("libtiff-4")
-    {
-        Ok(pk) => {
-            eprintln!(
-                "found acceptable libtiff installed at: {:?}",
-                pk.link_paths[0]
-            );
-            println!("cargo:rustc-link-search=native={:?}", pk.link_paths[0]);
+    if enable_tiff {
+        // On platforms like apples aarch64, users are likely to have installed libtiff with homebrew,
+        // which isn't in the default search path, so try to determine path from pkg-config
+        match pkg_config::Config::new()
+            .atleast_version("4.0")
+            .probe("libtiff-4")
+        {
+            Ok(pk) => {
+                eprintln!(
+                    "found acceptable libtiff installed at: {:?}",
+                    pk.link_paths[0]
+                );
+                println!("cargo:rustc-link-search=native={:?}", pk.link_paths[0]);
+            }
+            Err(err) => {
+                // pkg-config might not even be installed. Let's try to stumble forward
+                // to see if the build succeeds regardless, e.g. if libtiff is installed
+                // in some default search path.
+                eprintln!("Failed to find libtiff with pkg-config: {}", err);
+            }
         }
-        Err(err) => {
-            // pkg-config might not even be installed. Let's try to stumble forward
-            // to see if the build succeeds regardless, e.g. if libtiff is installed
-            // in some default search path.
-            eprintln!("Failed to find libtiff with pkg-config: {}", err);
-        }
+        println!("cargo:rustc-link-lib=dylib=tiff");
     }
-    println!("cargo:rustc-link-lib=dylib=tiff");
 
     if cfg!(target_os = "linux") {
         println!("cargo:rustc-link-lib=dylib=stdc++");
