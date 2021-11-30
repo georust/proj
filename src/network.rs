@@ -207,11 +207,10 @@ pub(crate) unsafe extern "C" fn network_close(
     handle: *mut PROJ_NETWORK_HANDLE,
     _: *mut c_void,
 ) {
-    // Reconstitute the Handle data so it can be dropped
-    let hd = &*(handle as *const c_void as *mut HandleData);
-    // Reconstitute the header value returned by network_get_header_value,
-    // since libproj never explicitly returns it to us
-    let _ = *hd;
+    // Because we created the raw pointer from a Box, we have to re-constitute the Box
+    // This is the exact reverse order seen in _network_open
+    let void = handle as *mut c_void as *mut HandleData;
+    let _: Box<HandleData> = Box::from_raw(void);
 }
 
 /// Network callback: get header value
