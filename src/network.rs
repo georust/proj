@@ -28,9 +28,8 @@ const RETRY_CODES: [u16; 4] = [429, 500, 502, 504];
 struct HandleData {
     request: reqwest::blocking::RequestBuilder,
     headers: reqwest::header::HeaderMap,
-    // this raw pointer is returned to libproj but never returned from libproj,
-    // so a copy of the pointer (raw pointers are Copy) is stored here, so it can be
-    // reconstituted and dropped in network_close.
+    // this raw pointer is handed out to libproj but never returned,
+    // so a copy of the pointer (raw pointers are Copy) is stored here.
     // Note to future self: are you 100% sure that the pointer is never read again
     // after network_close returns?
     hptr: Option<*const c_char>,
@@ -51,6 +50,8 @@ impl HandleData {
 }
 
 impl Drop for HandleData {
+    // whenever HandleData is dropped we check whether it has a pointer,
+    // dereferencing it if need be so the resource is freed
     fn drop(&mut self) {
         if let Some(header) = self.hptr {
             let _ = unsafe { CString::from_raw(header as *mut i8) };
