@@ -11,7 +11,7 @@ use reqwest::blocking::{Client, RequestBuilder, Response};
 use reqwest::Method;
 use std::ffi::CString;
 use std::os::raw::c_ulonglong;
-use std::ptr;
+use std::ptr::{self, NonNull};
 
 use crate::proj::{ProjError, _string};
 use libc::c_char;
@@ -32,14 +32,14 @@ struct HandleData {
     // so a copy of the pointer (raw pointers are Copy) is stored here.
     // Note to future self: are you 100% sure that the pointer is never read again
     // after network_close returns?
-    hptr: Option<*const c_char>,
+    hptr: Option<NonNull<c_char>>,
 }
 
 impl HandleData {
     fn new(
         request: reqwest::blocking::RequestBuilder,
         headers: reqwest::header::HeaderMap,
-        hptr: Option<*const c_char>,
+        hptr: Option<NonNull<c_char>>,
     ) -> Self {
         Self {
             request,
@@ -54,7 +54,7 @@ impl Drop for HandleData {
     // dereferencing it if need be so the resource is freed
     fn drop(&mut self) {
         if let Some(header) = self.hptr {
-            let _ = unsafe { CString::from_raw(header as *mut i8) };
+            let _ = unsafe { CString::from_raw(header.as_ptr() as *mut i8) };
         }
     }
 }
@@ -231,7 +231,7 @@ pub(crate) unsafe extern "C" fn network_get_header_value(
             // unwrapping an empty str is fine
             let cstr = CString::new(hvalue).unwrap();
             let err = cstr.into_raw();
-            hd.hptr = Some(err);
+            hd.hptr = Some(NonNull::new(err).expect("Failed to create non-Null pointer"));
             err
         }
     }
@@ -254,9 +254,11 @@ unsafe fn _network_get_header_value(
     let cstr = CString::new(hvalue).unwrap();
     let header = cstr.into_raw();
     // Raw pointers are Copy: the pointer returned by this function is never returned by libproj so
-    // in order to avoid a memory leak, the pointer is copied and stored in the HandleData struct,
-    // which is dropped in close_network. As part of that, the pointer in hptr is returned to Rust
-    hd.hptr = Some(header);
+    // in order to avoid a memory leak the pointer is copied and stored in the HandleData struct,
+    // which is dropped when close_network returns. As part of that drop, the pointer in hptr is returned to Rust
+    hd.hptr = Some(
+        NonNull::new(header).expect("Failed to create non-Null pointer when building header value"),
+    );
     Ok(header)
 }
 
