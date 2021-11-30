@@ -168,7 +168,7 @@ unsafe fn _network_open(
     // RANGE header definition is "bytes=x-y"
     let hvalue = format!("bytes={}-{}", offset, end);
     // Create a new client that can be reused for subsequent queries
-    let clt = Client::builder().build()?;
+    let clt = Client::builder().build();
     let req = clt.request(Method::GET, &url);
     // this performs the initial byte read, presumably as an error check
     let initial = req.try_clone().ok_or(ProjError::RequestCloneError)?;
@@ -209,8 +209,8 @@ pub(crate) unsafe extern "C" fn network_close(
 ) {
     // Reconstitute the Handle data so it can be dropped
     let hd = &*(handle as *const c_void as *mut HandleData);
-    // Reconstitute and drop the header value returned by network_get_header_value,
-    // since PROJ never explicitly returns it to us
+    // Reconstitute the header value returned by network_get_header_value,
+    // since libproj never explicitly returns it to us
     let _ = *hd;
 }
 
