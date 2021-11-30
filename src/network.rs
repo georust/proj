@@ -168,7 +168,7 @@ unsafe fn _network_open(
     // RANGE header definition is "bytes=x-y"
     let hvalue = format!("bytes={}-{}", offset, end);
     // Create a new client that can be reused for subsequent queries
-    let clt = Client::builder().build();
+    let clt = Client::builder().build()?;
     let req = clt.request(Method::GET, &url);
     // this performs the initial byte read, presumably as an error check
     let initial = req.try_clone().ok_or(ProjError::RequestCloneError)?;
