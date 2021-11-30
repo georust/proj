@@ -25,7 +25,6 @@ const MAX_RETRIES: u8 = 8;
 const RETRY_CODES: [u16; 4] = [429, 500, 502, 504];
 
 /// This struct is cast to `c_void`, then to `PROJ_NETWORK_HANDLE` so it can be passed around
-#[repr(C)]
 struct HandleData {
     request: reqwest::blocking::RequestBuilder,
     headers: reqwest::header::HeaderMap,
