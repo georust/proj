@@ -66,7 +66,8 @@ fn get_wait_time_exp(retrycount: i32) -> u64 {
 }
 
 /// Process CDN response: handle retries in case of server error, or early return for client errors
-fn error_handler<'a>(res: &'a mut Response, rb: RequestBuilder) -> Result<&'a Response, ProjError> {
+/// Successful retry data is stored into res
+fn error_handler(res: &mut Response, rb: RequestBuilder) -> Result<&Response, ProjError> {
     let mut status = res.status().as_u16();
     let mut retries = 0;
     // Check whether something went wrong on the server, or if it's an S3 retry code
