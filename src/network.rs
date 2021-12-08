@@ -11,7 +11,7 @@ use reqwest::blocking::{Client, RequestBuilder, Response};
 use reqwest::Method;
 use std::ffi::CString;
 use std::os::raw::c_ulonglong;
-use std::ptr;
+use std::ptr::{self, NonNull};
 
 use crate::proj::{ProjError, _string};
 use libc::c_char;
@@ -26,26 +26,31 @@ const RETRY_CODES: [u16; 4] = [429, 500, 502, 504];
 
 /// This struct is cast to `c_void`, then to `PROJ_NETWORK_HANDLE` so it can be passed around
 struct HandleData {
-    request: reqwest::blocking::RequestBuilder,
+    url: String,
     headers: reqwest::header::HeaderMap,
-    // this raw pointer is returned to libproj but never returned from libproj,
-    // so a copy of the pointer (raw pointers are Copy) is stored here, so it can be
-    // reconstituted and dropped in network_close.
+    // this raw pointer is handed out to libproj but never returned,
+    // so a copy of the pointer (raw pointers are Copy) is stored here.
     // Note to future self: are you 100% sure that the pointer is never read again
     // after network_close returns?
-    hptr: Option<*const c_char>,
+    hptr: Option<NonNull<c_char>>,
 }
 
 impl HandleData {
     fn new(
-        request: reqwest::blocking::RequestBuilder,
+        url: String,
         headers: reqwest::header::HeaderMap,
-        hptr: Option<*const c_char>,
+        hptr: Option<NonNull<c_char>>,
     ) -> Self {
-        Self {
-            request,
-            headers,
-            hptr,
+        Self { url, headers, hptr }
+    }
+}
+
+impl Drop for HandleData {
+    // whenever HandleData is dropped we check whether it has a pointer,
+    // dereferencing it if need be so the resource is freed
+    fn drop(&mut self) {
+        if let Some(header) = self.hptr {
+            let _ = unsafe { CString::from_raw(header.as_ptr() as *mut i8) };
         }
     }
 }
@@ -61,7 +66,8 @@ fn get_wait_time_exp(retrycount: i32) -> u64 {
 }
 
 /// Process CDN response: handle retries in case of server error, or early return for client errors
-fn error_handler<'a>(res: &'a mut Response, rb: RequestBuilder) -> Result<&'a Response, ProjError> {
+/// Successful retry data is stored into res
+fn error_handler(res: &mut Response, rb: RequestBuilder) -> Result<&Response, ProjError> {
     let mut status = res.status().as_u16();
     let mut retries = 0;
     // Check whether something went wrong on the server, or if it's an S3 retry code
@@ -74,8 +80,7 @@ fn error_handler<'a>(res: &'a mut Response, rb: RequestBuilder) -> Result<&'a Re
             let wait = time::Duration::from_millis(get_wait_time_exp(retries as i32));
             thread::sleep(wait);
             let retry = rb.try_clone().ok_or(ProjError::RequestCloneError)?;
-            let with_range = retry.header("Client", CLIENT);
-            *res = with_range.send()?;
+            *res = retry.send()?;
             status = res.status().as_u16();
         }
     // Not a timeout or known S3 retry code: bail out
@@ -165,22 +170,21 @@ unsafe fn _network_open(
     let initial = req.try_clone().ok_or(ProjError::RequestCloneError)?;
     let with_headers = initial.header("Range", &hvalue).header("Client", CLIENT);
     let mut res = with_headers.send()?;
-    let eh_rb = req
+    let in_case_of_error = req
         .try_clone()
         .ok_or(ProjError::RequestCloneError)?
         .header("Range", &hvalue);
     // hand the response off to the error-handler, continue on success
-    error_handler(&mut res, eh_rb)?;
+    error_handler(&mut res, in_case_of_error)?;
     // Write the initial read length value into the pointer
     let contentlength = res.content_length().ok_or(ProjError::ContentLength)? as usize;
     out_size_read.write(contentlength);
     let headers = res.headers().clone();
     // Copy the downloaded bytes into the buffer so it can be passed around
-    &res.bytes()?
+    res.bytes()?
         .as_ptr()
         .copy_to_nonoverlapping(buffer as *mut u8, contentlength.min(size_to_read));
-    // Store req into the handle so new ranges can be queried
-    let hd = HandleData::new(req, headers, None);
+    let hd = HandleData::new(url, headers, None);
     // heap-allocate the struct and cast it to a void pointer so it can be passed around to PROJ
     let hd_boxed = Box::new(hd);
     let void: *mut c_void = Box::into_raw(hd_boxed) as *mut c_void;
@@ -198,14 +202,10 @@ pub(crate) unsafe extern "C" fn network_close(
     handle: *mut PROJ_NETWORK_HANDLE,
     _: *mut c_void,
 ) {
-    // Reconstitute the Handle data so it can be dropped
-    let hd = &*(handle as *const c_void as *mut HandleData);
-    // Reconstitute and drop the header value returned by network_get_header_value,
-    // since PROJ never explicitly returns it to us
-    if let Some(header) = hd.hptr {
-        let _ = CString::from_raw(header as *mut i8);
-    }
-    let _ = *hd;
+    // Because we created the raw pointer from a Box, we have to re-constitute the Box
+    // This is the exact reverse order seen in _network_open
+    let void = handle as *mut c_void as *mut HandleData;
+    let _: Box<HandleData> = Box::from_raw(void);
 }
 
 /// Network callback: get header value
@@ -217,7 +217,7 @@ pub(crate) unsafe extern "C" fn network_get_header_value(
     header_name: *const c_char,
     ud: *mut c_void,
 ) -> *const c_char {
-    let mut hd = &mut *(handle as *const c_void as *mut HandleData);
+    let hd = &mut *(handle as *const c_void as *mut HandleData);
     match _network_get_header_value(pc, handle, header_name, ud) {
         Ok(res) => res,
         Err(_) => {
@@ -226,7 +226,7 @@ pub(crate) unsafe extern "C" fn network_get_header_value(
             // unwrapping an empty str is fine
             let cstr = CString::new(hvalue).unwrap();
             let err = cstr.into_raw();
-            hd.hptr = Some(err);
+            hd.hptr = Some(NonNull::new(err).expect("Failed to create non-Null pointer"));
             err
         }
     }
@@ -240,7 +240,7 @@ unsafe fn _network_get_header_value(
     _: *mut c_void,
 ) -> Result<*const c_char, ProjError> {
     let lookup = _string(header_name)?.to_lowercase();
-    let mut hd = &mut *(handle as *mut c_void as *mut HandleData);
+    let hd = &mut *(handle as *mut c_void as *mut HandleData);
     let hvalue = hd
         .headers
         .get(&lookup)
@@ -248,12 +248,15 @@ unsafe fn _network_get_header_value(
         .to_str()?;
     let cstr = CString::new(hvalue).unwrap();
     let header = cstr.into_raw();
-    // Raw pointers are Copy: the pointer returned by this function is never returned by libproj,so
-    // in order to avoid a memory leak, the pointer is copied and stored in the HandleData struct,
-    // which is dropped in close_network. As part of that, the pointer in hptr is returned to Rust
-    hd.hptr = Some(header);
+    // Raw pointers are Copy: the pointer returned by this function is never returned by libproj so
+    // in order to avoid a memory leak the pointer is copied and stored in the HandleData struct,
+    // which is dropped when close_network returns. As part of that drop, the pointer in hptr is returned to Rust
+    hd.hptr = Some(
+        NonNull::new(header).expect("Failed to create non-Null pointer when building header value"),
+    );
     Ok(header)
 }
+
 /// Network: read range
 ///
 /// Read size_to_read bytes from handle, starting at `offset`, into `buffer`. During this read,
@@ -311,17 +314,20 @@ fn _network_read_range(
     // - 1 is used because the HTTP convention is to use inclusive start and end offsets
     let end = offset as usize + size_to_read - 1;
     let hvalue = format!("bytes={}-{}", offset, end);
-    let mut hd = unsafe { &mut *(handle as *const c_void as *mut HandleData) };
-    let initial = hd.request.try_clone().ok_or(ProjError::RequestCloneError)?;
-    let with_headers = initial.header("Range", &hvalue).header("Client", CLIENT);
-    let mut res = with_headers.send()?;
-    let eh_rb = hd
-        .request
+    let hd = unsafe { &mut *(handle as *const c_void as *mut HandleData) };
+    let clt = Client::builder().build()?;
+    let initial = clt.request(Method::GET, &hd.url);
+    let in_case_of_error = initial
         .try_clone()
         .ok_or(ProjError::RequestCloneError)?
-        .header("Range", &hvalue);
-    // hand the response off to the error-handler, continue on success
-    error_handler(&mut res, eh_rb)?;
+        .header("Range", &hvalue)
+        .header("Client", CLIENT);
+    let req = in_case_of_error
+        .try_clone()
+        .ok_or(ProjError::RequestCloneError)?;
+    let mut res = req.send()?;
+    // hand the response and retry instance off to the error-handler, continue on success
+    error_handler(&mut res, in_case_of_error)?;
     let headers = res.headers().clone();
     let contentlength = res.content_length().ok_or(ProjError::ContentLength)? as usize;
     // Copy the downloaded bytes into the buffer so it can be passed around

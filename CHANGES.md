@@ -1,5 +1,8 @@
 # Changes
 
+## Unreleased
+- Fix memory leak in network grid functionality
+
 ## 0.24.0
 - update to proj-sys 0.21.0
 
