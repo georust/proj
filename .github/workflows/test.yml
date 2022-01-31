@@ -30,8 +30,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        container_image: ["georust/proj-ci:rust-1.52", "georust/proj-ci:rust-1.53"]
-        features: 
+        container_image:
+          - "georust/proj-ci:rust-1.52"
+          - "georust/proj-ci:rust-1.53"
+          - "georust/proj-ci:rust-1.54"
+          - "georust/proj-ci:rust-1.55"
+          - "georust/proj-ci:rust-1.56"
+          - "georust/proj-ci:rust-1.57"
+          - "georust/proj-ci:rust-1.58"
+        features:
           - ""
           - "--features network"
           - "--features bundled_proj"
@@ -74,22 +81,27 @@ jobs:
       matrix:
         include:
           - container:
-              image: georust/proj-ci:rust-1.53
-              env:
-                _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
-            features: ""
-          - container:
               image: georust/proj-ci:rust-1.52
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
             features: ""
           - container:
-              image: georust/proj-ci:rust-1.53
+              image: georust/proj-ci:rust-1.52
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: "--features bundled_proj"
           - container:
-              image: georust/proj-ci:rust-1.52
+              image: georust/proj-ci-without-system-proj:rust-1.52
+              env:
+                _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
+            features: ""
+          - container:
+              image: georust/proj-ci:rust-1.53
+              env:
+                _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
+            features: ""
+          - container:
+              image: georust/proj-ci:rust-1.53
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: "--features bundled_proj"
@@ -99,7 +111,77 @@ jobs:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: ""
           - container:
-              image: georust/proj-ci-without-system-proj:rust-1.52
+              image: georust/proj-ci:rust-1.54
+              env:
+                _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
+            features: ""
+          - container:
+              image: georust/proj-ci:rust-1.54
+              env:
+                _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
+            features: "--features bundled_proj"
+          - container:
+              image: georust/proj-ci-without-system-proj:rust-1.54
+              env:
+                _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
+            features: ""
+          - container:
+              image: georust/proj-ci:rust-1.55
+              env:
+                _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
+            features: ""
+          - container:
+              image: georust/proj-ci:rust-1.55
+              env:
+                _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
+            features: "--features bundled_proj"
+          - container:
+              image: georust/proj-ci-without-system-proj:rust-1.55
+              env:
+                _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
+            features: ""
+          - container:
+              image: georust/proj-ci:rust-1.56
+              env:
+                _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
+            features: ""
+          - container:
+              image: georust/proj-ci:rust-1.56
+              env:
+                _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
+            features: "--features bundled_proj"
+          - container:
+              image: georust/proj-ci-without-system-proj:rust-1.56
+              env:
+                _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
+            features: ""
+          - container:
+              image: georust/proj-ci:rust-1.57
+              env:
+                _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
+            features: ""
+          - container:
+              image: georust/proj-ci:rust-1.57
+              env:
+                _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
+            features: "--features bundled_proj"
+          - container:
+              image: georust/proj-ci-without-system-proj:rust-1.57
+              env:
+                _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
+            features: ""
+          - container:
+              image: georust/proj-ci:rust-1.58
+              env:
+                _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
+            features: ""
+          - container:
+              image: georust/proj-ci:rust-1.58
+              env:
+                _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
+            features: "--features bundled_proj"
+          - container:
+              image: georust/proj-ci-without-system-proj:rust-1.58
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: ""
