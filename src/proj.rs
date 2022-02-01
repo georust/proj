@@ -11,6 +11,7 @@ use proj_sys::{
     PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LP, PJ_XY,
 };
 use std::{
+    convert,
     ffi,
     fmt::{self, Debug},
     str,
@@ -450,7 +451,29 @@ impl Default for ProjBuilder {
     }
 }
 
-/// A coordinate transformation object
+/// A coordinate transformation object.
+///
+/// A `Proj` can be constructed a few different ways:
+///
+/// * [`ProjBuilder`]
+/// * [`Proj::new`]
+/// * [`Proj::new_known_crs`]
+///
+/// # Examples
+///
+/// ```rust
+/// # use approx::assert_relative_eq;
+/// use proj::{Proj, Coord};
+///
+/// let from = "EPSG:2230";
+/// let to = "EPSG:26946";
+/// let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+/// let result = nad_ft_to_m
+///     .convert((4760096.421921f64, 3744293.729449f64))
+///     .unwrap();
+/// assert_relative_eq!(result.x(), 1450880.29, epsilon=1.0e-2);
+/// assert_relative_eq!(result.y(), 1141263.01, epsilon=1.0e-2);
+/// ```
 pub struct Proj {
     c_proj: *mut PJconsts,
     ctx: *mut PJ_CONTEXT,
@@ -467,7 +490,28 @@ impl Proj {
     /// For conversion operations, `definition` defines input, output, and
     /// any intermediate steps that are required. See the `convert` example for more details.
     ///
+    /// # Examples
+    ///
+    /// Construcing a `Proj` from a PROJ string definition:
+    ///
+    /// ```
+    /// let transformer = proj::Proj::new(
+    ///     "+proj=merc +lat_ts=56.5 +ellps=GRS80"
+    /// ).unwrap();
+    /// ```
+    ///
+    /// A `TryFrom` implementation is available which wraps `new`:
+    ///
+    /// ```
+    /// use std::convert::TryFrom;
+    ///
+    /// let transformer = proj::Proj::try_from(
+    ///     "+proj=merc +lat_ts=56.5 +ellps=GRS80"
+    /// ).unwrap();
+    /// ```
+    ///
     /// # Safety
+    ///
     /// This method contains unsafe code.
     // In contrast to proj v4.x, the type of transformation
     // is signalled by the choice of enum used as input to the PJ_COORD union
@@ -498,23 +542,32 @@ impl Proj {
     /// [remember](https://proj.org/development/reference/functions.html#c.proj_create_crs_to_crs)
     /// to reverse the coordinates of `Point` or `Coordinate` structs in order for a conversion operation to
     /// return correct results.
+    //
+    /// # Examples
     ///
-    ///```rust
-    /// # use approx::assert_relative_eq;
-    /// extern crate proj;
-    /// use proj::{Proj, Coord};
+    /// Constructing a `Proj` from a source CRS and target CRS:
     ///
-    /// let from = "EPSG:2230";
-    /// let to = "EPSG:26946";
-    /// let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
-    /// let result = nad_ft_to_m
-    ///     .convert((4760096.421921f64, 3744293.729449f64))
-    ///     .unwrap();
-    /// assert_relative_eq!(result.x(), 1450880.29, epsilon=1.0e-2);
-    /// assert_relative_eq!(result.y(), 1141263.01, epsilon=1.0e-2);
+    /// ```rust
+    /// let transformer = proj::Proj::new_known_crs(
+    ///     "EPSG:2230",
+    ///     "EPSG:26946",
+    ///     None
+    /// ).unwrap();
+    /// ```
+    ///
+    /// A `TryFrom` implementation is available which wraps `new_known_crs`:
+    ///
+    /// ```rust
+    /// use std::convert::TryFrom;
+    ///
+    /// let transformer = proj::Proj::try_from((
+    ///     "EPSG:2230",
+    ///     "EPSG:26946"
+    /// )).unwrap();
     /// ```
     ///
     /// # Safety
+    ///
     /// This method contains unsafe code.
     pub fn new_known_crs(
         from: &str,
@@ -895,6 +948,45 @@ impl Proj {
         } else {
             Err(ProjError::Projection(error_message(err)?))
         }
+    }
+}
+
+impl convert::TryFrom<&str> for Proj {
+    type Error = ProjCreateError;
+
+    /// Create a `Proj` from a PROJ string definition.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::convert::TryFrom;
+    ///
+    /// let transformer = proj::Proj::try_from(
+    ///     "+proj=merc +lat_ts=56.5 +ellps=GRS80"
+    /// ).unwrap();
+    /// ```
+    fn try_from(definition: &str) -> Result<Proj, Self::Error> {
+        Proj::new(definition)
+    }
+}
+
+impl convert::TryFrom<(&str, &str)> for Proj {
+    type Error = ProjCreateError;
+
+    /// Create a `Proj` from a source CRS and target CRS.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use std::convert::TryFrom;
+    ///
+    /// let transformer = proj::Proj::try_from((
+    ///     "EPSG:2230",
+    ///     "EPSG:26946"
+    /// )).unwrap();
+    /// ```
+    fn try_from((source_crs, target_crs): (&str, &str)) -> Result<Proj, Self::Error> {
+        Proj::new_known_crs(source_crs, target_crs, None)
     }
 }
 
