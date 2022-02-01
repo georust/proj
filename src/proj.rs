@@ -1,25 +1,24 @@
+use crate::context::ThreadContext;
+use crate::pj::Pj;
 use libc::c_int;
 use libc::{c_char, c_double};
 use num_traits::Float;
 use proj_sys::{
-    proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_cleanup, proj_context_create,
-    proj_context_destroy, proj_context_get_url_endpoint, proj_context_is_network_enabled,
-    proj_context_set_search_paths, proj_context_set_url_endpoint, proj_create,
-    proj_create_crs_to_crs, proj_destroy, proj_errno_string, proj_get_area_of_use,
-    proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization, proj_pj_info,
-    proj_trans, proj_trans_array, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD,
-    PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LP, PJ_XY,
+    proj_area_create, proj_area_destroy, proj_area_set_bbox,
+    proj_context_get_url_endpoint, proj_context_set_search_paths,
+    proj_context_set_url_endpoint, proj_create, proj_create_crs_to_crs, proj_destroy,
+    proj_errno_string, proj_get_area_of_use, proj_grid_cache_set_enable, proj_info,
+    proj_normalize_for_visualization, proj_pj_info, proj_trans, proj_trans_array, PJconsts,
+    PJ_AREA, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LP, PJ_XY,
 };
 use std::fmt::{self, Debug};
 
-#[cfg(feature = "network")]
-use proj_sys::proj_context_set_enable_network;
-
 use proj_sys::{proj_errno, proj_errno_reset};
 
+use std::ffi;
 use std::ffi::CStr;
 use std::ffi::CString;
-use std::mem::MaybeUninit;
+use std::mem::{self, MaybeUninit};
 use std::path::Path;
 use std::str;
 use thiserror::Error;
@@ -123,21 +122,6 @@ impl Area {
     }
 }
 
-/// Easily get a String from the external library
-pub(crate) unsafe fn _string(raw_ptr: *const c_char) -> Result<String, ProjError> {
-    assert!(!raw_ptr.is_null());
-    let c_str = CStr::from_ptr(raw_ptr);
-    Ok(str::from_utf8(c_str.to_bytes())?.to_string())
-}
-
-/// Look up an error message using the error code
-fn error_message(code: c_int) -> Result<String, ProjError> {
-    unsafe {
-        let rv = proj_errno_string(code);
-        _string(rv)
-    }
-}
-
 /// Set the bounding box of the area of use
 fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
     // if a bounding box has been passed, modify the proj area object
@@ -148,42 +132,37 @@ fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
     }
 }
 
-/// called by Proj::new and ProjBuilder::transform_new_crs
-fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Option<Proj> {
-    let c_definition = CString::new(definition).ok()?;
-    let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
-    if new_c_proj.is_null() {
-        None
-    } else {
-        Some(Proj {
-            c_proj: new_c_proj,
-            ctx,
-            area: None,
-        })
-    }
+#[derive(Error, Debug)]
+pub enum ProjCreateError {
+    #[error("A nul byte was found in the PROJ string definition or CRS argument: {0}")]
+    ArgumentNulError(ffi::NulError),
+    #[error("The underlying PROJ call failed: {0}")]
+    ProjError(String),
+    #[error("A UTF8 error occurred when constructing a PROJ error message")]
+    ProjErrorMessageUtf8Error(std::str::Utf8Error),
 }
 
 /// Called by new_known_crs and proj_known_crs
-fn transform_epsg(ctx: *mut PJ_CONTEXT, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
+fn transform_epsg(ctx: ThreadContext, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
     let from_c = CString::new(from).ok()?;
     let to_c = CString::new(to).ok()?;
     let proj_area = unsafe { proj_area_create() };
     area_set_bbox(proj_area, area);
     let new_c_proj =
-        unsafe { proj_create_crs_to_crs(ctx, from_c.as_ptr(), to_c.as_ptr(), proj_area) };
+        unsafe { proj_create_crs_to_crs(ctx.as_ptr(), from_c.as_ptr(), to_c.as_ptr(), proj_area) };
     if new_c_proj.is_null() {
         None
     } else {
         // Normalise input and output order to Lon, Lat / Easting Northing by inserting
         // An axis swap operation if necessary
         let normalised = unsafe {
-            let normalised = proj_normalize_for_visualization(ctx, new_c_proj);
+            let normalised = proj_normalize_for_visualization(ctx.as_ptr(), new_c_proj);
             // deallocate stale PJ pointer
             proj_destroy(new_c_proj);
             normalised
         };
         Some(Proj {
-            c_proj: normalised,
+            pj: normalised,
             ctx,
             area: Some(proj_area),
         })
@@ -193,7 +172,7 @@ fn transform_epsg(ctx: *mut PJ_CONTEXT, from: &str, to: &str, area: Option<Area>
 /// Read-only utility methods for providing information about the current PROJ instance
 pub trait Info {
     #[doc(hidden)]
-    fn ctx(&self) -> *mut PJ_CONTEXT;
+    fn ctx(&self) -> &ThreadContext;
 
     /// Return [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about the current PROJ context
     /// # Safety
@@ -205,9 +184,9 @@ pub trait Info {
                 major: pinfo.major,
                 minor: pinfo.minor,
                 patch: pinfo.patch,
-                release: _string(pinfo.release)?,
-                version: _string(pinfo.version)?,
-                searchpath: _string(pinfo.searchpath)?,
+                release: crate::_string(pinfo.release)?,
+                version: crate::_string(pinfo.version)?,
+                searchpath: crate::_string(pinfo.searchpath)?,
             })
         }
     }
@@ -217,8 +196,7 @@ pub trait Info {
     /// # Safety
     /// This method contains unsafe code.
     fn network_enabled(&self) -> bool {
-        let res = unsafe { proj_context_is_network_enabled(self.ctx()) };
-        matches!(res, 1)
+        self.ctx().is_network_enabled()
     }
 
     /// Get the URL endpoint to query for remote grids
@@ -226,14 +204,14 @@ pub trait Info {
     /// # Safety
     /// This method contains unsafe code.
     fn get_url_endpoint(&self) -> Result<String, ProjError> {
-        unsafe { _string(proj_context_get_url_endpoint(self.ctx())) }
+        unsafe { Ok(crate::_string(proj_context_get_url_endpoint(self.ctx().as_ptr()))?) }
     }
 }
 
 impl Info for ProjBuilder {
     #[doc(hidden)]
-    fn ctx(&self) -> *mut PJ_CONTEXT {
-        self.ctx
+    fn ctx(&self) -> &ThreadContext {
+        &self.ctx
     }
 }
 
@@ -246,23 +224,20 @@ impl ProjBuilder {
     #[cfg(feature = "network")]
     pub fn enable_network(&mut self, enable: bool) -> Result<u8, ProjError> {
         if enable {
-            let _ = match crate::network::set_network_callbacks(self.ctx()) {
+            let _ = match crate::network::set_network_callbacks(self.ctx().as_ptr()) {
                 1 => Ok(1),
                 _ => Err(ProjError::Network),
             }?;
         }
-        let enable = if enable { 1 } else { 0 };
-        match (enable, unsafe {
-            proj_context_set_enable_network(self.ctx(), enable)
-        }) {
+        match (enable, self.ctx().set_enable_network(enable)) {
             // we asked to switch on: switched on
-            (1, 1) => Ok(1),
+            (true, true) => Ok(1),
             // we asked to switch off: switched off
-            (0, 0) => Ok(0),
+            (false, false) => Ok(0),
             // we asked to switch off, but it's still on
-            (0, 1) => Err(ProjError::Network),
+            (false, true) => Err(ProjError::Network),
             // we asked to switch on, but it's still off
-            (1, 0) => Err(ProjError::Network),
+            (true, false) => Err(ProjError::Network),
             // scrëm
             _ => Err(ProjError::Network),
         }
@@ -287,7 +262,7 @@ impl ProjBuilder {
         // …then to raw pointers
         let paths_p: Vec<_> = paths_c.iter().map(|cstr| cstr.as_ptr()).collect();
         // …then pass the slice of raw pointers as a raw pointer (const char* const*)
-        unsafe { proj_context_set_search_paths(self.ctx(), newlength, paths_p.as_ptr()) }
+        unsafe { proj_context_set_search_paths(self.ctx().as_ptr(), newlength, paths_p.as_ptr()) }
         Ok(())
     }
 
@@ -303,7 +278,7 @@ impl ProjBuilder {
     /// This method contains unsafe code.
     pub fn grid_cache_enable(&mut self, enable: bool) {
         let enable = if enable { 1 } else { 0 };
-        let _ = unsafe { proj_grid_cache_set_enable(self.ctx(), enable) };
+        let _ = unsafe { proj_grid_cache_set_enable(self.ctx().as_ptr(), enable) };
     }
 
     /// Set the URL endpoint to query for remote grids
@@ -312,15 +287,15 @@ impl ProjBuilder {
     /// This method contains unsafe code.
     pub fn set_url_endpoint(&mut self, endpoint: &str) -> Result<(), ProjError> {
         let s = CString::new(endpoint)?;
-        unsafe { proj_context_set_url_endpoint(self.ctx(), s.as_ptr()) };
+        unsafe { proj_context_set_url_endpoint(self.ctx().as_ptr(), s.as_ptr()) };
         Ok(())
     }
 }
 
 impl Info for Proj {
     #[doc(hidden)]
-    fn ctx(&self) -> *mut PJ_CONTEXT {
-        self.ctx
+    fn ctx(&self) -> &ThreadContext {
+        &self.ctx
     }
 }
 
@@ -344,14 +319,15 @@ pub struct Projinfo {
 ///
 /// Create a transformation object by calling `proj` or `proj_known_crs`.
 pub struct ProjBuilder {
-    ctx: *mut PJ_CONTEXT,
+    ctx: ThreadContext,
 }
 
 impl ProjBuilder {
     /// Create a new `ProjBuilder`, allowing grid downloads and other customisation.
     pub fn new() -> Self {
-        let ctx = unsafe { proj_context_create() };
-        ProjBuilder { ctx }
+        ProjBuilder {
+            ctx: ThreadContext::new(),
+        }
     }
 
     /// Try to create a coordinate transformation object
@@ -365,9 +341,12 @@ impl ProjBuilder {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn proj(mut self, definition: &str) -> Option<Proj> {
-        let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
-        transform_string(ctx, definition)
+    pub fn proj(self, definition: &str) -> Result<Proj, crate::pj::PjCreateError> {
+        Ok(Proj {
+            ctx: self.ctx,
+            pj: Pj::from_definition(self.ctx, definition)?,
+            area: None,
+        })
     }
 
     /// Try to create a transformation object that is a pipeline between two known coordinate reference systems.
@@ -408,9 +387,8 @@ impl ProjBuilder {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn proj_known_crs(mut self, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
-        let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
-        transform_epsg(ctx, from, to, area)
+    pub fn proj_known_crs(self, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
+        transform_epsg(self.ctx, from, to, area)
     }
 }
 
@@ -422,8 +400,8 @@ impl Default for ProjBuilder {
 
 /// A coordinate transformation object
 pub struct Proj {
-    c_proj: *mut PJconsts,
-    ctx: *mut PJ_CONTEXT,
+    pj: crate::pj::Pj,
+    ctx: ThreadContext,
     area: Option<*mut PJ_AREA>,
 }
 
@@ -443,9 +421,13 @@ impl Proj {
     // is signalled by the choice of enum used as input to the PJ_COORD union
     // PJ_LP signals projection of geodetic coordinates, with output being PJ_XY
     // and vice versa, or using PJ_XY for conversion operations
-    pub fn new(definition: &str) -> Option<Proj> {
-        let ctx = unsafe { proj_context_create() };
-        transform_string(ctx, definition)
+    pub fn new(definition: &str) -> Result<Proj, crate::pj::PjCreateError> { // TOOD: fix error type
+        let context = ThreadContext::new();
+        Ok(Proj {
+            ctx: context,
+            pj: Pj::from_definition(context, definition)?,
+            area: None,
+        })
     }
 
     /// Try to create a new transformation object that is a pipeline between two known coordinate reference systems.
@@ -487,8 +469,7 @@ impl Proj {
     /// # Safety
     /// This method contains unsafe code.
     pub fn new_known_crs(from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
-        let ctx = unsafe { proj_context_create() };
-        transform_epsg(ctx, from, to, area)
+        transform_epsg(ThreadContext::new(), from, to, area)
     }
 
     /// Set the bounding box of the area of use
@@ -530,7 +511,7 @@ impl Proj {
         let mut out_area_name = MaybeUninit::uninit();
         let res = unsafe {
             proj_get_area_of_use(
-                self.ctx,
+                self.ctx.as_ptr(),
                 self.c_proj,
                 out_west_lon_degree.as_mut_ptr(),
                 out_south_lat_degree.as_mut_ptr(),
@@ -549,7 +530,7 @@ impl Proj {
             let name = unsafe {
                 let name = out_area_name.assume_init();
                 if !name.is_null() {
-                    Some(_string(name)?)
+                    Some(crate::_string(name)?)
                 } else {
                     None
                 }
@@ -579,17 +560,17 @@ impl Proj {
             let id = if pj_info.id.is_null() {
                 None
             } else {
-                Some(_string(pj_info.id).expect("PROJ built an invalid string"))
+                Some(crate::_string(pj_info.id).expect("PROJ built an invalid string"))
             };
             let description = if pj_info.description.is_null() {
                 None
             } else {
-                Some(_string(pj_info.description).expect("PROJ built an invalid string"))
+                Some(crate::_string(pj_info.description).expect("PROJ built an invalid string"))
             };
             let definition = if pj_info.definition.is_null() {
                 None
             } else {
-                Some(_string(pj_info.definition).expect("PROJ built an invalid string"))
+                Some(crate::_string(pj_info.definition).expect("PROJ built an invalid string"))
             };
             let has_inverse = pj_info.has_inverse == 1;
             PjInfo {
@@ -640,22 +621,20 @@ impl Proj {
         // For conversion (i.e. between projected coordinates) you should use
         // PJ_XY {x: , y: }
         let coords = PJ_LP { lam: c_x, phi: c_y };
-        unsafe {
-            proj_errno_reset(self.c_proj);
-            // PJ_DIRECTION_* determines a forward or inverse projection
-            let trans = proj_trans(self.c_proj, inv, PJ_COORD { lp: coords });
-            // output of coordinates uses the PJ_XY struct
-            new_x = trans.xy.x;
-            new_y = trans.xy.y;
-            err = proj_errno(self.c_proj);
-        }
-        if err == 0 {
+        self.pj.errno_reset();
+        // PJ_DIRECTION_* determines a forward or inverse projection
+        let trans = self.pj.trans(inv, PJ_COORD { lp: coords });
+        // output of coordinates uses the PJ_XY struct
+        new_x = trans.xy.x;
+        new_y = trans.xy.y;
+        err = self.pj.errno();
+        if err.0 == 0 {
             Ok(Coord::from_xy(
                 F::from(new_x).ok_or(ProjError::FloatConversion)?,
                 F::from(new_y).ok_or(ProjError::FloatConversion)?,
             ))
         } else {
-            Err(ProjError::Projection(error_message(err)?))
+            Err(ProjError::Projection(err.message(&self.ctx)?))
         }
     }
 
@@ -705,20 +684,18 @@ impl Proj {
         let new_y;
         let err;
         let coords = PJ_XY { x: c_x, y: c_y };
-        unsafe {
-            proj_errno_reset(self.c_proj);
-            let trans = proj_trans(self.c_proj, PJ_DIRECTION_PJ_FWD, PJ_COORD { xy: coords });
-            new_x = trans.xy.x;
-            new_y = trans.xy.y;
-            err = proj_errno(self.c_proj);
-        }
-        if err == 0 {
+        self.pj.errno_reset();
+        let trans = self.pj.trans(PJ_DIRECTION_PJ_FWD, PJ_COORD { xy: coords });
+        new_x = trans.xy.x;
+        new_y = trans.xy.y;
+        err = self.pj.errno();
+        if err.0 == 0 {
             Ok(C::from_xy(
                 F::from(new_x).ok_or(ProjError::FloatConversion)?,
                 F::from(new_y).ok_or(ProjError::FloatConversion)?,
             ))
         } else {
-            Err(ProjError::Conversion(error_message(err)?))
+            Err(ProjError::Conversion(err.message(&self.ctx)?))
         }
     }
 
@@ -835,15 +812,15 @@ impl Proj {
         let mp = pj.as_mut_ptr();
         // Transformation operations are slightly different
         match op {
-            Transformation::Conversion => unsafe {
-                proj_errno_reset(self.c_proj);
-                trans = proj_trans_array(self.c_proj, PJ_DIRECTION_PJ_FWD, pj.len(), mp);
-                err = proj_errno(self.c_proj);
+            Transformation::Conversion => {
+                self.pj.errno_reset();
+                trans = unsafe { proj_trans_array(self.c_proj, PJ_DIRECTION_PJ_FWD, pj.len(), mp) };
+                err = self.pj.errno();
             },
-            Transformation::Projection => unsafe {
-                proj_errno_reset(self.c_proj);
-                trans = proj_trans_array(self.c_proj, inv, pj.len(), mp);
-                err = proj_errno(self.c_proj);
+            Transformation::Projection => {
+                self.pj.errno_reset();
+                trans = unsafe { proj_trans_array(self.c_proj, inv, pj.len(), mp) };
+                err = self.pj.errno();
             },
         }
         if err == 0 && trans == 0 {
@@ -859,7 +836,7 @@ impl Proj {
             }
             Ok(points)
         } else {
-            Err(ProjError::Projection(error_message(err)?))
+            Err(ProjError::Projection(crate::error_message(err)?))
         }
     }
 }
@@ -891,20 +868,6 @@ impl Drop for Proj {
             if let Some(area) = self.area {
                 proj_area_destroy(area)
             }
-            proj_destroy(self.c_proj);
-            proj_context_destroy(self.ctx);
-            // NB do NOT call until proj_destroy and proj_context_destroy have both returned:
-            // https://proj.org/development/reference/functions.html#c.proj_cleanup
-            proj_cleanup()
-        }
-    }
-}
-
-impl Drop for ProjBuilder {
-    fn drop(&mut self) {
-        unsafe {
-            proj_context_destroy(self.ctx);
-            proj_cleanup()
         }
     }
 }

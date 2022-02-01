@@ -199,6 +199,8 @@ assert_relative_eq!(result.y(), 1141263.01, epsilon=1e-2);
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+use std::{ffi, str};
+
 #[cfg(feature = "network")]
 mod network;
 
@@ -210,6 +212,9 @@ mod geo_types;
 #[macro_use]
 extern crate approx;
 
+mod context;
+mod errno;
+mod pj;
 mod proj;
 
 pub use crate::proj::Area;
@@ -219,3 +224,10 @@ pub use crate::proj::Proj;
 pub use crate::proj::ProjBuilder;
 pub use crate::proj::ProjError;
 pub use crate::proj::Projinfo;
+
+/// Easily get a String from the external library
+pub(crate) unsafe fn _string(raw_ptr: *const libc::c_char) -> Result<String, str::Utf8Error> {
+    assert!(!raw_ptr.is_null());
+    let c_str = ffi::CStr::from_ptr(raw_ptr);
+    Ok(str::from_utf8(c_str.to_bytes())?.to_string())
+}
