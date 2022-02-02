@@ -1,24 +1,20 @@
 use crate::context::ThreadContext;
 use crate::pj::Pj;
-use libc::c_int;
-use libc::{c_char, c_double};
+use libc::c_double;
 use num_traits::Float;
 use proj_sys::{
     proj_area_create, proj_area_destroy, proj_area_set_bbox,
     proj_context_get_url_endpoint, proj_context_set_search_paths,
-    proj_context_set_url_endpoint, proj_create, proj_create_crs_to_crs, proj_destroy,
-    proj_errno_string, proj_get_area_of_use, proj_grid_cache_set_enable, proj_info,
-    proj_normalize_for_visualization, proj_pj_info, proj_trans, proj_trans_array, PJconsts,
+    proj_context_set_url_endpoint, proj_create_crs_to_crs, proj_destroy,
+    proj_get_area_of_use, proj_grid_cache_set_enable, proj_info,
+    proj_normalize_for_visualization, proj_pj_info, proj_trans_array,
     PJ_AREA, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LP, PJ_XY,
 };
 use std::fmt::{self, Debug};
 
-use proj_sys::{proj_errno, proj_errno_reset};
-
 use std::ffi;
-use std::ffi::CStr;
 use std::ffi::CString;
-use std::mem::{self, MaybeUninit};
+use std::mem::MaybeUninit;
 use std::path::Path;
 use std::str;
 use thiserror::Error;
@@ -143,7 +139,7 @@ pub enum ProjCreateError {
 }
 
 /// Called by new_known_crs and proj_known_crs
-fn transform_epsg(ctx: ThreadContext, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
+fn transform_epsg<'ctx>(ctx: ThreadContext, from: &str, to: &str, area: Option<Area>) -> Option<Proj<'ctx>> {
     let from_c = CString::new(from).ok()?;
     let to_c = CString::new(to).ok()?;
     let proj_area = unsafe { proj_area_create() };
@@ -162,9 +158,10 @@ fn transform_epsg(ctx: ThreadContext, from: &str, to: &str, area: Option<Area>) 
             normalised
         };
         Some(Proj {
-            pj: normalised,
+            pj: Pj::from_pj_ptr(&ctx, normalised).unwrap(),
             ctx,
             area: Some(proj_area),
+            foo: std::marker::PhantomData,
         })
     }
 }
@@ -292,7 +289,7 @@ impl ProjBuilder {
     }
 }
 
-impl Info for Proj {
+impl<'ctx> Info for Proj<'ctx> {
     #[doc(hidden)]
     fn ctx(&self) -> &ThreadContext {
         &self.ctx
@@ -344,8 +341,9 @@ impl ProjBuilder {
     pub fn proj(self, definition: &str) -> Result<Proj, crate::pj::PjCreateError> {
         Ok(Proj {
             ctx: self.ctx,
-            pj: Pj::from_definition(self.ctx, definition)?,
+            pj: Pj::from_definition(&self.ctx, definition)?,
             area: None,
+            foo: std::marker::PhantomData,
         })
     }
 
@@ -387,7 +385,7 @@ impl ProjBuilder {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn proj_known_crs(self, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
+    pub fn proj_known_crs<'ctx>(self, from: &str, to: &str, area: Option<Area>) -> Option<Proj<'ctx>> {
         transform_epsg(self.ctx, from, to, area)
     }
 }
@@ -399,13 +397,14 @@ impl Default for ProjBuilder {
 }
 
 /// A coordinate transformation object
-pub struct Proj {
-    pj: crate::pj::Pj,
+pub struct Proj<'ctx> {
+    pj: crate::pj::Pj<'ctx>,
     ctx: ThreadContext,
     area: Option<*mut PJ_AREA>,
+    foo: std::marker::PhantomData<&'ctx ()>,
 }
 
-impl Proj {
+impl<'ctx> Proj<'ctx> {
     /// Try to create a new transformation object
     ///
     /// **Note:** for projection operations, `definition` specifies
@@ -425,8 +424,9 @@ impl Proj {
         let context = ThreadContext::new();
         Ok(Proj {
             ctx: context,
-            pj: Pj::from_definition(context, definition)?,
+            pj: Pj::from_definition(&context, definition)?,
             area: None,
+            foo: std::marker::PhantomData,
         })
     }
 
@@ -468,7 +468,7 @@ impl Proj {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn new_known_crs(from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
+    pub fn new_known_crs(from: &str, to: &str, area: Option<Area>) -> Option<Proj<'ctx>> {
         transform_epsg(ThreadContext::new(), from, to, area)
     }
 
@@ -512,7 +512,7 @@ impl Proj {
         let res = unsafe {
             proj_get_area_of_use(
                 self.ctx.as_ptr(),
-                self.c_proj,
+                self.pj.as_ptr(),
                 out_west_lon_degree.as_mut_ptr(),
                 out_south_lat_degree.as_mut_ptr(),
                 out_east_lon_degree.as_mut_ptr(),
@@ -556,7 +556,7 @@ impl Proj {
 
     fn pj_info(&self) -> PjInfo {
         unsafe {
-            let pj_info = proj_pj_info(self.c_proj);
+            let pj_info = proj_pj_info(self.pj.as_ptr());
             let id = if pj_info.id.is_null() {
                 None
             } else {
@@ -814,16 +814,16 @@ impl Proj {
         match op {
             Transformation::Conversion => {
                 self.pj.errno_reset();
-                trans = unsafe { proj_trans_array(self.c_proj, PJ_DIRECTION_PJ_FWD, pj.len(), mp) };
+                trans = unsafe { proj_trans_array(self.pj.as_ptr(), PJ_DIRECTION_PJ_FWD, pj.len(), mp) };
                 err = self.pj.errno();
             },
             Transformation::Projection => {
                 self.pj.errno_reset();
-                trans = unsafe { proj_trans_array(self.c_proj, inv, pj.len(), mp) };
+                trans = unsafe { proj_trans_array(self.pj.as_ptr(), inv, pj.len(), mp) };
                 err = self.pj.errno();
             },
         }
-        if err == 0 && trans == 0 {
+        if err.0 == 0 && trans == 0 {
             // re-fill original slice with Coords
             // feels a bit clunky, but we're guaranteed that pj and points have the same length
             unsafe {
@@ -836,7 +836,7 @@ impl Proj {
             }
             Ok(points)
         } else {
-            Err(ProjError::Projection(crate::error_message(err)?))
+            Err(ProjError::Projection(err.message(&self.ctx)?))
         }
     }
 }
@@ -849,7 +849,7 @@ struct PjInfo {
     accuracy: f64,
 }
 
-impl fmt::Debug for Proj {
+impl<'ctx> fmt::Debug for Proj<'ctx> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let pj_info = self.pj_info();
         f.debug_struct("Proj")
@@ -862,7 +862,7 @@ impl fmt::Debug for Proj {
     }
 }
 
-impl Drop for Proj {
+impl<'ctx> Drop for Proj<'ctx> {
     fn drop(&mut self) {
         unsafe {
             if let Some(area) = self.area {
@@ -1073,7 +1073,7 @@ mod test {
     #[test]
     // Test that instantiation fails wth bad proj string input
     fn test_init_error() {
-        assert!(Proj::new("🦀").is_none());
+        assert!(Proj::new("🦀").is_err());
     }
     #[test]
     fn test_conversion_error() {

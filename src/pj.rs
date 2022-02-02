@@ -1,13 +1,16 @@
 use crate::context::ThreadContext;
 use crate::errno::Errno;
-use std::{ffi, ptr};
+use std::{ffi, ptr, rc};
 use thiserror::Error;
 
 /// A safe wrapper around `proj_sys::PJ`.
-pub(crate) struct Pj(ptr::NonNull<proj_sys::PJ>);
+pub(crate) struct Pj {
+    pj: ptr::NonNull<proj_sys::PJ>,
+    ctx: rc::Rc<ThreadContext>,
+}
 
 impl Pj {
-    pub fn from_definition(ctx: ThreadContext, definition: &str) -> Result<Self, PjCreateError> {
+    pub fn from_definition(ctx: rc::Rc<ThreadContext>, definition: &str) -> Result<Self, PjCreateError> {
         let definition =
             ffi::CString::new(definition).map_err(|e| PjCreateError::ArgumentNulError(e))?;
         let pj_ptr = unsafe { proj_sys::proj_create(ctx.as_ptr(), definition.as_ptr()) };
@@ -15,12 +18,12 @@ impl Pj {
     }
 
     pub fn from_crs_to_crs(
-        ctx: ThreadContext,
+        ctx: rc::Rc<ThreadContext>,
         source_crs: &str,
         target_crs: &str,
-    ) -> Result<Self, PjCreateError> {
-        let source_crs = ffi::CString::new(source_crs)?;
-        let target_crs = ffi::CString::new(target_crs)?;
+    ) -> Result<Self, PjCreateError> { // TODO: return Result<Self, Errno>
+        let source_crs = ffi::CString::new(source_crs).unwrap(); // TODO
+        let target_crs = ffi::CString::new(target_crs).unwrap(); // TODO
         let pj_ptr = unsafe {
             proj_sys::proj_create_crs_to_crs(
                 ctx.as_ptr(),
@@ -32,8 +35,8 @@ impl Pj {
         Pj::from_pj_ptr(ctx, pj_ptr)
     }
 
-    fn from_pj_ptr(
-        ctx: ThreadContext,
+    pub fn from_pj_ptr(
+        ctx: rc::Rc<ThreadContext>,
         pj_ptr: *mut proj_sys::PJconsts,
     ) -> Result<Self, PjCreateError> {
         ptr::NonNull::new(pj_ptr)
@@ -41,11 +44,11 @@ impl Pj {
                 Ok(s) => PjCreateError::ProjError(s),
                 Err(err) => PjCreateError::ProjErrorMessageUtf8Error(err),
             })
-            .map(|ptr| Pj(ptr))
+            .map(|ptr| Pj{pj: ptr, ctx: ctx})
     }
 
     pub fn as_ptr(&self) -> *mut proj_sys::PJ {
-        self.0.as_ptr()
+        self.pj.as_ptr()
     }
 
     pub fn errno_reset(&mut self) -> Errno {
@@ -61,7 +64,7 @@ impl Pj {
         direction: proj_sys::PJ_DIRECTION,
         coord: proj_sys::PJ_COORD,
     ) -> proj_sys::PJ_COORD {
-        proj_sys::proj_trans(self.as_ptr(), direction, coord)
+        unsafe { proj_sys::proj_trans(self.as_ptr(), direction, coord) }
     }
 }
 
