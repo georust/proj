@@ -11,6 +11,7 @@ use proj_sys::{
     PJ_AREA, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LP, PJ_XY,
 };
 use std::fmt::{self, Debug};
+use std::rc;
 
 use std::ffi;
 use std::ffi::CString;
@@ -139,7 +140,7 @@ pub enum ProjCreateError {
 }
 
 /// Called by new_known_crs and proj_known_crs
-fn transform_epsg<'ctx>(ctx: ThreadContext, from: &str, to: &str, area: Option<Area>) -> Option<Proj<'ctx>> {
+fn transform_epsg(ctx: rc::Rc<ThreadContext>, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
     let from_c = CString::new(from).ok()?;
     let to_c = CString::new(to).ok()?;
     let proj_area = unsafe { proj_area_create() };
@@ -158,10 +159,9 @@ fn transform_epsg<'ctx>(ctx: ThreadContext, from: &str, to: &str, area: Option<A
             normalised
         };
         Some(Proj {
-            pj: Pj::from_pj_ptr(&ctx, normalised).unwrap(),
-            ctx,
+            ctx: ctx.clone(),
+            pj: Pj::from_pj_ptr(ctx, normalised).unwrap(),
             area: Some(proj_area),
-            foo: std::marker::PhantomData,
         })
     }
 }
@@ -289,7 +289,7 @@ impl ProjBuilder {
     }
 }
 
-impl<'ctx> Info for Proj<'ctx> {
+impl Info for Proj {
     #[doc(hidden)]
     fn ctx(&self) -> &ThreadContext {
         &self.ctx
@@ -339,11 +339,11 @@ impl ProjBuilder {
     /// # Safety
     /// This method contains unsafe code.
     pub fn proj(self, definition: &str) -> Result<Proj, crate::pj::PjCreateError> {
+        let ctx = rc::Rc::new(self.ctx);
         Ok(Proj {
-            ctx: self.ctx,
-            pj: Pj::from_definition(&self.ctx, definition)?,
+            ctx: ctx.clone(),
+            pj: Pj::from_definition(ctx, definition)?,
             area: None,
-            foo: std::marker::PhantomData,
         })
     }
 
@@ -385,8 +385,8 @@ impl ProjBuilder {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn proj_known_crs<'ctx>(self, from: &str, to: &str, area: Option<Area>) -> Option<Proj<'ctx>> {
-        transform_epsg(self.ctx, from, to, area)
+    pub fn proj_known_crs<'ctx>(self, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
+        transform_epsg(rc::Rc::new(self.ctx), from, to, area)
     }
 }
 
@@ -397,14 +397,13 @@ impl Default for ProjBuilder {
 }
 
 /// A coordinate transformation object
-pub struct Proj<'ctx> {
-    pj: crate::pj::Pj<'ctx>,
-    ctx: ThreadContext,
+pub struct Proj {
+    pj: crate::pj::Pj,
+    ctx: rc::Rc<ThreadContext>,
     area: Option<*mut PJ_AREA>,
-    foo: std::marker::PhantomData<&'ctx ()>,
 }
 
-impl<'ctx> Proj<'ctx> {
+impl Proj {
     /// Try to create a new transformation object
     ///
     /// **Note:** for projection operations, `definition` specifies
@@ -421,12 +420,11 @@ impl<'ctx> Proj<'ctx> {
     // PJ_LP signals projection of geodetic coordinates, with output being PJ_XY
     // and vice versa, or using PJ_XY for conversion operations
     pub fn new(definition: &str) -> Result<Proj, crate::pj::PjCreateError> { // TOOD: fix error type
-        let context = ThreadContext::new();
+        let ctx = rc::Rc::new(ThreadContext::new());
         Ok(Proj {
-            ctx: context,
-            pj: Pj::from_definition(&context, definition)?,
+            ctx: ctx.clone(),
+            pj: Pj::from_definition(ctx.clone(), definition)?,
             area: None,
-            foo: std::marker::PhantomData,
         })
     }
 
@@ -468,8 +466,8 @@ impl<'ctx> Proj<'ctx> {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn new_known_crs(from: &str, to: &str, area: Option<Area>) -> Option<Proj<'ctx>> {
-        transform_epsg(ThreadContext::new(), from, to, area)
+    pub fn new_known_crs(from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
+        transform_epsg(rc::Rc::new(ThreadContext::new()), from, to, area)
     }
 
     /// Set the bounding box of the area of use
@@ -622,11 +620,13 @@ impl<'ctx> Proj<'ctx> {
         // PJ_XY {x: , y: }
         let coords = PJ_LP { lam: c_x, phi: c_y };
         self.pj.errno_reset();
-        // PJ_DIRECTION_* determines a forward or inverse projection
-        let trans = self.pj.trans(inv, PJ_COORD { lp: coords });
-        // output of coordinates uses the PJ_XY struct
-        new_x = trans.xy.x;
-        new_y = trans.xy.y;
+        unsafe {
+            // PJ_DIRECTION_* determines a forward or inverse projection
+            let trans = self.pj.trans(inv, PJ_COORD { lp: coords });
+            // output of coordinates uses the PJ_XY struct
+            new_x = trans.xy.x;
+            new_y = trans.xy.y;
+        }
         err = self.pj.errno();
         if err.0 == 0 {
             Ok(Coord::from_xy(
@@ -685,9 +685,11 @@ impl<'ctx> Proj<'ctx> {
         let err;
         let coords = PJ_XY { x: c_x, y: c_y };
         self.pj.errno_reset();
-        let trans = self.pj.trans(PJ_DIRECTION_PJ_FWD, PJ_COORD { xy: coords });
-        new_x = trans.xy.x;
-        new_y = trans.xy.y;
+        unsafe {
+            let trans = self.pj.trans(PJ_DIRECTION_PJ_FWD, PJ_COORD { xy: coords });
+            new_x = trans.xy.x;
+            new_y = trans.xy.y;
+        }
         err = self.pj.errno();
         if err.0 == 0 {
             Ok(C::from_xy(
@@ -849,7 +851,7 @@ struct PjInfo {
     accuracy: f64,
 }
 
-impl<'ctx> fmt::Debug for Proj<'ctx> {
+impl fmt::Debug for Proj {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let pj_info = self.pj_info();
         f.debug_struct("Proj")
@@ -862,7 +864,7 @@ impl<'ctx> fmt::Debug for Proj<'ctx> {
     }
 }
 
-impl<'ctx> Drop for Proj<'ctx> {
+impl<'ctx> Drop for Proj {
     fn drop(&mut self) {
         unsafe {
             if let Some(area) = self.area {
