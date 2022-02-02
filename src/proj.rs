@@ -244,7 +244,7 @@ impl ProjBuilder {
     /// This method contains unsafe code.
     #[cfg_attr(docsrs, doc(cfg(feature = "network")))]
     #[cfg(feature = "network")]
-    pub fn enable_network(&self, enable: bool) -> Result<u8, ProjError> {
+    pub fn enable_network(&mut self, enable: bool) -> Result<u8, ProjError> {
         if enable {
             let _ = match crate::network::set_network_callbacks(self.ctx()) {
                 1 => Ok(1),
@@ -272,7 +272,7 @@ impl ProjBuilder {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn set_search_paths<P: AsRef<Path>>(&self, newpath: P) -> Result<(), ProjError> {
+    pub fn set_search_paths<P: AsRef<Path>>(&mut self, newpath: P) -> Result<(), ProjError> {
         let existing = self.info()?.searchpath;
         let pathsep = if cfg!(windows) { ";" } else { ":" };
         let mut individual: Vec<&str> = existing.split(pathsep).collect();
@@ -301,7 +301,7 @@ impl ProjBuilder {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn grid_cache_enable(&self, enable: bool) {
+    pub fn grid_cache_enable(&mut self, enable: bool) {
         let enable = if enable { 1 } else { 0 };
         let _ = unsafe { proj_grid_cache_set_enable(self.ctx(), enable) };
     }
@@ -310,7 +310,7 @@ impl ProjBuilder {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn set_url_endpoint(&self, endpoint: &str) -> Result<(), ProjError> {
+    pub fn set_url_endpoint(&mut self, endpoint: &str) -> Result<(), ProjError> {
         let s = CString::new(endpoint)?;
         unsafe { proj_context_set_url_endpoint(self.ctx(), s.as_ptr()) };
         Ok(())
@@ -947,8 +947,8 @@ mod test {
         // ETRS89
         let to = "EPSG:4258";
 
-        let online_builder = ProjBuilder::new();
-        let offline_builder = ProjBuilder::new();
+        let mut online_builder = ProjBuilder::new();
+        let mut offline_builder = ProjBuilder::new();
 
         assert_eq!(online_builder.network_enabled(), false);
         assert_eq!(offline_builder.network_enabled(), false);
@@ -1008,7 +1008,7 @@ mod test {
     #[should_panic]
     // This failure is a bug in libproj
     fn test_searchpath() {
-        let tf = ProjBuilder::new();
+        let mut tf = ProjBuilder::new();
         tf.set_search_paths(&"/foo").unwrap();
         let ipath = tf.info().unwrap().searchpath;
         let pathsep = if cfg!(windows) { ";" } else { ":" };
@@ -1019,7 +1019,7 @@ mod test {
     fn test_set_endpoint() {
         let from = "EPSG:4326";
         let to = "EPSG:4326+3855";
-        let tf = ProjBuilder::new();
+        let mut tf = ProjBuilder::new();
         let ep = tf.get_url_endpoint().unwrap();
         assert_eq!(&ep, "https://cdn.proj.org");
         tf.set_url_endpoint("https://github.com/georust").unwrap();
