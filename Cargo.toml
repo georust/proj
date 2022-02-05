@@ -13,7 +13,7 @@ readme = "README.md"
 edition = "2018"
 
 [dependencies]
-proj-sys = { version = "0.21.0", path = "proj-sys" }
+proj-sys = { version = "0.22.0", path = "proj-sys" }
 geo-types = { version = "0.7", optional = true }
 libc = "0.2.62"
 num-traits = "0.2.8"
