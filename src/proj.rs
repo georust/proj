@@ -31,6 +31,30 @@ use thiserror::Error;
 pub trait CoordinateType: Float + Copy + PartialOrd + Debug {}
 impl<T: Float + Copy + PartialOrd + Debug> CoordinateType for T {}
 
+/// An error number returned from a PROJ call.
+pub(crate) struct Errno(pub libc::c_int);
+
+impl Errno {
+    /// Return the error message associated with the error number.
+    pub fn message(&self, context: *mut PJ_CONTEXT) -> String {
+        let ptr = unsafe { proj_sys::proj_context_errno_string(context, self.0) };
+        if ptr.is_null() {
+            panic!("PROJ did not supply an error")
+        } else {
+            unsafe { _string(ptr).expect("PROJ provided an invalid error string") }
+        }
+    }
+}
+
+/// Construct a `Result` from the result of a `proj_create*` call.
+fn result_from_create<T>(context: *mut PJ_CONTEXT, ptr: *mut T) -> Result<*mut T, Errno> {
+    if ptr.is_null() {
+        Err(Errno(unsafe { proj_context_errno(context) }))
+    } else {
+        Ok(ptr)
+    }
+}
+
 /// A point in two dimensional space. The primary unit of input/output for proj.
 ///
 /// By default, any numeric `(x, y)` tuple implements `Coord`, but you can conform your type to
@@ -106,8 +130,6 @@ pub enum ProjCreateError {
     ArgumentNulError(ffi::NulError),
     #[error("The underlying PROJ call failed: {0}")]
     ProjError(String),
-    #[error("A UTF8 error occurred when constructing a PROJ error message")]
-    ProjErrorMessageUtf8Error(std::str::Utf8Error),
 }
 
 /// The bounding box of an area of use
@@ -166,19 +188,13 @@ fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
 fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Result<Proj, ProjCreateError> {
     let c_definition =
         CString::new(definition).map_err(|e| ProjCreateError::ArgumentNulError(e))?;
-    let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
-    if new_c_proj.is_null() {
-        let error_code = unsafe { proj_context_errno(ctx) };
-        let message =
-            error_message(error_code).map_err(|e| ProjCreateError::ProjErrorMessageUtf8Error(e))?;
-        Err(ProjCreateError::ProjError(message))
-    } else {
-        Ok(Proj {
-            c_proj: new_c_proj,
-            ctx,
-            area: None,
-        })
-    }
+    let ptr = result_from_create(ctx, unsafe { proj_create(ctx, c_definition.as_ptr()) })
+        .map_err(|e| ProjCreateError::ProjError(e.message(ctx)))?;
+    Ok(Proj {
+        c_proj: ptr,
+        ctx,
+        area: None,
+    })
 }
 
 /// Called by new_known_crs and proj_known_crs
@@ -192,28 +208,23 @@ fn transform_epsg(
     let to_c = CString::new(to).map_err(|e| ProjCreateError::ArgumentNulError(e))?;
     let proj_area = unsafe { proj_area_create() };
     area_set_bbox(proj_area, area);
-    let new_c_proj =
-        unsafe { proj_create_crs_to_crs(ctx, from_c.as_ptr(), to_c.as_ptr(), proj_area) };
-    if new_c_proj.is_null() {
-        let error_code = unsafe { proj_context_errno(ctx) };
-        let message =
-            error_message(error_code).map_err(|e| ProjCreateError::ProjErrorMessageUtf8Error(e))?;
-        Err(ProjCreateError::ProjError(message))
-    } else {
-        // Normalise input and output order to Lon, Lat / Easting Northing by inserting
-        // An axis swap operation if necessary
-        let normalised = unsafe {
-            let normalised = proj_normalize_for_visualization(ctx, new_c_proj);
-            // deallocate stale PJ pointer
-            proj_destroy(new_c_proj);
-            normalised
-        };
-        Ok(Proj {
-            c_proj: normalised,
-            ctx,
-            area: Some(proj_area),
-        })
-    }
+    let ptr = result_from_create(ctx, unsafe {
+        proj_create_crs_to_crs(ctx, from_c.as_ptr(), to_c.as_ptr(), proj_area)
+    })
+    .map_err(|e| ProjCreateError::ProjError(e.message(ctx)))?;
+    // Normalise input and output order to Lon, Lat / Easting Northing by inserting
+    // An axis swap operation if necessary
+    let normalised = unsafe {
+        let normalised = proj_normalize_for_visualization(ctx, ptr);
+        // deallocate stale PJ pointer
+        proj_destroy(ptr);
+        normalised
+    };
+    Ok(Proj {
+        c_proj: normalised,
+        ctx,
+        area: Some(proj_area),
+    })
 }
 
 /// Read-only utility methods for providing information about the current PROJ instance
