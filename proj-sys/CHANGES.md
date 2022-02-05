@@ -1,3 +1,10 @@
+# Unreleased
+
+# 0.22.0
+
+- Only require tiff for source builds when network feature is enabled
+    - <https://github.com/georust/proj/pull/95/commits/b0f447446d07cadc2da86d6be3d37eb35c3620d6>
+
 # 0.21.0
 
 - BREAKING: Remove `bundled_proj_tiff` feature and assume system libproj has

@@ -1,7 +1,19 @@
 # Changes
 
 ## Unreleased
+
+## 0.25.0
+
 - Fix memory leak in network grid functionality
+  - <https://github.com/georust/proj/pull/94>
+- Mark mutable methods with `&mut`
+  - <https://github.com/georust/proj/pull/102>
+- Update `proj::Proj` constructors to return `Result` instead of `Option`
+  - <https://github.com/georust/proj/pull/98>
+- Add `TryFrom` impls for `proj::Proj`
+  - <https://github.com/georust/proj/pull/100>
+- Refactor `proj_create*` calls
+  - <https://github.com/georust/proj/pull/103>
 
 ## 0.24.0
 - update to proj-sys 0.21.0
