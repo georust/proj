@@ -1,0 +1,20 @@
+---
+source: src/geo_types.rs
+assertion_line: 307
+expression: output
+
+---
+Triangle(
+    Coordinate {
+        x: 0.23556229698665834,
+        y: 48.00830018706168,
+    },
+    Coordinate {
+        x: 2.3016357481228447,
+        y: 48.871518021466834,
+    },
+    Coordinate {
+        x: 3.543777524968399,
+        y: 47.81269343169002,
+    },
+)

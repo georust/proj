@@ -1,0 +1,16 @@
+---
+source: src/geo_types.rs
+assertion_line: 288
+expression: output
+
+---
+Rect {
+    min: Coordinate {
+        x: -9.859999997843591,
+        y: 41.14999998828262,
+    },
+    max: Coordinate {
+        x: 10.379999964442588,
+        y: 51.55999998529196,
+    },
+}

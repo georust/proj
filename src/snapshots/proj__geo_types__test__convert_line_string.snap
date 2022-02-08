@@ -1,0 +1,22 @@
+---
+source: src/geo_types.rs
+assertion_line: 289
+expression: output
+
+---
+LineString(
+    [
+        Coordinate {
+            x: 1.9461678869815624,
+            y: 45.34098542962509,
+        },
+        Coordinate {
+            x: 3.3178711489185697,
+            y: 46.11575845137438,
+        },
+        Coordinate {
+            x: 4.361572299428162,
+            y: 45.56529578393842,
+        },
+    ],
+)
