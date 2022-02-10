@@ -3,14 +3,18 @@ use libc::{c_char, c_double};
 use num_traits::Float;
 use proj_sys::{
     proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_cleanup, proj_context_create,
-    proj_context_destroy, proj_context_get_url_endpoint, proj_context_is_network_enabled,
-    proj_context_set_search_paths, proj_context_set_url_endpoint, proj_create,
-    proj_create_crs_to_crs, proj_destroy, proj_errno_string, proj_get_area_of_use,
+    proj_context_destroy, proj_context_errno, proj_context_get_url_endpoint,
+    proj_context_is_network_enabled, proj_context_set_search_paths, proj_context_set_url_endpoint,
+    proj_create, proj_create_crs_to_crs, proj_destroy, proj_errno_string, proj_get_area_of_use,
     proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization, proj_pj_info,
     proj_trans, proj_trans_array, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD,
-    PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LP, PJ_XY,
+    PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_XYZT,
 };
-use std::fmt::{self, Debug};
+use std::{
+    ffi,
+    fmt::{self, Debug},
+    str,
+};
 
 #[cfg(feature = "network")]
 use proj_sys::proj_context_set_enable_network;
@@ -21,7 +25,6 @@ use std::ffi::CStr;
 use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::path::Path;
-use std::str;
 use thiserror::Error;
 
 pub trait CoordinateType: Float + Copy + PartialOrd + Debug {}
@@ -96,6 +99,16 @@ pub enum ProjError {
     DownloadError(String, String, u8),
 }
 
+#[derive(Error, Debug)]
+pub enum ProjCreateError {
+    #[error("A nul byte was found in the PROJ string definition or CRS argument: {0}")]
+    ArgumentNulError(ffi::NulError),
+    #[error("The underlying PROJ call failed: {0}")]
+    ProjError(String),
+    #[error("A UTF8 error occurred when constructing a PROJ error message")]
+    ProjErrorMessageUtf8Error(std::str::Utf8Error),
+}
+
 /// The bounding box of an area of use
 ///
 /// In the case of an area of use crossing the antimeridian (longitude +/- 180 degrees),
@@ -124,14 +137,14 @@ impl Area {
 }
 
 /// Easily get a String from the external library
-pub(crate) unsafe fn _string(raw_ptr: *const c_char) -> Result<String, ProjError> {
+pub(crate) unsafe fn _string(raw_ptr: *const c_char) -> Result<String, str::Utf8Error> {
     assert!(!raw_ptr.is_null());
     let c_str = CStr::from_ptr(raw_ptr);
     Ok(str::from_utf8(c_str.to_bytes())?.to_string())
 }
 
 /// Look up an error message using the error code
-fn error_message(code: c_int) -> Result<String, ProjError> {
+fn error_message(code: c_int) -> Result<String, str::Utf8Error> {
     unsafe {
         let rv = proj_errno_string(code);
         _string(rv)
@@ -149,13 +162,17 @@ fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
 }
 
 /// called by Proj::new and ProjBuilder::transform_new_crs
-fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Option<Proj> {
-    let c_definition = CString::new(definition).ok()?;
+fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Result<Proj, ProjCreateError> {
+    let c_definition =
+        CString::new(definition).map_err(|e| ProjCreateError::ArgumentNulError(e))?;
     let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
     if new_c_proj.is_null() {
-        None
+        let error_code = unsafe { proj_context_errno(ctx) };
+        let message =
+            error_message(error_code).map_err(|e| ProjCreateError::ProjErrorMessageUtf8Error(e))?;
+        Err(ProjCreateError::ProjError(message))
     } else {
-        Some(Proj {
+        Ok(Proj {
             c_proj: new_c_proj,
             ctx,
             area: None,
@@ -164,15 +181,23 @@ fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Option<Proj> {
 }
 
 /// Called by new_known_crs and proj_known_crs
-fn transform_epsg(ctx: *mut PJ_CONTEXT, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
-    let from_c = CString::new(from).ok()?;
-    let to_c = CString::new(to).ok()?;
+fn transform_epsg(
+    ctx: *mut PJ_CONTEXT,
+    from: &str,
+    to: &str,
+    area: Option<Area>,
+) -> Result<Proj, ProjCreateError> {
+    let from_c = CString::new(from).map_err(|e| ProjCreateError::ArgumentNulError(e))?;
+    let to_c = CString::new(to).map_err(|e| ProjCreateError::ArgumentNulError(e))?;
     let proj_area = unsafe { proj_area_create() };
     area_set_bbox(proj_area, area);
     let new_c_proj =
         unsafe { proj_create_crs_to_crs(ctx, from_c.as_ptr(), to_c.as_ptr(), proj_area) };
     if new_c_proj.is_null() {
-        None
+        let error_code = unsafe { proj_context_errno(ctx) };
+        let message =
+            error_message(error_code).map_err(|e| ProjCreateError::ProjErrorMessageUtf8Error(e))?;
+        Err(ProjCreateError::ProjError(message))
     } else {
         // Normalise input and output order to Lon, Lat / Easting Northing by inserting
         // An axis swap operation if necessary
@@ -182,7 +207,7 @@ fn transform_epsg(ctx: *mut PJ_CONTEXT, from: &str, to: &str, area: Option<Area>
             proj_destroy(new_c_proj);
             normalised
         };
-        Some(Proj {
+        Ok(Proj {
             c_proj: normalised,
             ctx,
             area: Some(proj_area),
@@ -226,7 +251,7 @@ pub trait Info {
     /// # Safety
     /// This method contains unsafe code.
     fn get_url_endpoint(&self) -> Result<String, ProjError> {
-        unsafe { _string(proj_context_get_url_endpoint(self.ctx())) }
+        Ok(unsafe { _string(proj_context_get_url_endpoint(self.ctx()))? })
     }
 }
 
@@ -244,7 +269,7 @@ impl ProjBuilder {
     /// This method contains unsafe code.
     #[cfg_attr(docsrs, doc(cfg(feature = "network")))]
     #[cfg(feature = "network")]
-    pub fn enable_network(&self, enable: bool) -> Result<u8, ProjError> {
+    pub fn enable_network(&mut self, enable: bool) -> Result<u8, ProjError> {
         if enable {
             let _ = match crate::network::set_network_callbacks(self.ctx()) {
                 1 => Ok(1),
@@ -272,7 +297,7 @@ impl ProjBuilder {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn set_search_paths<P: AsRef<Path>>(&self, newpath: P) -> Result<(), ProjError> {
+    pub fn set_search_paths<P: AsRef<Path>>(&mut self, newpath: P) -> Result<(), ProjError> {
         let existing = self.info()?.searchpath;
         let pathsep = if cfg!(windows) { ";" } else { ":" };
         let mut individual: Vec<&str> = existing.split(pathsep).collect();
@@ -301,7 +326,7 @@ impl ProjBuilder {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn grid_cache_enable(&self, enable: bool) {
+    pub fn grid_cache_enable(&mut self, enable: bool) {
         let enable = if enable { 1 } else { 0 };
         let _ = unsafe { proj_grid_cache_set_enable(self.ctx(), enable) };
     }
@@ -310,7 +335,7 @@ impl ProjBuilder {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn set_url_endpoint(&self, endpoint: &str) -> Result<(), ProjError> {
+    pub fn set_url_endpoint(&mut self, endpoint: &str) -> Result<(), ProjError> {
         let s = CString::new(endpoint)?;
         unsafe { proj_context_set_url_endpoint(self.ctx(), s.as_ptr()) };
         Ok(())
@@ -365,7 +390,7 @@ impl ProjBuilder {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn proj(mut self, definition: &str) -> Option<Proj> {
+    pub fn proj(mut self, definition: &str) -> Result<Proj, ProjCreateError> {
         let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
         transform_string(ctx, definition)
     }
@@ -408,7 +433,12 @@ impl ProjBuilder {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn proj_known_crs(mut self, from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
+    pub fn proj_known_crs(
+        mut self,
+        from: &str,
+        to: &str,
+        area: Option<Area>,
+    ) -> Result<Proj, ProjCreateError> {
         let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
         transform_epsg(ctx, from, to, area)
     }
@@ -443,7 +473,7 @@ impl Proj {
     // is signalled by the choice of enum used as input to the PJ_COORD union
     // PJ_LP signals projection of geodetic coordinates, with output being PJ_XY
     // and vice versa, or using PJ_XY for conversion operations
-    pub fn new(definition: &str) -> Option<Proj> {
+    pub fn new(definition: &str) -> Result<Proj, ProjCreateError> {
         let ctx = unsafe { proj_context_create() };
         transform_string(ctx, definition)
     }
@@ -486,7 +516,11 @@ impl Proj {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn new_known_crs(from: &str, to: &str, area: Option<Area>) -> Option<Proj> {
+    pub fn new_known_crs(
+        from: &str,
+        to: &str,
+        area: Option<Area>,
+    ) -> Result<Proj, ProjCreateError> {
         let ctx = unsafe { proj_context_create() };
         transform_epsg(ctx, from, to, area)
     }
@@ -639,11 +673,17 @@ impl Proj {
         // This signals that we wish to project geodetic coordinates.
         // For conversion (i.e. between projected coordinates) you should use
         // PJ_XY {x: , y: }
-        let coords = PJ_LP { lam: c_x, phi: c_y };
+        // We also initialize z and t in case libproj tries to read them.
+        let coords = PJ_LPZT {
+            lam: c_x,
+            phi: c_y,
+            z: 0.0,
+            t: f64::INFINITY,
+        };
         unsafe {
             proj_errno_reset(self.c_proj);
             // PJ_DIRECTION_* determines a forward or inverse projection
-            let trans = proj_trans(self.c_proj, inv, PJ_COORD { lp: coords });
+            let trans = proj_trans(self.c_proj, inv, PJ_COORD { lpzt: coords });
             // output of coordinates uses the PJ_XY struct
             new_x = trans.xy.x;
             new_y = trans.xy.y;
@@ -704,10 +744,19 @@ impl Proj {
         let new_x;
         let new_y;
         let err;
-        let coords = PJ_XY { x: c_x, y: c_y };
+
+        // This doesn't seem strictly correct, but if we set PJ_XY or PJ_LP here, the
+        // other two values remain uninitialized and we can't be sure that libproj
+        // doesn't try to read them. proj_trans_generic does the same thing.
+        let xyzt = PJ_XYZT {
+            x: c_x,
+            y: c_y,
+            z: 0.0,
+            t: f64::INFINITY,
+        };
         unsafe {
             proj_errno_reset(self.c_proj);
-            let trans = proj_trans(self.c_proj, PJ_DIRECTION_PJ_FWD, PJ_COORD { xy: coords });
+            let trans = proj_trans(self.c_proj, PJ_DIRECTION_PJ_FWD, PJ_COORD { xyzt });
             new_x = trans.xy.x;
             new_y = trans.xy.y;
             err = proj_errno(self.c_proj);
@@ -826,7 +875,12 @@ impl Proj {
                 let c_x: c_double = point.x().to_f64().ok_or(ProjError::FloatConversion)?;
                 let c_y: c_double = point.y().to_f64().ok_or(ProjError::FloatConversion)?;
                 Ok(PJ_COORD {
-                    xy: PJ_XY { x: c_x, y: c_y },
+                    xyzt: PJ_XYZT {
+                        x: c_x,
+                        y: c_y,
+                        z: 0.0,
+                        t: f64::INFINITY,
+                    },
                 })
             })
             .collect::<Result<Vec<_>, ProjError>>()?;
@@ -947,8 +1001,8 @@ mod test {
         // ETRS89
         let to = "EPSG:4258";
 
-        let online_builder = ProjBuilder::new();
-        let offline_builder = ProjBuilder::new();
+        let mut online_builder = ProjBuilder::new();
+        let mut offline_builder = ProjBuilder::new();
 
         assert_eq!(online_builder.network_enabled(), false);
         assert_eq!(offline_builder.network_enabled(), false);
@@ -1008,7 +1062,7 @@ mod test {
     #[should_panic]
     // This failure is a bug in libproj
     fn test_searchpath() {
-        let tf = ProjBuilder::new();
+        let mut tf = ProjBuilder::new();
         tf.set_search_paths(&"/foo").unwrap();
         let ipath = tf.info().unwrap().searchpath;
         let pathsep = if cfg!(windows) { ";" } else { ":" };
@@ -1019,7 +1073,7 @@ mod test {
     fn test_set_endpoint() {
         let from = "EPSG:4326";
         let to = "EPSG:4326+3855";
-        let tf = ProjBuilder::new();
+        let mut tf = ProjBuilder::new();
         let ep = tf.get_url_endpoint().unwrap();
         assert_eq!(&ep, "https://cdn.proj.org");
         tf.set_url_endpoint("https://github.com/georust").unwrap();
@@ -1039,6 +1093,33 @@ mod test {
         assert_relative_eq!(t.x(), 1450880.2910605022);
         assert_relative_eq!(t.y(), 1141263.0111604782);
     }
+
+    #[test]
+    fn test_from_crs_nul_error() {
+        match Proj::new_known_crs("\0", "EPSG:4326", None) {
+            Err(ProjCreateError::ArgumentNulError(_)) => (),
+            _ => unreachable!(),
+        }
+
+        match Proj::new_known_crs("EPSG:4326", "\0", None) {
+            Err(ProjCreateError::ArgumentNulError(_)) => (),
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn test_from_crs_error() {
+        match Proj::new_known_crs("EPSG:4326", "🦀", None) {
+            Err(ProjCreateError::ProjError(..)) => (),
+            _ => unreachable!(),
+        }
+
+        match Proj::new_known_crs("🦀", "EPSG:4326", None) {
+            Err(ProjCreateError::ProjError(..)) => (),
+            _ => unreachable!(),
+        }
+    }
+
     #[test]
     // Carry out a projection from geodetic coordinates
     fn test_projection() {
@@ -1091,11 +1172,11 @@ mod test {
     fn test_conversion() {
         // Generated by PROJ by specifying "from" and "to" EPSG codes and calling def()
         let projstring = "
-            proj=pipeline step proj=unitconvert xy_in=us-ft 
-            xy_out=m step inv proj=lcc lat_0=32.1666666666667 
-            lon_0=-116.25 lat_1=33.8833333333333 lat_2=32.7833333333333 
-            x_0=2000000.0001016 y_0=500000.0001016 ellps=GRS80 step proj=lcc lat_0=32.1666666666667 
-            lon_0=-116.25 lat_1=33.8833333333333 lat_2=32.7833333333333 x_0=2000000 y_0=500000 
+            proj=pipeline step proj=unitconvert xy_in=us-ft
+            xy_out=m step inv proj=lcc lat_0=32.1666666666667
+            lon_0=-116.25 lat_1=33.8833333333333 lat_2=32.7833333333333
+            x_0=2000000.0001016 y_0=500000.0001016 ellps=GRS80 step proj=lcc lat_0=32.1666666666667
+            lon_0=-116.25 lat_1=33.8833333333333 lat_2=32.7833333333333 x_0=2000000 y_0=500000
             ellps=GRS80
             ";
         let nad83_m = Proj::new(projstring).unwrap();
@@ -1107,11 +1188,25 @@ mod test {
         assert_relative_eq!(t.x(), 1450880.2910605022);
         assert_relative_eq!(t.y(), 1141263.0111604782);
     }
+
     #[test]
     // Test that instantiation fails wth bad proj string input
     fn test_init_error() {
-        assert!(Proj::new("🦀").is_none());
+        match Proj::new("🦀") {
+            Err(ProjCreateError::ProjError(_)) => (),
+            _ => unreachable!(),
+        }
     }
+
+    #[test]
+    // Test that instantiation fails wth bad proj string input
+    fn test_init_error_nul() {
+        match Proj::new("\0") {
+            Err(ProjCreateError::ArgumentNulError(_)) => (),
+            _ => unreachable!(),
+        }
+    }
+
     #[test]
     fn test_conversion_error() {
         // because step 1 isn't an inverse conversion, it's expecting lon lat input
