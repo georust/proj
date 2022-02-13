@@ -1,6 +1,9 @@
 # Changes
 
-## Unreleased
+## 0.25.1
+
+- Fix intermittently wrong results due to memory initialization error.
+  - <https://github.com/georust/proj/pull/104>
 
 ## 0.25.0
 
