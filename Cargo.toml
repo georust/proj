@@ -30,7 +30,8 @@ pkg_config = [ "proj-sys/pkg_config" ]
 network = ["reqwest", "proj-sys/network"]
 
 [dev-dependencies]
-approx = "0.3"
+approx = "0.4"
+geo-types = { version = "0.7", features = ["approx"] }
 
 [package.metadata.docs.rs]
 features = [ "proj-sys/nobuild", "network", "geo-types" ]
