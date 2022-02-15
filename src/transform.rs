@@ -8,68 +8,73 @@ pub trait Transform<T> {
 
     /// Transform a Geometry by mutating it in place.
     ///
-    /// # Examples
-    ///
-    /// Transform a geometry using a PROJ string definition:
-    ///
-    /// ```
-    /// use geo_types;
-    /// use proj::{Proj, Transform};
-    /// # use approx::assert_relative_eq;
-    ///
-    /// let mut point = geo_types::point!(x: -36.508f32, y: -54.2815f32);
-    /// let proj = Proj::new("+proj=axisswap +order=2,1,3,4").expect("invalid proj string");
-    /// point.transform(&proj);
-    ///
-    /// assert_relative_eq!(
-    ///     point,
-    ///     geo_types::point!(x: -54.2815f32, y: -36.508f32)
-    /// );
-    /// ```
+    #[cfg_attr(feature = "geo-types", doc = r##"
+# Examples
+
+Transform a geometry using a PROJ string definition:
+
+```
+use geo_types;
+use proj::{Proj, Transform};
+ # use approx::assert_relative_eq;
+
+let mut point = geo_types::point!(x: -36.508f32, y: -54.2815f32);
+let proj = Proj::new("+proj=axisswap +order=2,1,3,4").expect("invalid proj string");
+ point.transform(&proj);
+
+assert_relative_eq!(
+    point,
+    geo_types::point!(x: -54.2815f32, y: -36.508f32)
+);
+```
+"##)]
     fn transform(&mut self, proj: &Proj) -> Result<(), ProjError>;
 
     /// Immutable flavor of [`Transform::transform`], which allocates a new geometry.
     ///
-    /// # Examples
-    ///
-    /// Transform a geometry using a PROJ string definition:
-    ///
-    /// ```
-    /// use geo_types;
-    /// use proj::{Proj, Transform};
-    /// # use approx::assert_relative_eq;
-    ///
-    /// let point = geo_types::point!(x: -36.508f32, y: -54.2815f32);
-    /// let proj = Proj::new("+proj=axisswap +order=2,1,3,4").expect("invalid proj string");
-    ///
-    /// assert_relative_eq!(
-    ///     point.transformed(&proj).unwrap(),
-    ///     geo_types::point!(x: -54.2815f32, y: -36.508f32)
-    /// );
-    ///
-    /// // original `point` is untouched
-    /// assert_relative_eq!(
-    ///     point,
-    ///     geo_types::point!(x: -36.508f32, y: -54.2815f32)
-    /// );
-    /// ```
+    #[cfg_attr(feature = "geo-types", doc = r##"
+# Examples
+
+Transform a geometry using a PROJ string definition:
+
+```
+use geo_types;
+use proj::{Proj, Transform};
+# use approx::assert_relative_eq;
+
+let point = geo_types::point!(x: -36.508f32, y: -54.2815f32);
+let proj = Proj::new("+proj=axisswap +order=2,1,3,4").expect("invalid proj string");
+
+assert_relative_eq!(
+    point.transformed(&proj).unwrap(),
+    geo_types::point!(x: -54.2815f32, y: -36.508f32)
+);
+
+// original `point` is untouched
+assert_relative_eq!(
+    point,
+    geo_types::point!(x: -36.508f32, y: -54.2815f32)
+);
+```
+"##)]
     fn transformed(&self, proj: &Proj) -> Result<Self::Output, ProjError>;
 
     /// Transform a geometry from one CRS to another CRS by modifying it in place.
     ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use approx::assert_relative_eq;
-    /// use proj::Transform;
-    /// use geo_types::{point, Point};
-    ///
-    /// let mut point: Point<f32> = point!(x: -36.508f32, y: -54.2815f32);
-    /// point.transform_crs_to_crs("EPSG:4326", "EPSG:3857").unwrap();
-    ///
-    /// assert_relative_eq!(point, point!(x: -4064052.0f32, y: -7223650.5f32));
-    /// ```
-    ///
+    #[cfg_attr(feature = "geo-types", doc = r##"
+# Examples
+
+```
+# use approx::assert_relative_eq;
+use proj::Transform;
+use geo_types::{point, Point};
+
+let mut point: Point<f32> = point!(x: -36.508f32, y: -54.2815f32);
+point.transform_crs_to_crs("EPSG:4326", "EPSG:3857").unwrap();
+
+assert_relative_eq!(point, point!(x: -4064052.0f32, y: -7223650.5f32));
+```
+"##)]
     fn transform_crs_to_crs(
         &mut self,
         source_crs: &str,
@@ -81,21 +86,22 @@ pub trait Transform<T> {
 
     /// Immutable flavor of [`Transform::transform_crs_to_crs`], which allocates a new geometry.
     ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use approx::assert_relative_eq;
-    /// use proj::Transform;
-    /// use geo_types::{point, Point};
-    ///
-    /// let mut point: Point<f32> = point!(x: -36.508f32, y: -54.2815f32);
-    ///
-    /// assert_relative_eq!(
-    ///     point.transformed_crs_to_crs("EPSG:4326", "EPSG:3857").unwrap(),
-    ///     point!(x: -4064052.0f32, y: -7223650.5f32)
-    /// );
-    /// ```
-    ///
+    #[cfg_attr(feature = "geo-types", doc = r##"
+# Examples
+
+```
+# use approx::assert_relative_eq;
+use proj::Transform;
+use geo_types::{point, Point};
+
+let mut point: Point<f32> = point!(x: -36.508f32, y: -54.2815f32);
+
+assert_relative_eq!(
+    point.transformed_crs_to_crs("EPSG:4326", "EPSG:3857").unwrap(),
+    point!(x: -4064052.0f32, y: -7223650.5f32)
+);
+```
+"##)]
     fn transformed_crs_to_crs(
         &self,
         source_crs: &str,
