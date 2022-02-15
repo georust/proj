@@ -11,8 +11,7 @@ use proj_sys::{
     PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_XYZT,
 };
 use std::{
-    convert,
-    ffi,
+    convert, ffi,
     fmt::{self, Debug},
     str,
 };
