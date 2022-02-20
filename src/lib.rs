@@ -211,6 +211,8 @@ mod geo_types;
 extern crate approx;
 
 mod proj;
+mod transform;
+pub use transform::{Transform, TransformError};
 
 pub use crate::proj::Area;
 pub use crate::proj::Coord;

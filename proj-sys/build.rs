@@ -99,7 +99,7 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
     config.define("BUILD_PROJSYNC", "OFF");
     config.define("ENABLE_CURL", "OFF");
 
-    let enable_tiff = cfg!(feature="network");
+    let enable_tiff = cfg!(feature = "network");
     if enable_tiff {
         eprintln!("enabling tiff support");
         config.define("ENABLE_TIFF", "ON");
