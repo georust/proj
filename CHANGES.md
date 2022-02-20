@@ -1,5 +1,10 @@
 # Changes
 
+## 0.25.2
+
+- Introduce `Transform` trait, add implementations for `geo-types`
+  - <https://github.com/georust/proj/pull/109>
+
 ## 0.25.1
 
 - Fix intermittently wrong results due to memory initialization error.
