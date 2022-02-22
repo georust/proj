@@ -1,6 +1,5 @@
 use libc::c_int;
 use libc::{c_char, c_double};
-use num_traits::Float;
 use proj_sys::{
     proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_cleanup, proj_context_create,
     proj_context_destroy, proj_context_errno, proj_context_get_url_endpoint,
@@ -25,10 +24,11 @@ use std::ffi::CStr;
 use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::path::Path;
+use geo_types::CoordFloat;
 use thiserror::Error;
 
-pub trait CoordinateType: Float + Copy + PartialOrd + Debug {}
-impl<T: Float + Copy + PartialOrd + Debug> CoordinateType for T {}
+pub trait CoordinateType: CoordFloat {}
+impl<T: CoordFloat> CoordinateType for T {}
 
 /// An error number returned from a PROJ call.
 pub(crate) struct Errno(pub libc::c_int);
