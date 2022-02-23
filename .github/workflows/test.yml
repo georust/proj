@@ -1,4 +1,11 @@
-on: push
+on:
+  push:
+    branches:
+      - main
+      - staging
+      - trying
+  pull_request:
+
 name: proj ci
 jobs:
   # The `ci-result` job doesn't actually test anything - it just aggregates the
@@ -31,7 +38,7 @@ jobs:
       fail-fast: false
       matrix:
         container_image: ["georust/proj-ci:rust-1.52", "georust/proj-ci:rust-1.53"]
-        features: 
+        features:
           - ""
           - "--features network"
           - "--features bundled_proj"
