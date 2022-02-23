@@ -24,8 +24,17 @@ use std::ffi::CStr;
 use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::path::Path;
-use geo_types::CoordFloat;
 use thiserror::Error;
+
+#[cfg(feature = "geo-types")]
+use geo_types::CoordFloat;
+#[cfg(not(feature = "geo-types"))]
+use num_traits::{Num, Float, NumCast};
+#[cfg(not(feature = "geo-types"))]
+pub trait CoordFloat: Float + Num + Copy + NumCast + PartialOrd + PartialOrd + Debug + Default {}
+#[cfg(not(feature = "geo-types"))]
+impl<T: Float + Num + Copy + NumCast + PartialOrd + PartialOrd + Debug + Default> CoordFloat for T {}
+
 
 pub trait CoordinateType: CoordFloat {}
 impl<T: CoordFloat> CoordinateType for T {}
