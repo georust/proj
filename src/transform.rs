@@ -8,7 +8,9 @@ pub trait Transform<T> {
 
     /// Transform a Geometry by mutating it in place.
     ///
-    #[cfg_attr(feature = "geo-types", doc = r##"
+    #[cfg_attr(
+        feature = "geo-types",
+        doc = r##"
 # Examples
 
 Transform a geometry using a PROJ string definition:
@@ -27,12 +29,15 @@ assert_relative_eq!(
     geo_types::point!(x: -54.2815f32, y: -36.508f32)
 );
 ```
-"##)]
+"##
+    )]
     fn transform(&mut self, proj: &Proj) -> Result<(), ProjError>;
 
     /// Immutable flavor of [`Transform::transform`], which allocates a new geometry.
     ///
-    #[cfg_attr(feature = "geo-types", doc = r##"
+    #[cfg_attr(
+        feature = "geo-types",
+        doc = r##"
 # Examples
 
 Transform a geometry using a PROJ string definition:
@@ -56,12 +61,15 @@ assert_relative_eq!(
     geo_types::point!(x: -36.508f32, y: -54.2815f32)
 );
 ```
-"##)]
+"##
+    )]
     fn transformed(&self, proj: &Proj) -> Result<Self::Output, ProjError>;
 
     /// Transform a geometry from one CRS to another CRS by modifying it in place.
     ///
-    #[cfg_attr(feature = "geo-types", doc = r##"
+    #[cfg_attr(
+        feature = "geo-types",
+        doc = r##"
 # Examples
 
 ```
@@ -74,7 +82,8 @@ point.transform_crs_to_crs("EPSG:4326", "EPSG:3857").unwrap();
 
 assert_relative_eq!(point, point!(x: -4064052.0f32, y: -7223650.5f32));
 ```
-"##)]
+"##
+    )]
     fn transform_crs_to_crs(
         &mut self,
         source_crs: &str,
@@ -86,7 +95,9 @@ assert_relative_eq!(point, point!(x: -4064052.0f32, y: -7223650.5f32));
 
     /// Immutable flavor of [`Transform::transform_crs_to_crs`], which allocates a new geometry.
     ///
-    #[cfg_attr(feature = "geo-types", doc = r##"
+    #[cfg_attr(
+        feature = "geo-types",
+        doc = r##"
 # Examples
 
 ```
@@ -101,7 +112,8 @@ assert_relative_eq!(
     point!(x: -4064052.0f32, y: -7223650.5f32)
 );
 ```
-"##)]
+"##
+    )]
     fn transformed_crs_to_crs(
         &self,
         source_crs: &str,
