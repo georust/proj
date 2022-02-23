@@ -502,7 +502,7 @@ impl Proj {
     ///
     /// # Examples
     ///
-    /// Construcing a `Proj` from a PROJ string definition:
+    /// Constructing a `Proj` from a PROJ string definition:
     ///
     /// ```
     /// let transformer = proj::Proj::new(

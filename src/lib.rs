@@ -143,12 +143,12 @@
 //! # use approx::assert_relative_eq;
 //! use proj::{Proj, Coord};
 //!
-//! struct MyPointOfIntereset {
+//! struct MyPointOfInterest {
 //!     lat: f64,
 //!     lon: f64,
 //! }
 //!
-//! impl Coord<f64> for MyPointOfIntereset {
+//! impl Coord<f64> for MyPointOfInterest {
 //!     fn x(&self) -> f64 {
 //!         self.lon
 //!     }
@@ -160,7 +160,7 @@
 //!     }
 //! }
 //!
-//! let donut_shop = MyPointOfIntereset { lat: 34.095620, lon: -118.283555 };
+//! let donut_shop = MyPointOfInterest { lat: 34.095620, lon: -118.283555 };
 //!
 //! let from = "EPSG:4326";
 //! let to = "EPSG:3309";
