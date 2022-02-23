@@ -186,7 +186,7 @@ fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
 /// called by Proj::new and ProjBuilder::transform_new_crs
 fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Result<Proj, ProjCreateError> {
     let c_definition =
-        CString::new(definition).map_err(|e| ProjCreateError::ArgumentNulError(e))?;
+        CString::new(definition).map_err(ProjCreateError::ArgumentNulError)?;
     let ptr = result_from_create(ctx, unsafe { proj_create(ctx, c_definition.as_ptr()) })
         .map_err(|e| ProjCreateError::ProjError(e.message(ctx)))?;
     Ok(Proj {
@@ -203,8 +203,8 @@ fn transform_epsg(
     to: &str,
     area: Option<Area>,
 ) -> Result<Proj, ProjCreateError> {
-    let from_c = CString::new(from).map_err(|e| ProjCreateError::ArgumentNulError(e))?;
-    let to_c = CString::new(to).map_err(|e| ProjCreateError::ArgumentNulError(e))?;
+    let from_c = CString::new(from).map_err(ProjCreateError::ArgumentNulError)?;
+    let to_c = CString::new(to).map_err(ProjCreateError::ArgumentNulError)?;
     let proj_area = unsafe { proj_area_create() };
     area_set_bbox(proj_area, area);
     let ptr = result_from_create(ctx, unsafe {
@@ -1104,22 +1104,22 @@ mod test {
         let to = "EPSG:4258";
 
         let mut online_builder = ProjBuilder::new();
-        let mut offline_builder = ProjBuilder::new();
+        let offline_builder = ProjBuilder::new();
 
-        assert_eq!(online_builder.network_enabled(), false);
-        assert_eq!(offline_builder.network_enabled(), false);
+        assert!(!online_builder.network_enabled());
+        assert!(!offline_builder.network_enabled());
 
         online_builder.enable_network(true).unwrap();
-        assert_eq!(online_builder.network_enabled(), true);
-        assert_eq!(offline_builder.network_enabled(), false);
+        assert!(online_builder.network_enabled());
+        assert!(!offline_builder.network_enabled());
 
         // Disable caching to ensure we're accessing the network.
         // Cache is stored in proj's [user writeable directory](https://proj.org/resource_files.html#user-writable-directory)
         online_builder.grid_cache_enable(false);
 
         // I expected the following call to trigger a download, but it doesn't!
-        let online_proj = online_builder.proj_known_crs(&from, &to, None).unwrap();
-        let offline_proj = offline_builder.proj_known_crs(&from, &to, None).unwrap();
+        let online_proj = online_builder.proj_known_crs(from, to, None).unwrap();
+        let offline_proj = offline_builder.proj_known_crs(from, to, None).unwrap();
 
         // download begins here:
         // File to download: uk_os_OSTN15_NTv2_OSGBtoETRS.tif
@@ -1179,7 +1179,7 @@ mod test {
         let ep = tf.get_url_endpoint().unwrap();
         assert_eq!(&ep, "https://cdn.proj.org");
         tf.set_url_endpoint("https://github.com/georust").unwrap();
-        let proj = tf.proj_known_crs(&from, &to, None).unwrap();
+        let proj = tf.proj_known_crs(from, to, None).unwrap();
         let ep = proj.get_url_endpoint().unwrap();
         // Has the new endpoint propagated to the Proj instance?
         assert_eq!(&ep, "https://github.com/georust");
@@ -1188,7 +1188,7 @@ mod test {
     fn test_from_crs() {
         let from = "EPSG:2230";
         let to = "EPSG:26946";
-        let proj = Proj::new_known_crs(&from, &to, None).unwrap();
+        let proj = Proj::new_known_crs(from, to, None).unwrap();
         let t = proj
             .convert(MyPoint::new(4760096.421921, 3744293.729449))
             .unwrap();
@@ -1351,7 +1351,7 @@ mod test {
     fn test_array_convert() {
         let from = "EPSG:2230";
         let to = "EPSG:26946";
-        let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+        let ft_to_m = Proj::new_known_crs(from, to, None).unwrap();
         let mut v = vec![
             MyPoint::new(4760096.421921, 3744293.729449),
             MyPoint::new(4760197.421921, 3744394.729449),
@@ -1367,7 +1367,7 @@ mod test {
     fn test_input_order() {
         let from = "EPSG:4326";
         let to = "EPSG:2230";
-        let to_feet = Proj::new_known_crs(&from, &to, None).unwrap();
+        let to_feet = Proj::new_known_crs(from, to, None).unwrap();
         // 👽
         let usa_m = MyPoint::new(-115.797615, 37.2647978);
         let usa_ft = to_feet.convert(usa_m).unwrap();
