@@ -69,7 +69,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-// returns the path of "inlude" for the built proj
+// returns the path of "include" for the built proj
 fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
     eprintln!("building libproj from source");
     if let Ok(val) = &env::var("_PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC") {

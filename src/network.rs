@@ -147,6 +147,7 @@ pub(crate) unsafe extern "C" fn network_open(
 }
 
 /// Where the ACTUAL work happens, taking advantage of Rust error-handling etc
+#[allow(clippy::too_many_arguments)]
 unsafe fn _network_open(
     _: *mut PJ_CONTEXT,
     url: *const c_char,
@@ -301,6 +302,7 @@ pub(crate) unsafe extern "C" fn network_read_range(
 }
 
 /// Where the ACTUAL work happens
+#[allow(clippy::too_many_arguments)]
 fn _network_read_range(
     _: *mut PJ_CONTEXT,
     handle: *mut PROJ_NETWORK_HANDLE,
