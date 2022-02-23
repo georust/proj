@@ -12,7 +12,7 @@ expect docs.rs to do.
 
 ## To update the prebuilt bindings
 
-Currently the process looks like:
+Currently, the process looks like:
 
 ```
 cd proj-sys
@@ -27,4 +27,3 @@ copy that file over the `src/bindings_docs-rs.rs`, but retain the header:
 /* THESE ARE NOT LIVE BINDINGS */
 /* THEY EXIST FOR USE BY DOCS-RS ONLY */
 ```
-
