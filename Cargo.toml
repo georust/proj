@@ -14,11 +14,11 @@ edition = "2018"
 
 [dependencies]
 proj-sys = { version = "0.22.0", path = "proj-sys" }
-geo-types = { version = "0.7", optional = true }
-libc = "0.2.62"
-num-traits = "0.2.8"
-thiserror = "1.0.4"
-reqwest = { version = "0.11.0", optional = true, default-features = false, features = ["blocking", "rustls-tls"] }
+geo-types = { version = "0.7.3", optional = true }
+libc = "0.2.119"
+num-traits = "0.2.14"
+thiserror = "1.0.30"
+reqwest = { version = "0.11.9", optional = true, default-features = false, features = ["blocking", "rustls-tls"] }
 
 [workspace]
 members = ["proj-sys"]
@@ -30,8 +30,9 @@ pkg_config = [ "proj-sys/pkg_config" ]
 network = ["reqwest", "proj-sys/network"]
 
 [dev-dependencies]
+# approx version must match the one used in geo-types
 approx = "0.4"
-geo-types = { version = "0.7", features = ["approx"] }
+geo-types = { version = "0.7.3", features = ["approx"] }
 
 [package.metadata.docs.rs]
 features = [ "proj-sys/nobuild", "network", "geo-types" ]
