@@ -13,11 +13,11 @@ links = "proj"
 [dependencies]
 
 [build-dependencies]
-bindgen = "0.59.1"
-pkg-config = "0.3.19"
-cmake = "0.1"
-flate2 = "1.0.14"
-tar = "0.4.26"
+bindgen = "0.59.2"
+pkg-config = "0.3.24"
+cmake = "0.1.48"
+flate2 = "1.0.22"
+tar = "0.4.38"
 
 [features]
 nobuild = []
