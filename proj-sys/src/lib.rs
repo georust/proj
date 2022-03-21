@@ -2,7 +2,7 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![doc(html_logo_url = "https://raw.githubusercontent.com/georust/meta/master/logo/logo.png")]
-//! # Low-level bindings for PROJ v8.1.x
+//! # Low-level bindings for PROJ v9.0.x
 //!
 //! **This is a
 //! [`*-sys`](https://doc.rust-lang.org/cargo/reference/build-scripts.html#-sys-packages)
@@ -12,7 +12,7 @@
 //! A guide to the functions can be found here:
 //! <https://proj.org/development/reference/functions.html>.
 //!
-//! By default, the crate will search for an existing `libproj` (via `PROJ v8.1.x`)
+//! By default, the crate will search for an acceptable existing `libproj`
 //! installation on your system using
 //! [pkg-config](https://www.freedesktop.org/wiki/Software/pkg-config/).
 //!

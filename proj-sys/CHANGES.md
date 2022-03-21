@@ -1,5 +1,7 @@
 # Unreleased
 
+- Update to PROJ 9.0.0
+
 # 0.22.0
 
 - Only require tiff for source builds when network feature is enabled
