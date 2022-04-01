@@ -200,6 +200,7 @@ You can also transform entire geometries from `geo-types` by using the
 `Transform` trait.
 
 ```
+# use approx::assert_relative_eq;
 use proj::{Proj, Transform};
 use geo_types::{Coordinate, line_string};
 
@@ -212,15 +213,15 @@ let proj = Proj::new_known_crs("EPSG:4326", "EPSG:6366", None).unwrap();
 // create a new line with a different projection
 let new_line = line.transformed(&proj).unwrap();
 
-assert_eq!(new_line[0], Coordinate { x: 538447.8454476658, y: 3602285.563945497, });
-assert_eq!(new_line[1], Coordinate { x: 538452.2313532799, y: 3602268.065714932, });
+assert_relative_eq!(new_line[0], Coordinate { x: 538447.8454476658, y: 3602285.563945497, });
+assert_relative_eq!(new_line[1], Coordinate { x: 538452.2313532799, y: 3602268.065714932, });
 
 // or transform the original in-place
 let mut line = line;
 line.transform(&proj).unwrap();
 
-assert_eq!(line[0], Coordinate { x: 538447.8454476658, y: 3602285.563945497, });
-assert_eq!(line[1], Coordinate { x: 538452.2313532799, y: 3602268.065714932, });
+assert_relative_eq!(line[0], Coordinate { x: 538447.8454476658, y: 3602285.563945497, });
+assert_relative_eq!(line[1], Coordinate { x: 538452.2313532799, y: 3602268.065714932, });
 ```
 "##
 )]
