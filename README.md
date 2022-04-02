@@ -197,7 +197,7 @@ If you've enabled the `geo-types` feature, you can skip allocating an intermedia
 and pass the [`geo-types`](https://crates.io/crates/geo-types) directly.
 
 ```rust
-# use approx::assert_relative_eq;
+use approx::assert_relative_eq;
 use proj::Proj;
 use geo_types::Point;
 
@@ -211,6 +211,33 @@ let result = nad_ft_to_m.convert(my_point).unwrap();
 
 assert_relative_eq!(result.x(), 1450880.2910605003f64);
 assert_relative_eq!(result.y(), 1141263.0111604529f64);
+```
+
+You can also transform entire geometries from `geo-types` by using the
+`Transform` trait.
+
+```rust
+use proj::{Proj, Transform};
+use geo_types::{Coordinate, line_string};
+
+let line = line_string![
+    (x: -116.590457069172_f64, y: 32.55730630167689),
+    (x: -116.590411068973, y: 32.55714830169309),
+];
+let proj = Proj::new_known_crs("EPSG:4326", "EPSG:6366", None).unwrap();
+
+// create a new line with a different projection
+let new_line = line.transformed(&proj).unwrap();
+
+assert_eq!(new_line[0], Coordinate { x: 538447.8454476658, y: 3602285.563945497, });
+assert_eq!(new_line[1], Coordinate { x: 538452.2313532799, y: 3602268.065714932, });
+
+// or transform the original in-place
+let mut line = line;
+line.transform(&proj).unwrap();
+
+assert_eq!(line[0], Coordinate { x: 538447.8454476658, y: 3602285.563945497, });
+assert_eq!(line[1], Coordinate { x: 538452.2313532799, y: 3602268.065714932, });
 ```
 
 License: MIT/Apache-2.0
