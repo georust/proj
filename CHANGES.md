@@ -1,5 +1,10 @@
 # Changes
 
+## 0.26.0
+
+- Update to proj 9
+  - <https://github.com/georust/proj/pull/119>
+
 ## 0.25.2
 
 - Introduce `Transform` trait, add implementations for `geo-types`
