@@ -130,8 +130,11 @@ jobs:
     runs-on: macos-latest
     env:
       _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
+    defaults:
+      run:
+        working-directory: proj-sys
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
       - run: brew install proj
-      - run: cargo test ${{ matrix.features }}
+      - run: cargo test
