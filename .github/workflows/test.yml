@@ -40,7 +40,7 @@ jobs:
       matrix:
         container_image:
           # Minimum supported rust (MSRV)
-          - "georust/proj-ci:proj-9.0.0-rust-1.52"
+          - "georust/proj-ci:proj-9.0.0-rust-1.56"
           # Latest stable rust
           - "georust/proj-ci:proj-9.0.0-rust-1.59"
         features:
@@ -87,17 +87,17 @@ jobs:
         include:
           # Minimum supported rust (MSRV)
           - container:
-              image: georust/proj-ci:proj-9.0.0-rust-1.52
+              image: georust/proj-ci:proj-9.0.0-rust-1.56
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
             features: ""
           - container:
-              image: georust/proj-ci:proj-9.0.0-rust-1.52
+              image: georust/proj-ci:proj-9.0.0-rust-1.56
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: "--features bundled_proj"
           - container:
-              image: georust/proj-ci-without-system-proj:proj-9.0.0-rust-1.52
+              image: georust/proj-ci-without-system-proj:proj-9.0.0-rust-1.56
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: ""
@@ -130,8 +130,11 @@ jobs:
     runs-on: macos-latest
     env:
       _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
+    defaults:
+      run:
+        working-directory: proj-sys
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
       - run: brew install proj
-      - run: cargo test ${{ matrix.features }}
+      - run: cargo test
