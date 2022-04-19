@@ -98,8 +98,8 @@
 //!
 //! # Requirements
 //!
-//! By default, the crate requires `libproj` 8.1.x to be present on your system. While it may be
-//! backwards-compatible with older PROJ 6 versions, this is neither tested nor supported.
+//! By default, the crate requires `libproj` 9.0.x to be present on your system and will use `pkg-config`
+//! to attempt to locate it. If this fails, the crate will attempt to build libproj from its bundled source.
 //!
 //! # Feature Flags
 //!
