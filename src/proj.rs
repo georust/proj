@@ -1018,7 +1018,9 @@ impl convert::TryFrom<(&str, &str)> for Proj {
     }
 }
 
-struct PjInfo {
+/// Info about the current PROJ definition
+#[derive(Clone, Debug)]
+pub struct PjInfo {
     id: Option<String>,
     description: Option<String>,
     definition: Option<String>,

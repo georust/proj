@@ -1,6 +1,8 @@
 # Changes
 
 ## Unreleased
+- Make `PjInfo` struct public
+  - <https://github.com/georust/proj/pull/133>
 - Actually return an error if a definition can't be retrieved
   - <https://github.com/georust/proj/pull/132>
 
