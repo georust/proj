@@ -1,5 +1,9 @@
 # Changes
 
+## Unreleased
+- Actually return an error if a definition can't be retrieved
+  - <https://github.com/georust/proj/pull/132>
+
 ## 0.26.0
 
 - Update to proj 9
