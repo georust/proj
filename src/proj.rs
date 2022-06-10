@@ -121,6 +121,8 @@ pub enum ProjError {
     HeaderConversion(#[from] reqwest::header::ToStrError),
     #[error("A {0} error occurred for url {1} after {2} retries")]
     DownloadError(String, String, u8),
+    #[error("The current definition could not be retrieved")]
+    Definition,
 }
 
 #[derive(Error, Debug)]
@@ -185,8 +187,7 @@ fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
 
 /// called by Proj::new and ProjBuilder::transform_new_crs
 fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Result<Proj, ProjCreateError> {
-    let c_definition =
-        CString::new(definition).map_err(ProjCreateError::ArgumentNulError)?;
+    let c_definition = CString::new(definition).map_err(ProjCreateError::ArgumentNulError)?;
     let ptr = result_from_create(ctx, unsafe { proj_create(ctx, c_definition.as_ptr()) })
         .map_err(|e| ProjCreateError::ProjError(e.message(ctx)))?;
     Ok(Proj {
@@ -704,10 +705,7 @@ impl Proj {
     /// # Safety
     /// This method contains unsafe code.
     pub fn def(&self) -> Result<String, ProjError> {
-        Ok(self
-            .pj_info()
-            .definition
-            .expect("proj_pj_info did not provide a definition"))
+        self.pj_info().definition.ok_or(ProjError::Definition)
     }
 
     /// Project geodetic coordinates (in radians) into the projection specified by `definition`
