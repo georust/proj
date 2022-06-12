@@ -1019,6 +1019,8 @@ impl convert::TryFrom<(&str, &str)> for Proj {
 }
 
 /// Info about the current PROJ definition
+///
+/// [PROJ reference documentation](https://proj.org/development/reference/datatypes.html?highlight=has_inverse#c.PJ_PROJ_INFO)
 #[derive(Clone, Debug)]
 pub struct PjInfo {
     id: Option<String>,
