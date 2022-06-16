@@ -227,54 +227,51 @@ fn transform_epsg(
     })
 }
 
-///// Read-only utility methods for providing information about the current PROJ instance
-pub trait HasInfo {
-    #[doc(hidden)]
-    fn ctx(&self) -> *mut PJ_CONTEXT;
-
-    /// Return [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about the current PROJ context
-    /// # Safety
-    /// This method contains unsafe code.
-    fn info(&self) -> Result<Info, ProjError> {
-        unsafe {
-            let pinfo: PJ_INFO = proj_info();
-            Ok(Info {
-                major: pinfo.major,
-                minor: pinfo.minor,
-                patch: pinfo.patch,
-                release: _string(pinfo.release)?,
-                version: _string(pinfo.version)?,
-                searchpath: _string(pinfo.searchpath)?,
-            })
+macro_rules! define_info_methods {
+    () => {
+        fn ctx(&self) -> *mut PJ_CONTEXT {
+            self.ctx
         }
-    }
 
-    /// Check whether network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for) is currently enabled or disabled.
-    ///
-    /// # Safety
-    /// This method contains unsafe code.
-    fn network_enabled(&self) -> bool {
-        let res = unsafe { proj_context_is_network_enabled(self.ctx()) };
-        matches!(res, 1)
-    }
+        /// Return [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about the current PROJ context
+        /// # Safety
+        /// This method contains unsafe code.
+        pub fn info(&self) -> Result<Info, ProjError> {
+            unsafe {
+                let pinfo: PJ_INFO = proj_info();
+                Ok(Info {
+                    major: pinfo.major,
+                    minor: pinfo.minor,
+                    patch: pinfo.patch,
+                    release: _string(pinfo.release)?,
+                    version: _string(pinfo.version)?,
+                    searchpath: _string(pinfo.searchpath)?,
+                })
+            }
+        }
 
-    /// Get the URL endpoint to query for remote grids
-    ///
-    /// # Safety
-    /// This method contains unsafe code.
-    fn get_url_endpoint(&self) -> Result<String, ProjError> {
-        Ok(unsafe { _string(proj_context_get_url_endpoint(self.ctx()))? })
-    }
-}
+        /// Check whether network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for) is currently enabled or disabled.
+        ///
+        /// # Safety
+        /// This method contains unsafe code.
+        pub fn network_enabled(&self) -> bool {
+            let res = unsafe { proj_context_is_network_enabled(self.ctx()) };
+            matches!(res, 1)
+        }
 
-impl HasInfo for ProjBuilder {
-    #[doc(hidden)]
-    fn ctx(&self) -> *mut PJ_CONTEXT {
-        self.ctx
-    }
+        /// Get the URL endpoint to query for remote grids
+        ///
+        /// # Safety
+        /// This method contains unsafe code.
+        pub fn get_url_endpoint(&self) -> Result<String, ProjError> {
+            Ok(unsafe { _string(proj_context_get_url_endpoint(self.ctx()))? })
+        }
+    };
 }
 
 impl ProjBuilder {
+    define_info_methods!();
+
     /// Enable or disable network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for).
     ///
     /// # Safety
@@ -351,13 +348,6 @@ impl ProjBuilder {
         let s = CString::new(endpoint)?;
         unsafe { proj_context_set_url_endpoint(self.ctx(), s.as_ptr()) };
         Ok(())
-    }
-}
-
-impl HasInfo for Proj {
-    #[doc(hidden)]
-    fn ctx(&self) -> *mut PJ_CONTEXT {
-        self.ctx
     }
 }
 
@@ -612,6 +602,8 @@ impl Proj {
             }
         }
     }
+
+    define_info_methods!();
 
     /// Returns the area of use of a projection
     ///

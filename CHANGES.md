@@ -1,7 +1,8 @@
 # Changes
 
 ## Unreleased
-- Make `PjInfo` struct public
+- Inline the functionality of the legacy `Info` trait directly into `Proj`/`ProjBuilder` and remove the `Info` trait.
+- Make `PjInfo` struct public, and rename it to `Info`
   - <https://github.com/georust/proj/pull/133>
 - Actually return an error if a definition can't be retrieved
   - <https://github.com/georust/proj/pull/132>
