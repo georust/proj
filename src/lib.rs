@@ -249,4 +249,3 @@ pub use crate::proj::Proj;
 pub use crate::proj::ProjBuilder;
 pub use crate::proj::ProjCreateError;
 pub use crate::proj::ProjError;
-pub use crate::proj::Projinfo;

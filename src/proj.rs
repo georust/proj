@@ -227,18 +227,18 @@ fn transform_epsg(
     })
 }
 
-/// Read-only utility methods for providing information about the current PROJ instance
-pub trait Info {
+///// Read-only utility methods for providing information about the current PROJ instance
+pub trait HasInfo {
     #[doc(hidden)]
     fn ctx(&self) -> *mut PJ_CONTEXT;
 
     /// Return [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about the current PROJ context
     /// # Safety
     /// This method contains unsafe code.
-    fn info(&self) -> Result<Projinfo, ProjError> {
+    fn info(&self) -> Result<Info, ProjError> {
         unsafe {
             let pinfo: PJ_INFO = proj_info();
-            Ok(Projinfo {
+            Ok(Info {
                 major: pinfo.major,
                 minor: pinfo.minor,
                 patch: pinfo.patch,
@@ -267,7 +267,7 @@ pub trait Info {
     }
 }
 
-impl Info for ProjBuilder {
+impl HasInfo for ProjBuilder {
     #[doc(hidden)]
     fn ctx(&self) -> *mut PJ_CONTEXT {
         self.ctx
@@ -354,7 +354,7 @@ impl ProjBuilder {
     }
 }
 
-impl Info for Proj {
+impl HasInfo for Proj {
     #[doc(hidden)]
     fn ctx(&self) -> *mut PJ_CONTEXT {
         self.ctx
@@ -368,7 +368,7 @@ enum Transformation {
 
 /// [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about PROJ
 #[derive(Clone, Debug)]
-pub struct Projinfo {
+pub struct Info {
     pub major: i32,
     pub minor: i32,
     pub patch: i32,
@@ -671,7 +671,7 @@ impl Proj {
         }
     }
 
-    fn pj_info(&self) -> PjInfo {
+    fn proj_info(&self) -> ProjInfo {
         unsafe {
             let pj_info = proj_pj_info(self.c_proj);
             let id = if pj_info.id.is_null() {
@@ -690,7 +690,7 @@ impl Proj {
                 Some(_string(pj_info.definition).expect("PROJ built an invalid string"))
             };
             let has_inverse = pj_info.has_inverse == 1;
-            PjInfo {
+            ProjInfo {
                 id,
                 description,
                 definition,
@@ -705,7 +705,7 @@ impl Proj {
     /// # Safety
     /// This method contains unsafe code.
     pub fn def(&self) -> Result<String, ProjError> {
-        self.pj_info().definition.ok_or(ProjError::Definition)
+        self.proj_info().definition.ok_or(ProjError::Definition)
     }
 
     /// Project geodetic coordinates (in radians) into the projection specified by `definition`
@@ -1032,7 +1032,7 @@ pub struct ProjInfo {
 
 impl fmt::Debug for Proj {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let pj_info = self.pj_info();
+        let pj_info = self.proj_info();
         f.debug_struct("Proj")
             .field("id", &pj_info.id)
             .field("description", &pj_info.description)
