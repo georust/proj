@@ -1,5 +1,9 @@
 # 0.23.0
 
+- Update to PROJ 9.0.1
+
+# 0.23.0
+
 - Update to PROJ 9.0.0
 
 # 0.22.0
