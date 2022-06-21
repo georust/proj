@@ -233,7 +233,13 @@ macro_rules! define_info_methods {
             self.ctx
         }
 
-        /// Return [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about the current PROJ context
+        /// Return information about the current instace of the PROJ libary.
+        ///
+        /// See: <https://proj.org/development/reference/datatypes.html#c.PJ_INFO>
+        ///
+        /// If instead you are looking for information about a specific transformation, see
+        /// [`Proj::proj_info`].
+        ///
         /// # Safety
         /// This method contains unsafe code.
         pub fn info(&self) -> Result<Info, ProjError> {
@@ -663,7 +669,16 @@ impl Proj {
         }
     }
 
-    fn proj_info(&self) -> ProjInfo {
+    /// Get information about a specific transformation object.
+    ///
+    /// See <https://proj.org/development/reference/functions.html#c.proj_pj_info>
+    ///
+    /// If instead you are looking for information about the proj installation, see
+    /// [`Proj::info`].
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn proj_info(&self) -> ProjInfo {
         unsafe {
             let pj_info = proj_pj_info(self.c_proj);
             let id = if pj_info.id.is_null() {
