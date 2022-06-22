@@ -1,5 +1,11 @@
 # Unreleased
 
+- BREAKING: make PjInfo public
+    - Getting information about the version of libproj installed was renamed from proj.info() to proj.lib_info()
+    - https://github.com/georust/proj/pull/133
+
+# 0.26.0
+
 - Update to PROJ 9.0.0
 
 # 0.22.0
