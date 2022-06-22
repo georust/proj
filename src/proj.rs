@@ -313,7 +313,7 @@ impl ProjBuilder {
     /// # Safety
     /// This method contains unsafe code.
     pub fn set_search_paths<P: AsRef<Path>>(&mut self, newpath: P) -> Result<(), ProjError> {
-        let existing = self.info()?.searchpath;
+        let existing = self.lib_info()?.searchpath;
         let pathsep = if cfg!(windows) { ";" } else { ":" };
         let mut individual: Vec<&str> = existing.split(pathsep).collect();
         let np = Path::new(newpath.as_ref());
@@ -1175,7 +1175,7 @@ mod test {
     fn test_searchpath() {
         let mut tf = ProjBuilder::new();
         tf.set_search_paths(&"/foo").unwrap();
-        let ipath = tf.info().unwrap().searchpath;
+        let ipath = tf.lib_info().unwrap().searchpath;
         let pathsep = if cfg!(windows) { ";" } else { ":" };
         let individual: Vec<&str> = ipath.split(pathsep).collect();
         assert_eq!(&individual.last().unwrap(), &&"/foo")
