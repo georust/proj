@@ -227,54 +227,57 @@ fn transform_epsg(
     })
 }
 
-/// Read-only utility methods for providing information about the current PROJ instance
-pub trait Info {
-    #[doc(hidden)]
-    fn ctx(&self) -> *mut PJ_CONTEXT;
-
-    /// Return [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about the current PROJ context
-    /// # Safety
-    /// This method contains unsafe code.
-    fn info(&self) -> Result<Projinfo, ProjError> {
-        unsafe {
-            let pinfo: PJ_INFO = proj_info();
-            Ok(Projinfo {
-                major: pinfo.major,
-                minor: pinfo.minor,
-                patch: pinfo.patch,
-                release: _string(pinfo.release)?,
-                version: _string(pinfo.version)?,
-                searchpath: _string(pinfo.searchpath)?,
-            })
+macro_rules! define_info_methods {
+    () => {
+        fn ctx(&self) -> *mut PJ_CONTEXT {
+            self.ctx
         }
-    }
 
-    /// Check whether network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for) is currently enabled or disabled.
-    ///
-    /// # Safety
-    /// This method contains unsafe code.
-    fn network_enabled(&self) -> bool {
-        let res = unsafe { proj_context_is_network_enabled(self.ctx()) };
-        matches!(res, 1)
-    }
+        /// Return information about the current instance of the PROJ libary.
+        ///
+        /// See: <https://proj.org/development/reference/datatypes.html#c.PJ_INFO>
+        ///
+        /// If instead you are looking for information about the current projection / conversion, see
+        /// [`Proj::proj_info`].
+        ///
+        /// # Safety
+        /// This method contains unsafe code.
+        pub fn lib_info(&self) -> Result<Info, ProjError> {
+            unsafe {
+                let pinfo: PJ_INFO = proj_info();
+                Ok(Info {
+                    major: pinfo.major,
+                    minor: pinfo.minor,
+                    patch: pinfo.patch,
+                    release: _string(pinfo.release)?,
+                    version: _string(pinfo.version)?,
+                    searchpath: _string(pinfo.searchpath)?,
+                })
+            }
+        }
 
-    /// Get the URL endpoint to query for remote grids
-    ///
-    /// # Safety
-    /// This method contains unsafe code.
-    fn get_url_endpoint(&self) -> Result<String, ProjError> {
-        Ok(unsafe { _string(proj_context_get_url_endpoint(self.ctx()))? })
-    }
-}
+        /// Check whether network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for) is currently enabled or disabled.
+        ///
+        /// # Safety
+        /// This method contains unsafe code.
+        pub fn network_enabled(&self) -> bool {
+            let res = unsafe { proj_context_is_network_enabled(self.ctx()) };
+            matches!(res, 1)
+        }
 
-impl Info for ProjBuilder {
-    #[doc(hidden)]
-    fn ctx(&self) -> *mut PJ_CONTEXT {
-        self.ctx
-    }
+        /// Get the URL endpoint to query for remote grids
+        ///
+        /// # Safety
+        /// This method contains unsafe code.
+        pub fn get_url_endpoint(&self) -> Result<String, ProjError> {
+            Ok(unsafe { _string(proj_context_get_url_endpoint(self.ctx()))? })
+        }
+    };
 }
 
 impl ProjBuilder {
+    define_info_methods!();
+
     /// Enable or disable network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for).
     ///
     /// # Safety
@@ -310,7 +313,7 @@ impl ProjBuilder {
     /// # Safety
     /// This method contains unsafe code.
     pub fn set_search_paths<P: AsRef<Path>>(&mut self, newpath: P) -> Result<(), ProjError> {
-        let existing = self.info()?.searchpath;
+        let existing = self.lib_info()?.searchpath;
         let pathsep = if cfg!(windows) { ";" } else { ":" };
         let mut individual: Vec<&str> = existing.split(pathsep).collect();
         let np = Path::new(newpath.as_ref());
@@ -354,13 +357,6 @@ impl ProjBuilder {
     }
 }
 
-impl Info for Proj {
-    #[doc(hidden)]
-    fn ctx(&self) -> *mut PJ_CONTEXT {
-        self.ctx
-    }
-}
-
 enum Transformation {
     Projection,
     Conversion,
@@ -368,7 +364,7 @@ enum Transformation {
 
 /// [Information](https://proj.org/development/reference/datatypes.html#c.PJ_INFO) about PROJ
 #[derive(Clone, Debug)]
-pub struct Projinfo {
+pub struct Info {
     pub major: i32,
     pub minor: i32,
     pub patch: i32,
@@ -613,6 +609,8 @@ impl Proj {
         }
     }
 
+    define_info_methods!();
+
     /// Returns the area of use of a projection
     ///
     /// When multiple usages are available, the first one will be returned.
@@ -671,7 +669,16 @@ impl Proj {
         }
     }
 
-    fn pj_info(&self) -> PjInfo {
+    /// Get information about a specific transformation object.
+    ///
+    /// See <https://proj.org/development/reference/functions.html#c.proj_pj_info>
+    ///
+    /// If instead you are looking for information about the PROJ installation, see
+    /// [`Proj::lib_info`].
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn proj_info(&self) -> ProjInfo {
         unsafe {
             let pj_info = proj_pj_info(self.c_proj);
             let id = if pj_info.id.is_null() {
@@ -690,7 +697,7 @@ impl Proj {
                 Some(_string(pj_info.definition).expect("PROJ built an invalid string"))
             };
             let has_inverse = pj_info.has_inverse == 1;
-            PjInfo {
+            ProjInfo {
                 id,
                 description,
                 definition,
@@ -705,7 +712,7 @@ impl Proj {
     /// # Safety
     /// This method contains unsafe code.
     pub fn def(&self) -> Result<String, ProjError> {
-        self.pj_info().definition.ok_or(ProjError::Definition)
+        self.proj_info().definition.ok_or(ProjError::Definition)
     }
 
     /// Project geodetic coordinates (in radians) into the projection specified by `definition`
@@ -1018,17 +1025,21 @@ impl convert::TryFrom<(&str, &str)> for Proj {
     }
 }
 
-struct PjInfo {
-    id: Option<String>,
-    description: Option<String>,
-    definition: Option<String>,
-    has_inverse: bool,
-    accuracy: f64,
+/// Info about the current PROJ definition
+///
+/// [PROJ reference documentation](https://proj.org/development/reference/datatypes.html?highlight=has_inverse#c.PJ_PROJ_INFO)
+#[derive(Clone, Debug)]
+pub struct ProjInfo {
+    pub id: Option<String>,
+    pub description: Option<String>,
+    pub definition: Option<String>,
+    pub has_inverse: bool,
+    pub accuracy: f64,
 }
 
 impl fmt::Debug for Proj {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let pj_info = self.pj_info();
+        let pj_info = self.proj_info();
         f.debug_struct("Proj")
             .field("id", &pj_info.id)
             .field("description", &pj_info.description)
@@ -1164,7 +1175,7 @@ mod test {
     fn test_searchpath() {
         let mut tf = ProjBuilder::new();
         tf.set_search_paths(&"/foo").unwrap();
-        let ipath = tf.info().unwrap().searchpath;
+        let ipath = tf.lib_info().unwrap().searchpath;
         let pathsep = if cfg!(windows) { ";" } else { ":" };
         let individual: Vec<&str> = ipath.split(pathsep).collect();
         assert_eq!(&individual.last().unwrap(), &&"/foo")

@@ -1,4 +1,4 @@
-# Unreleased
+# 0.23.0
 
 - Update to PROJ 9.0.0
 
