@@ -2,7 +2,7 @@
 
 pub const PROJ_VERSION_MAJOR: u32 = 9;
 pub const PROJ_VERSION_MINOR: u32 = 0;
-pub const PROJ_VERSION_PATCH: u32 = 0;
+pub const PROJ_VERSION_PATCH: u32 = 1;
 pub const PJ_DEFAULT_CTX: u32 = 0;
 pub const PROJ_ERR_INVALID_OP: u32 = 1024;
 pub const PROJ_ERR_INVALID_OP_WRONG_SYNTAX: u32 = 1025;
@@ -1478,6 +1478,7 @@ pub type proj_file_finder = ::std::option::Option<
     ) -> *const ::std::os::raw::c_char,
 >;
 extern "C" {
+    #[doc = " @endcond"]
     pub fn proj_context_set_file_finder(
         ctx: *mut PJ_CONTEXT,
         finder: proj_file_finder,
@@ -1485,7 +1486,6 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " @endcond"]
     pub fn proj_context_set_search_paths(
         ctx: *mut PJ_CONTEXT,
         count_paths: ::std::os::raw::c_int,
@@ -1493,13 +1493,13 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = " @cond Doxygen_Suppress"]
     pub fn proj_context_set_ca_bundle_path(
         ctx: *mut PJ_CONTEXT,
         path: *const ::std::os::raw::c_char,
     );
 }
 extern "C" {
+    #[doc = " @cond Doxygen_Suppress"]
     pub fn proj_context_use_proj4_init_rules(ctx: *mut PJ_CONTEXT, enable: ::std::os::raw::c_int);
 }
 extern "C" {
