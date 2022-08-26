@@ -31,7 +31,7 @@ network = ["reqwest", "proj-sys/network"]
 
 [dev-dependencies]
 # approx version must match the one used in geo-types
-approx = "0.4"
+approx = ">= 0.4.0, < 0.6.0"
 geo-types = { version = "0.7.3", features = ["approx"] }
 
 [package.metadata.docs.rs]

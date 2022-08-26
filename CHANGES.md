@@ -1,5 +1,10 @@
 # Changes
 
+## Unreleased
+
+- Bump `approx` dev dependency to match `geo-types`. This doesn't affect
+  downstream users, only those building the proj crate for development.
+
 ## 0.27.0
 - Inline the functionality of the legacy `Info` trait directly into `Proj`/`ProjBuilder` and remove the `Info` trait.
   - BREAKING: Getting information about the version of libproj installed was renamed from proj.info() to proj.lib_info()
