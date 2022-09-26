@@ -1,3 +1,9 @@
+# UNRELEASED
+
+- Add explicit `tiff` feature for people using tiff files outside of `network`
+  downloads. Tiff was already being enabled for used of the `network` feature.
+      - <https://github.com/georust/proj/pull/143>
+
 # 0.23.1
 
 - Update to PROJ 9.0.1
