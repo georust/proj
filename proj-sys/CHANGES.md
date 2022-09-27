@@ -1,6 +1,7 @@
 # UNRELEASED
 
 - Update to PROJ 9.1.0
+- Update MSRV to 1.57.0
 
 # 0.23.1
 

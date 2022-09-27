@@ -40,7 +40,7 @@ jobs:
       matrix:
         container_image:
           # Minimum supported rust (MSRV)
-          - "georust/proj-ci:proj-9.0.0-rust-1.56"
+          - "georust/proj-ci:proj-9.0.0-rust-1.57"
           # Latest stable rust
           - "georust/proj-ci:rust-1.63"
         features:
@@ -87,17 +87,17 @@ jobs:
         include:
           # Minimum supported rust (MSRV)
           - container:
-              image: georust/proj-ci:proj-9.0.0-rust-1.56
+              image: georust/proj-ci:proj-9.0.0-rust-1.57
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
             features: ""
           - container:
-              image: georust/proj-ci:proj-9.0.0-rust-1.56
+              image: georust/proj-ci:proj-9.0.0-rust-1.57
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: "--features bundled_proj"
           - container:
-              image: georust/proj-ci-without-system-proj:proj-9.0.0-rust-1.56
+              image: georust/proj-ci-without-system-proj:proj-9.0.0-rust-1.57
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: ""
