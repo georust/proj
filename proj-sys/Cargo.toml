@@ -1,6 +1,6 @@
 [package]
 name = "proj-sys"
-description = "Rust bindings for PROJ v9.0.x"
+description = "Rust bindings for PROJ v9.1.x"
 repository = "https://github.com/georust/proj"
 version = "0.23.1"
 readme = "README.md"
@@ -13,10 +13,10 @@ links = "proj"
 [dependencies]
 
 [build-dependencies]
-bindgen = "0.59.2"
-pkg-config = "0.3.24"
+bindgen = "0.60.1"
+pkg-config = "0.3.25"
 cmake = "0.1.48"
-flate2 = "1.0.22"
+flate2 = "1.0.24"
 tar = "0.4.38"
 
 [features]
