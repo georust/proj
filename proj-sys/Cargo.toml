@@ -24,7 +24,8 @@ nobuild = []
 bundled_proj = []
 # `pkg_config` feature is deprecated and does nothing
 pkg_config = []
-network = []
+network = ["tiff"]
+tiff = []
 
 [package.metadata.docs.rs]
 features = [ "nobuild" ] # This feature will be enabled during the docs.rs build

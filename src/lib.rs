@@ -114,6 +114,9 @@
 //! - `network`: exposes APIs which, when enabled, can fetch grid data from the internet to improve
 //!   projection accuracy. See [`enable_network`](struct.ProjBuilder.html#method.enable_network)
 //!   for details.
+//! - `tiff`: enables tiff support in the underlying libproj build. This is enabled via the
+//!   `network` feature for online fetching of grid data, but you can enable this explicitly,
+//!   without the `network` feature if you have pre-downloaded TIFF files.
 //!
 //! ## Network, Cache, and Search Path Functionality
 //!

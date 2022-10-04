@@ -99,8 +99,7 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
     config.define("BUILD_PROJSYNC", "OFF");
     config.define("ENABLE_CURL", "OFF");
 
-    let enable_tiff = cfg!(feature = "network");
-    if enable_tiff {
+    if cfg!(feature = "tiff") {
         eprintln!("enabling tiff support");
         config.define("ENABLE_TIFF", "ON");
     } else {
@@ -136,7 +135,7 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
     // The PROJ library needs SQLite and the C++ standard library.
     println!("cargo:rustc-link-lib=dylib=sqlite3");
 
-    if enable_tiff {
+    if cfg!(feature = "tiff") {
         // On platforms like apples aarch64, users are likely to have installed libtiff with homebrew,
         // which isn't in the default search path, so try to determine path from pkg-config
         match pkg_config::Config::new()
