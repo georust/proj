@@ -6,7 +6,7 @@ version = "0.23.1"
 readme = "README.md"
 authors = ["The Georust developers <mods@georust.org>"]
 keywords = ["proj", "projection", "osgeo", "geo", "geospatial"]
-license = "MIT/Apache-2.0"
+license = "MIT OR Apache-2.0"
 edition = "2018"
 links = "proj"
 
