@@ -5,6 +5,8 @@
       - <https://github.com/georust/proj/pull/143>
 - Update to PROJ 9.1.0
 - Update MSRV to 1.58.0
+- Changed license field to [SPDX 2.1 license expression](https://spdx.dev/spdx-specification-21-web-version/#h.jxpfx0ykyb60)
+  -  <https://github.com/georust/proj/pull/146>
 
 # 0.23.1
 
