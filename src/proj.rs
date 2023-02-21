@@ -343,7 +343,7 @@ impl ProjBuilder {
     /// This method contains unsafe code.
     pub fn grid_cache_enable(&mut self, enable: bool) {
         let enable = if enable { 1 } else { 0 };
-        let _ = unsafe { proj_grid_cache_set_enable(self.ctx(), enable) };
+        unsafe { proj_grid_cache_set_enable(self.ctx(), enable) };
     }
 
     /// Set the URL endpoint to query for remote grids
@@ -1162,7 +1162,7 @@ mod test {
     fn test_debug() {
         let wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
         let proj = Proj::new(wgs84).unwrap();
-        let debug_string = format!("{:?}", proj);
+        let debug_string = format!("{proj:?}");
         assert_eq!(
             "Proj { id: Some(\"longlat\"), description: Some(\"PROJ-based coordinate operation\"), definition: Some(\"proj=longlat datum=WGS84 no_defs ellps=WGS84 towgs84=0,0,0\"), has_inverse: true, accuracy: -1.0 }",
             debug_string
@@ -1174,7 +1174,7 @@ mod test {
     // This failure is a bug in libproj
     fn test_searchpath() {
         let mut tf = ProjBuilder::new();
-        tf.set_search_paths(&"/foo").unwrap();
+        tf.set_search_paths("/foo").unwrap();
         let ipath = tf.lib_info().unwrap().searchpath;
         let pathsep = if cfg!(windows) { ";" } else { ":" };
         let individual: Vec<&str> = ipath.split(pathsep).collect();
