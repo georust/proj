@@ -136,5 +136,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-      - run: brew install pkg-config proj
+      # At some point around Feb. 2023, the GH macos CI runner no longer had
+      # pkg-config installed by default, so we need to install it manually.
+      #
+      # This PR (merged a couple days ago) adds pkg-config back to the macos
+      # build: https://github.com/actions/runner-images/pull/7125
+      #
+      # but it seems like it hasn't been deployed yet. At some point we should
+      # be able to delete this step if CI passes.
+      - run: brew install pkg-config
+      - run: brew install proj
       - run: cargo test
