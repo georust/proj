@@ -8,6 +8,7 @@
   -  <https://github.com/georust/proj/pull/146>
 
 - Run clippy and apply fixes
+- Update to geo-types 0.7.8
 
 ## 0.27.0
 - Inline the functionality of the legacy `Info` trait directly into `Proj`/`ProjBuilder` and remove the `Info` trait.

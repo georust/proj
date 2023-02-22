@@ -14,7 +14,7 @@ edition = "2018"
 
 [dependencies]
 proj-sys = { version = "0.23.1", path = "proj-sys" }
-geo-types = { version = "0.7.3", optional = true }
+geo-types = { version = "0.7.8", optional = true }
 libc = "0.2.119"
 num-traits = "0.2.14"
 thiserror = "1.0.30"

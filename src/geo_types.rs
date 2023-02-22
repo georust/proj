@@ -16,7 +16,7 @@ use geo_types::{coord, Geometry};
 /// assert_relative_eq!(result.x, 1450880.29f64, epsilon=1.0e-2);
 /// assert_relative_eq!(result.y, 1141263.01f64, epsilon=1.0e-2);
 /// ```
-impl<T: crate::proj::CoordinateType> crate::Coord<T> for geo_types::Coordinate<T> {
+impl<T: crate::proj::CoordinateType> crate::Coord<T> for geo_types::Coord<T> {
     fn x(&self) -> T {
         self.x
     }
@@ -83,7 +83,7 @@ where
     }
 }
 
-impl<T> Transform<T> for geo_types::Coordinate<T>
+impl<T> Transform<T> for geo_types::Coord<T>
 where
     T: crate::proj::CoordinateType,
 {
