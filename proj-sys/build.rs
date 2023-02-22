@@ -41,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             pk.include_paths[0].clone()
         })
         .or_else(|err| {
-            eprintln!("pkg-config unable to find existing libproj installation: {}", err);
+            eprintln!("pkg-config unable to find existing libproj installation: {err}");
             build_from_source()
         })?
     };
@@ -153,7 +153,7 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
                 // pkg-config might not even be installed. Let's try to stumble forward
                 // to see if the build succeeds regardless, e.g. if libtiff is installed
                 // in some default search path.
-                eprintln!("Failed to find libtiff with pkg-config: {}", err);
+                eprintln!("Failed to find libtiff with pkg-config: {err}");
             }
         }
         println!("cargo:rustc-link-lib=dylib=tiff");

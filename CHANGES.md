@@ -7,6 +7,8 @@
 - Changed license field to [SPDX 2.1 license expression](https://spdx.dev/spdx-specification-21-web-version/#h.jxpfx0ykyb60)
   -  <https://github.com/georust/proj/pull/146>
 
+- Run clippy and apply fixes
+
 ## 0.27.0
 - Inline the functionality of the legacy `Info` trait directly into `Proj`/`ProjBuilder` and remove the `Info` trait.
   - BREAKING: Getting information about the version of libproj installed was renamed from proj.info() to proj.lib_info()

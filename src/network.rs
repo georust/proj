@@ -1,3 +1,10 @@
+#![deny(
+    clippy::cast_slice_from_raw_parts,
+    clippy::cast_slice_different_sizes,
+    clippy::invalid_null_ptr_usage,
+    clippy::ptr_as_ptr,
+    clippy::transmute_ptr_to_ref
+)]
 /// A module for native grid network functionality, so we don't have to depend on libcurl
 /// The crate-public functions are facades – they're designed for interaction with libproj –
 /// delegating actual functionality to non-public versions, prefixed by an underscore.
@@ -50,7 +57,7 @@ impl Drop for HandleData {
     // dereferencing it if need be so the resource is freed
     fn drop(&mut self) {
         if let Some(header) = self.hptr {
-            let _ = unsafe { CString::from_raw(header.as_ptr() as *mut i8) };
+            let _ = unsafe { CString::from_raw(header.as_ptr().cast::<i8>()) };
         }
     }
 }
@@ -137,6 +144,7 @@ pub(crate) unsafe extern "C" fn network_open(
         ud,
     ) {
         Ok(res) => res,
+        #[allow(clippy::ptr_as_ptr)]
         Err(e) => {
             let err_string = e.to_string();
             out_error_string.copy_from_nonoverlapping(err_string.as_ptr().cast(), err_string.len());
@@ -163,7 +171,7 @@ unsafe fn _network_open(
     // - 1 is used because the HTTP convention is to use inclusive start and end offsets
     let end = offset as usize + size_to_read - 1;
     // RANGE header definition is "bytes=x-y"
-    let hvalue = format!("bytes={}-{}", offset, end);
+    let hvalue = format!("bytes={offset}-{end}");
     // Create a new client that can be reused for subsequent queries
     let clt = Client::builder().build()?;
     let req = clt.request(Method::GET, &url);
@@ -184,12 +192,12 @@ unsafe fn _network_open(
     // Copy the downloaded bytes into the buffer so it can be passed around
     res.bytes()?
         .as_ptr()
-        .copy_to_nonoverlapping(buffer as *mut u8, contentlength.min(size_to_read));
+        .copy_to_nonoverlapping(buffer.cast::<u8>(), contentlength.min(size_to_read));
     let hd = HandleData::new(url, headers, None);
     // heap-allocate the struct and cast it to a void pointer so it can be passed around to PROJ
     let hd_boxed = Box::new(hd);
-    let void: *mut c_void = Box::into_raw(hd_boxed) as *mut c_void;
-    let opaque: *mut PROJ_NETWORK_HANDLE = void as *mut PROJ_NETWORK_HANDLE;
+    let void: *mut c_void = Box::into_raw(hd_boxed).cast::<libc::c_void>();
+    let opaque: *mut PROJ_NETWORK_HANDLE = void.cast::<proj_sys::PROJ_NETWORK_HANDLE>();
     // If everything's OK, set the error string to empty
     let err_string = "";
     out_error_string.copy_from_nonoverlapping(err_string.as_ptr().cast(), err_string.len());
@@ -205,8 +213,9 @@ pub(crate) unsafe extern "C" fn network_close(
 ) {
     // Because we created the raw pointer from a Box, we have to re-constitute the Box
     // This is the exact reverse order seen in _network_open
-    let void = handle as *mut c_void as *mut HandleData;
-    let _: Box<HandleData> = Box::from_raw(void);
+    let void = handle.cast::<libc::c_void>();
+    let hd = void.cast::<HandleData>();
+    let _: Box<HandleData> = Box::from_raw(hd);
 }
 
 /// Network callback: get header value
@@ -241,7 +250,8 @@ unsafe fn _network_get_header_value(
     _: *mut c_void,
 ) -> Result<*const c_char, ProjError> {
     let lookup = _string(header_name)?.to_lowercase();
-    let hd = &mut *(handle as *mut c_void as *mut HandleData);
+    let void = handle.cast::<libc::c_void>();
+    let hd = &mut *(void.cast::<HandleData>());
     let hvalue = hd
         .headers
         .get(&lookup)
@@ -293,7 +303,7 @@ pub(crate) unsafe extern "C" fn network_read_range(
         Err(e) => {
             // The assumption here is that if 0 is returned, whatever error is in out_error_string is displayed by libproj
             // since this isn't a conversion using CString, nul chars must be manually stripped
-            let err_string = e.to_string().replace("0", "nought");
+            let err_string = e.to_string().replace('0', "nought");
             out_error_string.copy_from_nonoverlapping(err_string.as_ptr().cast(), err_string.len());
             out_error_string.add(err_string.len()).write(0);
             0usize
@@ -315,7 +325,7 @@ fn _network_read_range(
 ) -> Result<usize, ProjError> {
     // - 1 is used because the HTTP convention is to use inclusive start and end offsets
     let end = offset as usize + size_to_read - 1;
-    let hvalue = format!("bytes={}-{}", offset, end);
+    let hvalue = format!("bytes={offset}-{end}");
     let hd = unsafe { &mut *(handle as *const c_void as *mut HandleData) };
     let clt = Client::builder().build()?;
     let initial = clt.request(Method::GET, &hd.url);
@@ -336,7 +346,7 @@ fn _network_read_range(
     unsafe {
         res.bytes()?
             .as_ptr()
-            .copy_to_nonoverlapping(buffer as *mut u8, contentlength.min(size_to_read));
+            .copy_to_nonoverlapping(buffer.cast::<u8>(), contentlength.min(size_to_read));
     }
     let err_string = "";
     unsafe {
