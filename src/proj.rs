@@ -7,8 +7,8 @@ use proj_sys::{
     proj_context_is_network_enabled, proj_context_set_search_paths, proj_context_set_url_endpoint,
     proj_create, proj_create_crs_to_crs, proj_destroy, proj_errno_string, proj_get_area_of_use,
     proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization, proj_pj_info,
-    proj_trans, proj_trans_array, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD,
-    PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_XYZT,
+    proj_trans, proj_trans_array, proj_trans_bounds, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD,
+    PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_XYZT,
 };
 use std::{
     convert, ffi,
@@ -914,6 +914,85 @@ impl Proj {
         F: CoordinateType,
     {
         self.array_general(points, Transformation::Projection, inverse)
+    }
+
+    /// Transform boundary densifying the edges to account for nonlinear transformations along
+    /// these edges and extracting the outermost bounds.
+    ///
+    /// Input and output CRS may be specified in two ways:
+    /// 1. Using the PROJ `pipeline` operator. This method makes use of the [`pipeline`](http://proj4.org/operations/pipeline.html)
+    /// functionality available since `PROJ` 5.
+    /// This has the advantage of being able to chain an arbitrary combination of projection, conversion,
+    /// and transformation steps, allowing for extremely complex operations ([`new`](#method.new))
+    /// 2. Using EPSG codes or `PROJ` strings to define input and output CRS ([`new_known_crs`](#method.new_known_crs))
+    ///
+    /// The following example converts from NAD83 US Survey Feet (EPSG 2230) to NAD83 Metres (EPSG 26946)
+    ///
+    /// ```rust
+    /// # use approx::assert_relative_eq;
+    /// extern crate proj;
+    /// use proj::{Proj, Coord};
+    ///
+    /// let from = "EPSG:2230";
+    /// let to = "EPSG:26946";
+    /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+    /// let result = ft_to_m
+    ///     .transform_bounds(4760096.421921, 3744293.729449, 4760196.421921, 3744393.729449, 21)
+    ///     .unwrap();
+    /// assert_relative_eq!(result[0] as f64, 1450880.29, epsilon=1e-2);
+    /// assert_relative_eq!(result[1] as f64, 1141263.01, epsilon=1e-2);
+    /// assert_relative_eq!(result[2] as f64, 1450910.77, epsilon=1e-2);
+    /// assert_relative_eq!(result[3] as f64, 1141293.49, epsilon=1e-2);
+    /// ```
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn transform_bounds<F>(
+        &self,
+        left: F,
+        bottom: F,
+        right: F,
+        top: F,
+        densify_pts: i32,
+    ) -> Result<[F; 4], ProjError>
+    where
+        F: CoordinateType,
+    {
+        let mut new_left = f64::default();
+        let mut new_bottom = f64::default();
+        let mut new_right = f64::default();
+        let mut new_top = f64::default();
+        let err;
+
+        unsafe {
+            proj_errno_reset(self.c_proj);
+            let _success = proj_trans_bounds(
+                self.ctx,
+                self.c_proj,
+                PJ_DIRECTION_PJ_FWD,
+                left.to_f64().ok_or(ProjError::FloatConversion)?,
+                bottom.to_f64().ok_or(ProjError::FloatConversion)?,
+                right.to_f64().ok_or(ProjError::FloatConversion)?,
+                top.to_f64().ok_or(ProjError::FloatConversion)?,
+                &mut new_left,
+                &mut new_bottom,
+                &mut new_right,
+                &mut new_top,
+                densify_pts,
+            );
+            err = proj_errno(self.c_proj);
+        }
+
+        if err == 0 {
+            Ok([
+                F::from(new_left).ok_or(ProjError::FloatConversion)?,
+                F::from(new_bottom).ok_or(ProjError::FloatConversion)?,
+                F::from(new_right).ok_or(ProjError::FloatConversion)?,
+                F::from(new_top).ok_or(ProjError::FloatConversion)?,
+            ])
+        } else {
+            Err(ProjError::Conversion(error_message(err)?))
+        }
     }
 
     // array conversion and projection logic is almost identical;
