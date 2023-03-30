@@ -163,6 +163,12 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
         println!("cargo:rustc-link-lib=dylib=stdc++");
     } else if cfg!(target_os = "macos") {
         println!("cargo:rustc-link-lib=dylib=c++");
+    } else if cfg!(target_os = "windows") {
+        if cfg!(target_env = "gnu") {
+            println!("cargo:rustc-link-lib=dylib=stdc++");
+        } else {
+            println!("cargo:warning=proj-sys: Not configuring an explicit C++ standard library on this target.");
+        }
     } else {
         println!("cargo:warning=proj-sys: Not configuring an explicit C++ standard library on this target.");
     }
