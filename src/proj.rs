@@ -924,6 +924,10 @@ impl Proj {
     /// and transformation steps, allowing for extremely complex operations ([`new`](#method.new))
     /// 2. Using EPSG codes or `PROJ` strings to define input and output CRS ([`new_known_crs`](#method.new_known_crs))
     ///
+    /// The `densify_pts` parameter describes the number of points to add to each edge to account
+    /// for nonlinear edges produced by the transform process. Large numbers will produce worse
+    /// performance.
+    ///
     /// The following example converts from NAD83 US Survey Feet (EPSG 2230) to NAD83 Metres (EPSG 26946)
     ///
     /// ```rust
