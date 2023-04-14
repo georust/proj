@@ -426,7 +426,6 @@ impl ProjBuilder {
     ///
     ///```rust
     /// # use approx::assert_relative_eq;
-    /// extern crate proj;
     /// use proj::{Proj, Coord};
     ///
     /// let from = "EPSG:2230";
@@ -787,7 +786,6 @@ impl Proj {
     ///
     /// ```rust
     /// # use approx::assert_relative_eq;
-    /// extern crate proj;
     /// use proj::{Proj, Coord};
     ///
     /// let from = "EPSG:2230";
@@ -930,7 +928,6 @@ impl Proj {
     ///
     /// ```rust
     /// # use approx::assert_relative_eq;
-    /// extern crate proj;
     /// use proj::{Proj, Coord};
     ///
     /// let from = "EPSG:2230";
