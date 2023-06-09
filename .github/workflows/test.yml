@@ -40,9 +40,9 @@ jobs:
       matrix:
         container_image:
           # Minimum supported rust (MSRV)
-          - "georust/proj-ci:proj-9.1.0-rust-1.58"
+          - "georust/proj-ci:proj-9.1.0-rust-1.63"
           # Latest stable rust
-          - "georust/proj-ci:proj-9.1.0-rust-1.64"
+          - "georust/proj-ci:proj-9.1.0-rust-1.70"
         features:
           - ""
           - "--features network"
@@ -87,34 +87,34 @@ jobs:
         include:
           # Minimum supported rust (MSRV)
           - container:
-              image: georust/proj-ci:proj-9.1.0-rust-1.58
+              image: georust/proj-ci:proj-9.1.0-rust-1.63
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
             features: ""
           - container:
-              image: georust/proj-ci:proj-9.1.0-rust-1.58
+              image: georust/proj-ci:proj-9.1.0-rust-1.63
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: "--features bundled_proj"
           - container:
-              image: georust/proj-ci-without-system-proj:proj-9.1.0-rust-1.58
+              image: georust/proj-ci-without-system-proj:proj-9.1.0-rust-1.63
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: ""
 
           # Latest stable rust
           - container:
-              image: georust/proj-ci:proj-9.1.0-rust-1.64
+              image: georust/proj-ci:proj-9.1.0-rust-1.70
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
             features: ""
           - container:
-              image: georust/proj-ci:proj-9.1.0-rust-1.64
+              image: georust/proj-ci:proj-9.1.0-rust-1.70
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: "--features bundled_proj"
           - container:
-              image: georust/proj-ci-without-system-proj:proj-9.1.0-rust-1.64
+              image: georust/proj-ci-without-system-proj:proj-9.1.0-rust-1.70
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: ""
