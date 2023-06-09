@@ -14,7 +14,7 @@ jobs:
   #
   # Ref: https://github.com/rust-lang/crater/blob/9ab6f9697c901c4a44025cf0a39b73ad5b37d198/.github/workflows/bors.yml#L125-L149
   #
-  # ALL THE SUBSEQUENT JOBS NEED THEIR `name` ADDED TO THE `needs` SECTION OF THIS JOB!
+  # ALL THE SUBSEQUENT JOBS NEED THEIR key ADDED TO THE `needs` SECTION OF THIS JOB!
   ci-result:
     name: ci result
     runs-on: ubuntu-latest
