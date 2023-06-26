@@ -1,9 +1,9 @@
 # Changes
 
-## Unreleased
+## 0.27.1
 
-- Bump geo-types
-- Allow typeck to infer pointer types
+- FIX: `network` feature fails to compile on aarch64/arm64
+  - https://github.com/georust/proj/issues/163
 - Bump `approx` dev dependency to match `geo-types`. This doesn't affect
   downstream users, only those building the proj crate for development.
   -  <https://github.com/georust/proj/pull/138>
@@ -11,7 +11,7 @@
   -  <https://github.com/georust/proj/pull/146>
 - Run clippy and apply fixes
   -  <https://github.com/georust/proj/pull/151>
-- Update to geo-types 0.7.8
+- Update to geo-types 0.7.10
   -  <https://github.com/georust/proj/pull/153>
 - Update MSRV to 1.63
   -  <https://github.com/georust/proj/pull/160>
