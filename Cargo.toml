@@ -15,7 +15,7 @@ rust-version = "1.63"
 
 [dependencies]
 proj-sys = { version = "0.23.1", path = "proj-sys" }
-geo-types = { version = "0.7.8", optional = true }
+geo-types = { version = "0.7.10", optional = true }
 libc = "0.2.119"
 num-traits = "0.2.14"
 thiserror = "1.0.30"
@@ -33,7 +33,7 @@ network = ["reqwest", "proj-sys/network"]
 [dev-dependencies]
 # approx version must match the one used in geo-types
 approx = ">= 0.4.0, < 0.6.0"
-geo-types = { version = "0.7.3", features = ["approx"] }
+geo-types = { version = "0.7.10", features = ["approx"] }
 
 [package.metadata.docs.rs]
 features = [ "proj-sys/nobuild", "network", "geo-types" ]

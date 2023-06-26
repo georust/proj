@@ -57,7 +57,7 @@ impl Drop for HandleData {
     // dereferencing it if need be so the resource is freed
     fn drop(&mut self) {
         if let Some(header) = self.hptr {
-            let _ = unsafe { CString::from_raw(header.as_ptr().cast::<i8>()) };
+            let _ = unsafe { CString::from_raw(header.as_ptr().cast()) };
         }
     }
 }
@@ -192,7 +192,7 @@ unsafe fn _network_open(
     // Copy the downloaded bytes into the buffer so it can be passed around
     res.bytes()?
         .as_ptr()
-        .copy_to_nonoverlapping(buffer.cast::<u8>(), contentlength.min(size_to_read));
+        .copy_to_nonoverlapping(buffer.cast(), contentlength.min(size_to_read));
     let hd = HandleData::new(url, headers, None);
     // heap-allocate the struct and cast it to a void pointer so it can be passed around to PROJ
     let hd_boxed = Box::new(hd);

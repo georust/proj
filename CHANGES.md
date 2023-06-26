@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Bump geo-types
+- Allow typeck to infer pointer types
 - Bump `approx` dev dependency to match `geo-types`. This doesn't affect
   downstream users, only those building the proj crate for development.
   -  <https://github.com/georust/proj/pull/138>
