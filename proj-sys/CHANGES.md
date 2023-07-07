@@ -1,4 +1,4 @@
-# UNRELEASED
+# 0.23.2
 
 - Add explicit `tiff` feature for people using tiff files outside of `network`
   downloads. Tiff was already being enabled for used of the `network` feature.
