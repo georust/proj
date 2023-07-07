@@ -3,7 +3,7 @@
 - Add explicit `tiff` feature for people using tiff files outside of `network`
   downloads. Tiff was already being enabled for used of the `network` feature.
       - <https://github.com/georust/proj/pull/143>
-- Update to PROJ 9.1.0
+- Update to PROJ 9.2.1
 - Update MSRV to 1.58.0
 - Changed license field to [SPDX 2.1 license expression](https://spdx.dev/spdx-specification-21-web-version/#h.jxpfx0ykyb60)
   -  <https://github.com/georust/proj/pull/146>
