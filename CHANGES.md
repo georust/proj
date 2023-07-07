@@ -1,5 +1,10 @@
 # Changes
 
+## 0.27.2
+
+- Update to proj-sys 0.23.2 (libproj 9.2.1)
+  - https://github.com/georust/proj/pull/167
+
 ## 0.27.1
 
 - FIX: `network` feature fails to compile on aarch64/arm64
