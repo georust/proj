@@ -253,3 +253,12 @@ pub use crate::proj::ProjBuilder;
 pub use crate::proj::ProjCreateError;
 pub use crate::proj::ProjError;
 pub use crate::proj::ProjInfo;
+
+#[cfg(test)]
+mod tests{
+    #[test]
+    fn fail() {
+        // testing that our CI won't merge this
+        panic!("this test fails")
+    }
+}
