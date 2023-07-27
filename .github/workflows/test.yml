@@ -1,12 +1,4 @@
-on:
-  push:
-    branches:
-      - main
-      - staging
-      - trying
-  pull_request:
-  merge_group:
-
+on: [push, pull_request, merge_group]
 name: proj ci
 jobs:
   # The `ci-result` job doesn't actually test anything - it just aggregates the
