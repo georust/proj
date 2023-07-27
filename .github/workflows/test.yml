@@ -5,6 +5,7 @@ on:
       - staging
       - trying
   pull_request:
+  merge_group:
 
 name: proj ci
 jobs:
