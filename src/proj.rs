@@ -426,7 +426,7 @@ impl ProjBuilder {
     ///
     ///```rust
     /// # use approx::assert_relative_eq;
-    /// use proj::{Proj, Coord};
+    /// use proj::{Coord, Proj};
     ///
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
@@ -469,7 +469,7 @@ impl Default for ProjBuilder {
 ///
 /// ```rust
 /// # use approx::assert_relative_eq;
-/// use proj::{Proj, Coord};
+/// use proj::{Coord, Proj};
 ///
 /// let from = "EPSG:2230";
 /// let to = "EPSG:26946";
@@ -477,8 +477,8 @@ impl Default for ProjBuilder {
 /// let result = nad_ft_to_m
 ///     .convert((4760096.421921f64, 3744293.729449f64))
 ///     .unwrap();
-/// assert_relative_eq!(result.x(), 1450880.29, epsilon=1.0e-2);
-/// assert_relative_eq!(result.y(), 1141263.01, epsilon=1.0e-2);
+/// assert_relative_eq!(result.x(), 1450880.29, epsilon = 1.0e-2);
+/// assert_relative_eq!(result.y(), 1141263.01, epsilon = 1.0e-2);
 /// ```
 pub struct Proj {
     c_proj: *mut PJconsts,
@@ -501,9 +501,7 @@ impl Proj {
     /// Constructing a `Proj` from a PROJ string definition:
     ///
     /// ```
-    /// let transformer = proj::Proj::new(
-    ///     "+proj=merc +lat_ts=56.5 +ellps=GRS80"
-    /// ).unwrap();
+    /// let transformer = proj::Proj::new("+proj=merc +lat_ts=56.5 +ellps=GRS80").unwrap();
     /// ```
     ///
     /// A `TryFrom` implementation is available which wraps `new`:
@@ -511,9 +509,7 @@ impl Proj {
     /// ```
     /// use std::convert::TryFrom;
     ///
-    /// let transformer = proj::Proj::try_from(
-    ///     "+proj=merc +lat_ts=56.5 +ellps=GRS80"
-    /// ).unwrap();
+    /// let transformer = proj::Proj::try_from("+proj=merc +lat_ts=56.5 +ellps=GRS80").unwrap();
     /// ```
     ///
     /// # Safety
@@ -554,11 +550,7 @@ impl Proj {
     /// Constructing a `Proj` from a source CRS and target CRS:
     ///
     /// ```rust
-    /// let transformer = proj::Proj::new_known_crs(
-    ///     "EPSG:2230",
-    ///     "EPSG:26946",
-    ///     None
-    /// ).unwrap();
+    /// let transformer = proj::Proj::new_known_crs("EPSG:2230", "EPSG:26946", None).unwrap();
     /// ```
     ///
     /// A `TryFrom` implementation is available which wraps `new_known_crs`:
@@ -566,10 +558,7 @@ impl Proj {
     /// ```rust
     /// use std::convert::TryFrom;
     ///
-    /// let transformer = proj::Proj::try_from((
-    ///     "EPSG:2230",
-    ///     "EPSG:26946"
-    /// )).unwrap();
+    /// let transformer = proj::Proj::try_from(("EPSG:2230", "EPSG:26946")).unwrap();
     /// ```
     ///
     /// # Safety
@@ -786,16 +775,14 @@ impl Proj {
     ///
     /// ```rust
     /// # use approx::assert_relative_eq;
-    /// use proj::{Proj, Coord};
+    /// use proj::{Coord, Proj};
     ///
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
     /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
-    /// let result = ft_to_m
-    ///     .convert((4760096.421921, 3744293.729449))
-    ///     .unwrap();
-    /// assert_relative_eq!(result.x() as f64, 1450880.29, epsilon=1e-2);
-    /// assert_relative_eq!(result.y() as f64, 1141263.01, epsilon=1e-2);
+    /// let result = ft_to_m.convert((4760096.421921, 3744293.729449)).unwrap();
+    /// assert_relative_eq!(result.x() as f64, 1450880.29, epsilon = 1e-2);
+    /// assert_relative_eq!(result.y() as f64, 1141263.01, epsilon = 1e-2);
     /// ```
     ///
     /// # Safety
@@ -849,7 +836,7 @@ impl Proj {
     /// to Longitude, Latitude / Easting, Northing.
     ///
     /// ```rust
-    /// use proj::{Proj, Coord};
+    /// use proj::{Coord, Proj};
     ///
     /// # use approx::assert_relative_eq;
     /// // Convert from NAD83(NSRS2007) to NAD83(2011)
@@ -861,8 +848,8 @@ impl Proj {
     ///     (-98.3166503906, 38.7112325390),
     /// ];
     /// NAD83_old_to_new.convert_array(&mut v);
-    /// assert_relative_eq!(v[0].x(), -98.54, epsilon=1e-2);
-    /// assert_relative_eq!(v[1].y(), 38.71, epsilon=1e-2);
+    /// assert_relative_eq!(v[0].x(), -98.54, epsilon = 1e-2);
+    /// assert_relative_eq!(v[1].y(), 38.71, epsilon = 1e-2);
     /// ```
     ///
     /// # Safety
@@ -883,7 +870,7 @@ impl Proj {
     /// (in radians) from the projection specified by `definition`.
     ///
     /// ```rust
-    /// use proj::{Proj, Coord};
+    /// use proj::{Coord, Proj};
     ///
     /// # use approx::assert_relative_eq;
     /// let from = "EPSG:2230";
@@ -894,8 +881,8 @@ impl Proj {
     ///     (4760197.421921, 3744394.729449),
     /// ];
     /// ft_to_m.convert_array(&mut v).unwrap();
-    /// assert_relative_eq!(v[0].x(), 1450880.29, epsilon=1e-2);
-    /// assert_relative_eq!(v[1].y(), 1141293.79, epsilon=1e-2);
+    /// assert_relative_eq!(v[0].x(), 1450880.29, epsilon = 1e-2);
+    /// assert_relative_eq!(v[1].y(), 1141293.79, epsilon = 1e-2);
     /// ```
     ///
     /// # Safety
@@ -932,18 +919,24 @@ impl Proj {
     ///
     /// ```rust
     /// # use approx::assert_relative_eq;
-    /// use proj::{Proj, Coord};
+    /// use proj::{Coord, Proj};
     ///
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
     /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
     /// let result = ft_to_m
-    ///     .transform_bounds(4760096.421921, 3744293.729449, 4760196.421921, 3744393.729449, 21)
+    ///     .transform_bounds(
+    ///         4760096.421921,
+    ///         3744293.729449,
+    ///         4760196.421921,
+    ///         3744393.729449,
+    ///         21,
+    ///     )
     ///     .unwrap();
-    /// assert_relative_eq!(result[0] as f64, 1450880.29, epsilon=1e-2);
-    /// assert_relative_eq!(result[1] as f64, 1141263.01, epsilon=1e-2);
-    /// assert_relative_eq!(result[2] as f64, 1450910.77, epsilon=1e-2);
-    /// assert_relative_eq!(result[3] as f64, 1141293.49, epsilon=1e-2);
+    /// assert_relative_eq!(result[0] as f64, 1450880.29, epsilon = 1e-2);
+    /// assert_relative_eq!(result[1] as f64, 1141263.01, epsilon = 1e-2);
+    /// assert_relative_eq!(result[2] as f64, 1450910.77, epsilon = 1e-2);
+    /// assert_relative_eq!(result[3] as f64, 1141293.49, epsilon = 1e-2);
     /// ```
     ///
     /// # Safety
@@ -1076,9 +1069,7 @@ impl convert::TryFrom<&str> for Proj {
     /// ```
     /// use std::convert::TryFrom;
     ///
-    /// let transformer = proj::Proj::try_from(
-    ///     "+proj=merc +lat_ts=56.5 +ellps=GRS80"
-    /// ).unwrap();
+    /// let transformer = proj::Proj::try_from("+proj=merc +lat_ts=56.5 +ellps=GRS80").unwrap();
     /// ```
     fn try_from(definition: &str) -> Result<Proj, Self::Error> {
         Proj::new(definition)
@@ -1095,10 +1086,7 @@ impl convert::TryFrom<(&str, &str)> for Proj {
     /// ```rust
     /// use std::convert::TryFrom;
     ///
-    /// let transformer = proj::Proj::try_from((
-    ///     "EPSG:2230",
-    ///     "EPSG:26946"
-    /// )).unwrap();
+    /// let transformer = proj::Proj::try_from(("EPSG:2230", "EPSG:26946")).unwrap();
     /// ```
     fn try_from((source_crs, target_crs): (&str, &str)) -> Result<Proj, Self::Error> {
         Proj::new_known_crs(source_crs, target_crs, None)

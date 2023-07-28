@@ -7,7 +7,6 @@ pub trait Transform<T> {
     type Output;
 
     /// Transform a Geometry by mutating it in place.
-    ///
     #[cfg_attr(
         feature = "geo-types",
         doc = r##"
@@ -34,7 +33,6 @@ assert_relative_eq!(
     fn transform(&mut self, proj: &Proj) -> Result<(), ProjError>;
 
     /// Immutable flavor of [`Transform::transform`], which allocates a new geometry.
-    ///
     #[cfg_attr(
         feature = "geo-types",
         doc = r##"
@@ -66,7 +64,6 @@ assert_relative_eq!(
     fn transformed(&self, proj: &Proj) -> Result<Self::Output, ProjError>;
 
     /// Transform a geometry from one CRS to another CRS by modifying it in place.
-    ///
     #[cfg_attr(
         feature = "geo-types",
         doc = r##"
@@ -94,7 +91,6 @@ assert_relative_eq!(point, point!(x: -4064052.0f32, y: -7223650.5f32));
     }
 
     /// Immutable flavor of [`Transform::transform_crs_to_crs`], which allocates a new geometry.
-    ///
     #[cfg_attr(
         feature = "geo-types",
         doc = r##"

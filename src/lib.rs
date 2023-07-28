@@ -38,8 +38,8 @@
 //! let result = ft_to_m
 //!     .convert((4760096.421921f64, 3744293.729449f64))
 //!     .unwrap();
-//! assert_relative_eq!(result.0, 1450880.29, epsilon=1e-2);
-//! assert_relative_eq!(result.1, 1141263.01, epsilon=1e-2);
+//! assert_relative_eq!(result.0, 1450880.29, epsilon = 1e-2);
+//! assert_relative_eq!(result.1, 1141263.01, epsilon = 1e-2);
 //! ```
 //!
 //! ## Convert from [NAD 83 US Survey Feet](https://epsg.io/2230) to [NAD 83 Meters](https://epsg.io/26946) Using the `pipeline` Operator
@@ -57,7 +57,8 @@
 //! # use approx::assert_relative_eq;
 //! use proj::Proj;
 //!
-//! let ft_to_m = Proj::new("
+//! let ft_to_m = Proj::new(
+//!     "
 //!     +proj=pipeline
 //!     +step +inv +proj=lcc +lat_1=33.88333333333333
 //!     +lat_2=32.78333333333333 +lat_0=32.16666666666666
@@ -66,12 +67,16 @@
 //!     +step +proj=lcc +lat_1=33.88333333333333 +lat_2=32.78333333333333 +lat_0=32.16666666666666
 //!     +lon_0=-116.25 +x_0=2000000 +y_0=500000
 //!     +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs
-//! ").unwrap();
+//! ",
+//! )
+//! .unwrap();
 //!
 //! // The Presidio, approximately
-//! let result = ft_to_m.convert((4760096.421921f64, 3744293.729449f64)).unwrap();
-//! assert_relative_eq!(result.0, 1450880.29, epsilon=1e-2);
-//! assert_relative_eq!(result.1, 1141263.01, epsilon=1e-2);
+//! let result = ft_to_m
+//!     .convert((4760096.421921f64, 3744293.729449f64))
+//!     .unwrap();
+//! assert_relative_eq!(result.0, 1450880.29, epsilon = 1e-2);
+//! assert_relative_eq!(result.1, 1141263.01, epsilon = 1e-2);
 //! ```
 //!
 //! # Usage
@@ -144,7 +149,7 @@
 //!
 //! ```rust
 //! # use approx::assert_relative_eq;
-//! use proj::{Proj, Coord};
+//! use proj::{Coord, Proj};
 //!
 //! struct MyPointOfInterest {
 //!     lat: f64,
@@ -163,7 +168,10 @@
 //!     }
 //! }
 //!
-//! let donut_shop = MyPointOfInterest { lat: 34.095620, lon: -118.283555 };
+//! let donut_shop = MyPointOfInterest {
+//!     lat: 34.095620,
+//!     lon: -118.283555,
+//! };
 //!
 //! let from = "EPSG:4326";
 //! let to = "EPSG:3309";
@@ -171,8 +179,8 @@
 //!
 //! let result = proj.convert(donut_shop).unwrap();
 //!
-//! assert_relative_eq!(result.x(), 158458.67, epsilon=1e-2);
-//! assert_relative_eq!(result.y(), -434296.88, epsilon=1e-2);
+//! assert_relative_eq!(result.x(), 158458.67, epsilon = 1e-2);
+//! assert_relative_eq!(result.y(), -434296.88, epsilon = 1e-2);
 //! ```
 #![cfg_attr(
     feature = "geo-types",
