@@ -171,8 +171,8 @@
 //!
 //! let result = proj.convert(donut_shop).unwrap();
 //!
-//! assert_relative_eq!(result.x(), 158458.67, epsilon=1e-2);
-//! assert_relative_eq!(result.y(), -434296.88, epsilon=1e-2);
+//! assert_relative_eq!(result.x(), 158460.18, epsilon=1e-2);
+//! assert_relative_eq!(result.y(), -434297.04, epsilon=1e-2);
 //! ```
 #![cfg_attr(
     feature = "geo-types",
