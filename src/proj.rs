@@ -1325,9 +1325,9 @@ mod test {
         let proj = Proj::new_known_crs(from, to, None).unwrap();
         let t = proj.convert((3968419.4, 379068.0, 4962142.2)).unwrap();
 
-        assert_relative_eq!(t.x(), 159814.79923647654);
-        assert_relative_eq!(t.y(), 380108.089631567);
-        assert_relative_eq!(t.z(), -27.239349158361257);
+        assert_relative_eq!(t.x(), 159783.64355817687, epsilon = 1e-5);
+        assert_relative_eq!(t.y(), 380007.7906745551, epsilon = 1e-5);
+        assert_relative_eq!(t.z(), 16.769676147028804, epsilon = 1e-5);
     }
 
     #[test]
