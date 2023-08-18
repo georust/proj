@@ -10,7 +10,7 @@ on:
 name: proj ci
 jobs:
   # The `ci-result` job doesn't actually test anything - it just aggregates the
-  # overall build status for bors, otherwise our bors.toml would need an entry
+  # overall build status, otherwise the merge queue would need an entry
   # for each individual job produced by the job-matrix.
   #
   # Ref: https://github.com/rust-lang/crater/blob/9ab6f9697c901c4a44025cf0a39b73ad5b37d198/.github/workflows/bors.yml#L125-L149
@@ -19,6 +19,7 @@ jobs:
   ci-result:
     name: ci result
     runs-on: ubuntu-latest
+    if: ${{ always() }}
     needs:
       - proj-ubuntu
       - proj-sys-ubuntu
@@ -26,10 +27,10 @@ jobs:
       - proj-sys-macos
     steps:
       - name: Mark the job as a success
-        if: success()
+        if: ${{ success() }}
         run: exit 0
       - name: Mark the job as a failure
-        if: "!success()"
+        if: ${{ failure() }}
         run: exit 1
 
   proj-ubuntu:
