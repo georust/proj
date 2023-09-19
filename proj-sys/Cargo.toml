@@ -7,17 +7,17 @@ readme = "README.md"
 authors = ["The Georust developers <mods@georust.org>"]
 keywords = ["proj", "projection", "osgeo", "geo", "geospatial"]
 license = "MIT OR Apache-2.0"
-edition = "2018"
+edition = "2021"
 links = "proj"
 
 [dependencies]
 
 [build-dependencies]
-bindgen = "0.66.1"
+bindgen = "0.68.1"
 pkg-config = "0.3.25"
-cmake = "0.1.48"
+cmake = "0.1.50"
 flate2 = "1.0.24"
-tar = "0.4.38"
+tar = "0.4.40"
 
 [features]
 nobuild = []
