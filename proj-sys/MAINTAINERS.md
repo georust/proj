@@ -12,13 +12,14 @@ expect docs.rs to do.
 
 ## To update the prebuilt bindings
 
-Currently, the process looks like:
+After updating the source in PROJSRC and the build.rs script to reference the new source,
+The process of updating bindings looks like:
 
 ```
 cd proj-sys
 cargo clean
 cargo build
-find ../target/proj-sys-* -name bindings_docs-rs.rs
+find ../target/debug/build/proj-sys* -name bindings.rs
 ```
 
 copy that file over the `src/bindings_docs-rs.rs`, but retain the header:
