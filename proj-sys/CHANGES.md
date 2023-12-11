@@ -1,3 +1,9 @@
+# Unreleased
+
+- Update to PROJ 9.3.1
+- Bump MSRV to 1.65
+
+
 # 0.23.2
 
 - Add explicit `tiff` feature for people using tiff files outside of `network`
