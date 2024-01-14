@@ -2,8 +2,8 @@ use libc::c_int;
 use libc::{c_char, c_double};
 use num_traits::Float;
 use proj_sys::{
-    proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_cleanup, proj_context_create,
-    proj_context_destroy, proj_context_errno, proj_context_get_url_endpoint,
+    proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_as_projjson, proj_cleanup,
+    proj_context_create, proj_context_destroy, proj_context_errno, proj_context_get_url_endpoint,
     proj_context_is_network_enabled, proj_context_set_search_paths, proj_context_set_url_endpoint,
     proj_create, proj_create_crs_to_crs, proj_destroy, proj_errno_string, proj_get_area_of_use,
     proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization, proj_pj_info,
@@ -1070,6 +1070,52 @@ impl Proj {
             Ok(points)
         } else {
             Err(ProjError::Projection(error_message(err)?))
+        }
+    }
+
+    /// ```rust
+    /// # use approx::assert_relative_eq;
+    /// use proj::{Proj, Coord};
+    ///
+    /// let from = "EPSG:2230";
+    /// let to = "EPSG:26946";
+    /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+    /// let result = ft_to_m.to_projjson(None, None).unwrap();
+    /// dbg!(result);
+    /// ```
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn to_projjson(
+        &self,
+        multiline: Option<bool>,
+        indentation_width: Option<usize>,
+    ) -> Result<String, ProjError> {
+        let mut opts_c = vec![];
+        if let Some(multiline) = multiline {
+            if multiline {
+                opts_c.push(CString::new("MULTILINE=YES")?);
+            } else {
+                opts_c.push(CString::new("MULTILINE=NO")?);
+            }
+        }
+        if let Some(indentation_width) = indentation_width {
+            opts_c.push(CString::new(format!(
+                "INDENTATION_WIDTH={}",
+                indentation_width
+            ))?);
+        }
+
+        let opts_p: Vec<_> = opts_c.iter().map(|cstr| cstr.as_ptr()).collect();
+
+        unsafe {
+            let out_ptr = proj_as_projjson(self.ctx, self.c_proj, opts_p.as_ptr());
+            if out_ptr.is_null() {
+                // Not sure the best way to retrieve and return the error
+                todo!()
+            } else {
+                Ok(_string(out_ptr)?)
+            }
         }
     }
 }
