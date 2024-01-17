@@ -51,9 +51,9 @@ jobs:
       matrix:
         container_image:
           # Minimum supported rust (MSRV)
-          - "georust/proj-ci:proj-9.3.1-rust-1.65"
+          - "georust/proj-ci:proj-9.3.1-rust-1.70"
           # Latest stable rust
-          - "georust/proj-ci:proj-9.3.1-rust-1.74"
+          - "georust/proj-ci:proj-9.3.1-rust-1.75"
         features:
           - ""
           - "--features network"
@@ -67,7 +67,7 @@ jobs:
       image: ${{ matrix.container_image }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - run: cargo build ${{ matrix.features }}
       - run: cargo test ${{ matrix.features }}
 
@@ -81,7 +81,7 @@ jobs:
         features: ["", "--features network"]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - run: cargo build ${{ matrix.features }}
       - run: cargo test ${{ matrix.features }}
 
@@ -98,40 +98,40 @@ jobs:
         include:
           # Minimum supported rust (MSRV)
           - container:
-              image: georust/proj-ci:proj-9.3.1-rust-1.65
+              image: georust/proj-ci:proj-9.3.1-rust-1.70
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
             features: ""
           - container:
-              image: georust/proj-ci:proj-9.3.1-rust-1.65
+              image: georust/proj-ci:proj-9.3.1-rust-1.70
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: "--features bundled_proj"
           - container:
-              image: georust/proj-ci-without-system-proj:proj-9.3.1-rust-1.65
+              image: georust/proj-ci-without-system-proj:proj-9.3.1-rust-1.70
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: ""
 
           # Latest stable rust
           - container:
-              image: georust/proj-ci:proj-9.3.1-rust-1.74
+              image: georust/proj-ci:proj-9.3.1-rust-1.75
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
             features: ""
           - container:
-              image: georust/proj-ci:proj-9.3.1-rust-1.74
+              image: georust/proj-ci:proj-9.3.1-rust-1.75
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: "--features bundled_proj"
           - container:
-              image: georust/proj-ci-without-system-proj:proj-9.3.1-rust-1.74
+              image: georust/proj-ci-without-system-proj:proj-9.3.1-rust-1.75
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: ""
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - run: cargo build ${{ matrix.features }}
       - run: cargo test ${{ matrix.features }}
 
@@ -146,7 +146,7 @@ jobs:
         working-directory: proj-sys
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       # At some point around Feb. 2023, the GH macos CI runner no longer had
       # pkg-config installed by default, so we need to install it manually.
       #
