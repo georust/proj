@@ -10,6 +10,7 @@ use proj_sys::{
     proj_trans, proj_trans_array, proj_trans_bounds, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD,
     PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_XYZT,
 };
+use std::ptr;
 use std::{
     convert, ffi,
     fmt::{self, Debug},
@@ -1073,16 +1074,7 @@ impl Proj {
         }
     }
 
-    /// ```rust
-    /// # use approx::assert_relative_eq;
-    /// use proj::{Proj, Coord};
-    ///
-    /// let from = "EPSG:2230";
-    /// let to = "EPSG:26946";
-    /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
-    /// let result = ft_to_m.to_projjson(None, None).unwrap();
-    /// dbg!(result);
-    /// ```
+    /// Return the projjson representation of a transformation
     ///
     /// # Safety
     /// This method contains unsafe code.
@@ -1091,23 +1083,27 @@ impl Proj {
         multiline: Option<bool>,
         indentation_width: Option<usize>,
     ) -> Result<String, ProjError> {
-        let mut opts_c = vec![];
+        let mut opts = vec![];
         if let Some(multiline) = multiline {
             if multiline {
-                opts_c.push(CString::new("MULTILINE=YES")?);
+                opts.push(String::from("MULTILINE=YES"));
             } else {
-                opts_c.push(CString::new("MULTILINE=NO")?);
+                opts.push(String::from("MULTILINE=NO"));
             }
         }
         if let Some(indentation_width) = indentation_width {
-            opts_c.push(CString::new(format!(
-                "INDENTATION_WIDTH={}",
-                indentation_width
-            ))?);
+            opts.push(format!("INDENTATION_WIDTH={}", indentation_width));
         }
-
-        let opts_p: Vec<_> = opts_c.iter().map(|cstr| cstr.as_ptr()).collect();
-
+        // Do we have input options? Join them into a single string
+        let sep = if opts.len() > 1 { "," } else { "" };
+        let joined = opts.join(sep);
+        let opts_c = CString::new(joined)?;
+        let opts_p = if opts_c.is_empty() {
+            // You cannot pass an empty string as an input option: it must be a null pointer
+            vec![ptr::null()]
+        } else {
+            vec![opts_c.as_ptr()]
+        };
         unsafe {
             let out_ptr = proj_as_projjson(self.ctx, self.c_proj, opts_p.as_ptr());
             if out_ptr.is_null() {
@@ -1529,5 +1525,14 @@ mod test {
         assert_eq!(area.east, 44.83);
         assert_eq!(area.north, 84.73);
         assert!(name.contains("Europe"));
+    }
+
+    #[test]
+    fn test_projjson() {
+        let from = "EPSG:2230";
+        let to = "EPSG:26946";
+        let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+        let result = ft_to_m.to_projjson(None, None).unwrap();
+        dbg!(&result);
     }
 }
