@@ -1550,7 +1550,13 @@ mod test {
         let to = "EPSG:26946";
         let ft_to_m = Proj::new_known_crs(from, to, None).unwrap();
         // Because libproj has been fussy about passing empty options strings we're testing both
-        let _ = ft_to_m.to_projjson(Some(true), None, None).unwrap();
+        let _ = ft_to_m
+            .to_projjson(
+                Some(true),
+                None,
+                Some("https://proj.org/schemas/v0.7/projjson.schema.json"),
+            )
+            .unwrap();
         let _ = ft_to_m.to_projjson(None, None, None).unwrap();
         // TODO: do we want to compare one of the results to proj's output?
     }
