@@ -1090,24 +1090,21 @@ impl Proj {
                 let mut opts = vec![];
                 if let Some(multiline) = multiline {
                     if multiline {
-                        opts.push(CString::new("MULTILINE=YES")?)
+                        opts.push(String::from("MULTILINE=YES"))
                     } else {
-                        opts.push(CString::new("MULTILINE=NO")?)
+                        opts.push(String::from("MULTILINE=NO"))
                     }
                 };
                 if let Some(indentation_width) = indentation_width {
-                    opts.push(CString::new(format!(
-                        "INDENTATION_WIDTH={}",
-                        indentation_width
-                    ))?)
+                    opts.push(format!("INDENTATION_WIDTH={}", indentation_width))
                 }
                 if let Some(schema) = schema {
-                    opts.push(CString::new(format!("SCHEMA={}", schema))?)
+                    opts.push(format!("SCHEMA={}", schema))
                 }
-                let opts_ptrs = opts.iter().map(|x| x.as_ptr()).collect::<Vec<_>>();
-                let result = unsafe { proj_as_projjson(self.ctx, self.c_proj, opts_ptrs.as_ptr()) };
-                let x = opts;
-                result
+                let sep = if opts.len() > 1 { "," } else { "" };
+                let opts_c = CString::new(opts.join(sep))?;
+                let opts_ptrs = vec![opts_c.as_ptr()];
+                unsafe { proj_as_projjson(self.ctx, self.c_proj, opts_ptrs.as_ptr()) }
             }
         };
 
