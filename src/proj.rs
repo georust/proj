@@ -1102,11 +1102,11 @@ impl Proj {
         let sep = if opts.len() > 1 { "," } else { "" };
         let joined = opts.join(sep);
         let opts_c = CString::new(joined)?;
-        let opts_p = if opts_c.is_empty() {
-            // You cannot pass an empty string as an input option: it must be a null pointer
-            vec![ptr::null()]
-        } else {
-            vec![opts_c.as_ptr()]
+        // it seems wasteful to leave the None check until now, but building the option pointers inside
+        // an if statement consistently causes libproj to segfault with a memory error due to bad input
+        let opts_p = match (multiline, indentation_width, schema) {
+            (None, None, None) => vec![ptr::null()],
+            _ => vec![opts_c.as_ptr()],
         };
         unsafe {
             let out_ptr = proj_as_projjson(self.ctx, self.c_proj, opts_p.as_ptr());
@@ -1536,7 +1536,15 @@ mod test {
         let from = "EPSG:2230";
         let to = "EPSG:26946";
         let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
-        let result = ft_to_m.to_projjson(None, None, None).unwrap();
-        dbg!(&result);
+        // Because libproj has been fussy about passing empty options strings we're testing both
+        let _ = ft_to_m
+            .to_projjson(
+                Some(true),
+                None,
+                Some("https://proj.org/schemas/v0.7/projjson.schema.json"),
+            )
+            .unwrap();
+        let _ = ft_to_m.to_projjson(None, None, None).unwrap();
+        // TODO: do we want to compare one of the results to proj's output?
     }
 }
