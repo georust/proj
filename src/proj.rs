@@ -1084,29 +1084,33 @@ impl Proj {
         indentation_width: Option<usize>,
         schema: Option<&str>,
     ) -> Result<String, ProjError> {
-        let mut opts = vec![];
-        if let Some(multiline) = multiline {
-            if multiline {
-                opts.push(String::from("MULTILINE=YES"));
-            } else {
-                opts.push(String::from("MULTILINE=NO"));
-            }
-        }
-        if let Some(indentation_width) = indentation_width {
-            opts.push(format!("INDENTATION_WIDTH={}", indentation_width));
-        }
-        if let Some(schema) = schema {
-            opts.push(format!("SCHEMA={}", schema));
-        }
         // Do we have input options? Join them into a single string
-        let sep = if opts.len() > 1 { "," } else { "" };
-        let joined = opts.join(sep);
-        let opts_c = CString::new(joined)?;
-        // it seems wasteful to leave the None check until now, but building the option pointers inside
-        // an if statement consistently causes libproj to segfault with a memory error due to bad input
-        let opts_p = match (multiline, indentation_width, schema) {
-            (None, None, None) => vec![ptr::null()],
-            _ => vec![opts_c.as_ptr()],
+        let opts_c = match (multiline, indentation_width, schema) {
+            (None, None, None) => None,
+            _ => {
+                let mut opts = vec![];
+                if let Some(multiline) = multiline {
+                    if multiline {
+                        opts.push(String::from("MULTILINE=YES"));
+                    } else {
+                        opts.push(String::from("MULTILINE=NO"));
+                    }
+                }
+                if let Some(indentation_width) = indentation_width {
+                    opts.push(format!("INDENTATION_WIDTH={}", indentation_width));
+                }
+                if let Some(schema) = schema {
+                    opts.push(format!("SCHEMA={}", schema));
+                }
+                let sep = if opts.len() > 1 { "," } else { "" };
+                let joined = opts.join(sep);
+                Some(CString::new(joined)?)
+            }
+        };
+        let opts_p = if let Some(opts_c) = opts_c {
+            vec![opts_c.as_ptr()]
+        } else {
+            vec![ptr::null()]
         };
         unsafe {
             let out_ptr = proj_as_projjson(self.ctx, self.c_proj, opts_p.as_ptr());
@@ -1535,7 +1539,7 @@ mod test {
     fn test_projjson() {
         let from = "EPSG:2230";
         let to = "EPSG:26946";
-        let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+        let ft_to_m = Proj::new_known_crs(from, to, None).unwrap();
         // Because libproj has been fussy about passing empty options strings we're testing both
         let _ = ft_to_m
             .to_projjson(
