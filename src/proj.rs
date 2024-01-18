@@ -1084,45 +1084,34 @@ impl Proj {
         indentation_width: Option<usize>,
         schema: Option<&str>,
     ) -> Result<String, ProjError> {
-        let opts_p = match (multiline, indentation_width, schema) {
-            (None, None, None) => None,
+        let out_ptr = match (multiline, indentation_width, schema) {
+            (None, None, None) => unsafe { proj_as_projjson(self.ctx, self.c_proj, ptr::null()) },
             _ => {
                 let mut opts = vec![];
                 if let Some(multiline) = multiline {
                     if multiline {
-                        opts.push(CString::new("MULTILINE=YES")?);
+                        opts.push(CString::new("MULTILINE=YES")?)
                     } else {
-                        opts.push(CString::new("MULTILINE=NO")?);
+                        opts.push(CString::new("MULTILINE=NO")?)
                     }
-                }
+                };
                 if let Some(indentation_width) = indentation_width {
                     opts.push(CString::new(format!(
                         "INDENTATION_WIDTH={}",
                         indentation_width
-                    ))?);
+                    ))?)
                 }
                 if let Some(schema) = schema {
-                    opts.push(CString::new(format!("SCHEMA={}", schema))?);
+                    opts.push(CString::new(format!("SCHEMA={}", schema))?)
                 }
-
-                Some(opts)
+                let opts_ptrs = opts.iter().map(|x| x.as_ptr()).collect::<Vec<_>>();
+                let result = unsafe { proj_as_projjson(self.ctx, self.c_proj, opts_ptrs.as_ptr()) };
+                let x = opts;
+                result
             }
         };
 
         unsafe {
-            // NOTE: we can't create the pointer to the vec of strings too early! As the [docstring
-            // of `as_ptr`
-            // mentions](https://doc.rust-lang.org/std/ffi/struct.CStr.html#method.as_ptr):
-            // > It is your responsibility to make sure that the underlying memory is not freed too
-            // > early. For example, the following code will cause undefined behavior when ptr is
-            // > used inside the unsafe block:
-            let out_ptr = if let Some(opts_p) = opts_p {
-                let opts_c = opts_p.iter().map(|x| x.as_ptr()).collect::<Vec<_>>();
-                proj_as_projjson(self.ctx, self.c_proj, opts_c.as_ptr())
-            } else {
-                proj_as_projjson(self.ctx, self.c_proj, ptr::null())
-            };
-
             if out_ptr.is_null() {
                 // Not sure the best way to retrieve and return the error
                 todo!()
