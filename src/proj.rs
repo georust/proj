@@ -1084,36 +1084,45 @@ impl Proj {
         indentation_width: Option<usize>,
         schema: Option<&str>,
     ) -> Result<String, ProjError> {
-        // Do we have input options? Join them into a single string
-        let opts_c = match (multiline, indentation_width, schema) {
+        let opts_p = match (multiline, indentation_width, schema) {
             (None, None, None) => None,
             _ => {
                 let mut opts = vec![];
                 if let Some(multiline) = multiline {
                     if multiline {
-                        opts.push(String::from("MULTILINE=YES"));
+                        opts.push(CString::new("MULTILINE=YES")?);
                     } else {
-                        opts.push(String::from("MULTILINE=NO"));
+                        opts.push(CString::new("MULTILINE=NO")?);
                     }
                 }
                 if let Some(indentation_width) = indentation_width {
-                    opts.push(format!("INDENTATION_WIDTH={}", indentation_width));
+                    opts.push(CString::new(format!(
+                        "INDENTATION_WIDTH={}",
+                        indentation_width
+                    ))?);
                 }
                 if let Some(schema) = schema {
-                    opts.push(format!("SCHEMA={}", schema));
+                    opts.push(CString::new(format!("SCHEMA={}", schema))?);
                 }
-                let sep = if opts.len() > 1 { "," } else { "" };
-                let joined = opts.join(sep);
-                Some(CString::new(joined)?)
+
+                Some(opts)
             }
         };
-        let opts_p = if let Some(opts_c) = opts_c {
-            vec![opts_c.as_ptr()]
-        } else {
-            vec![ptr::null()]
-        };
+
         unsafe {
-            let out_ptr = proj_as_projjson(self.ctx, self.c_proj, opts_p.as_ptr());
+            // NOTE: we can't create the pointer to the vec of strings too early! As the [docstring
+            // of `as_ptr`
+            // mentions](https://doc.rust-lang.org/std/ffi/struct.CStr.html#method.as_ptr):
+            // > It is your responsibility to make sure that the underlying memory is not freed too
+            // > early. For example, the following code will cause undefined behavior when ptr is
+            // > used inside the unsafe block:
+            let out_ptr = if let Some(opts_p) = opts_p {
+                let opts_c = opts_p.iter().map(|x| x.as_ptr()).collect::<Vec<_>>();
+                proj_as_projjson(self.ctx, self.c_proj, opts_c.as_ptr())
+            } else {
+                proj_as_projjson(self.ctx, self.c_proj, ptr::null())
+            };
+
             if out_ptr.is_null() {
                 // Not sure the best way to retrieve and return the error
                 todo!()
@@ -1539,15 +1548,9 @@ mod test {
     fn test_projjson() {
         let from = "EPSG:2230";
         let to = "EPSG:26946";
-        let ft_to_m = Proj::new_known_crs(from, to, None).unwrap();
+        let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
         // Because libproj has been fussy about passing empty options strings we're testing both
-        let _ = ft_to_m
-            .to_projjson(
-                Some(true),
-                None,
-                Some("https://proj.org/schemas/v0.7/projjson.schema.json"),
-            )
-            .unwrap();
+        let _ = ft_to_m.to_projjson(Some(true), None, None).unwrap();
         let _ = ft_to_m.to_projjson(None, None, None).unwrap();
         // TODO: do we want to compare one of the results to proj's output?
     }
