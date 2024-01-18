@@ -1548,7 +1548,7 @@ mod test {
     fn test_projjson() {
         let from = "EPSG:2230";
         let to = "EPSG:26946";
-        let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+        let ft_to_m = Proj::new_known_crs(from, to, None).unwrap();
         // Because libproj has been fussy about passing empty options strings we're testing both
         let _ = ft_to_m.to_projjson(Some(true), None, None).unwrap();
         let _ = ft_to_m.to_projjson(None, None, None).unwrap();
