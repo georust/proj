@@ -1082,6 +1082,7 @@ impl Proj {
         &self,
         multiline: Option<bool>,
         indentation_width: Option<usize>,
+        schema: Option<&str>,
     ) -> Result<String, ProjError> {
         let mut opts = vec![];
         if let Some(multiline) = multiline {
@@ -1093,6 +1094,9 @@ impl Proj {
         }
         if let Some(indentation_width) = indentation_width {
             opts.push(format!("INDENTATION_WIDTH={}", indentation_width));
+        }
+        if let Some(schema) = schema {
+            opts.push(format!("SCHEMA={}", schema));
         }
         // Do we have input options? Join them into a single string
         let sep = if opts.len() > 1 { "," } else { "" };
@@ -1532,7 +1536,7 @@ mod test {
         let from = "EPSG:2230";
         let to = "EPSG:26946";
         let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
-        let result = ft_to_m.to_projjson(None, None).unwrap();
+        let result = ft_to_m.to_projjson(None, None, None).unwrap();
         dbg!(&result);
     }
 }
