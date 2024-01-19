@@ -2,14 +2,15 @@ use libc::c_int;
 use libc::{c_char, c_double};
 use num_traits::Float;
 use proj_sys::{
-    proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_cleanup, proj_context_create,
-    proj_context_destroy, proj_context_errno, proj_context_get_url_endpoint,
+    proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_as_projjson, proj_cleanup,
+    proj_context_create, proj_context_destroy, proj_context_errno, proj_context_get_url_endpoint,
     proj_context_is_network_enabled, proj_context_set_search_paths, proj_context_set_url_endpoint,
     proj_create, proj_create_crs_to_crs, proj_destroy, proj_errno_string, proj_get_area_of_use,
     proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization, proj_pj_info,
     proj_trans, proj_trans_array, proj_trans_bounds, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD,
     PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_XYZT,
 };
+use std::ptr;
 use std::{
     convert, ffi,
     fmt::{self, Debug},
@@ -1064,6 +1065,47 @@ impl Proj {
             Err(ProjError::Projection(error_message(err)?))
         }
     }
+
+    /// Return the projjson representation of a transformation
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn to_projjson(
+        &self,
+        multiline: Option<bool>,
+        indentation_width: Option<usize>,
+        schema: Option<&str>,
+    ) -> Result<String, ProjError> {
+        let mut opts = vec![];
+        if let Some(multiline) = multiline {
+            if multiline {
+                opts.push(CString::new(String::from("MULTILINE=YES"))?)
+            } else {
+                opts.push(CString::new(String::from("MULTILINE=NO"))?)
+            }
+        };
+        if let Some(indentation_width) = indentation_width {
+            opts.push(CString::new(format!(
+                "INDENTATION_WIDTH={}",
+                indentation_width
+            ))?)
+        }
+        if let Some(schema) = schema {
+            opts.push(CString::new(format!("SCHEMA={}", schema))?)
+        }
+        let mut opts_ptrs: Vec<_> = opts.iter().map(|cs| cs.as_ptr()).collect();
+        // we always have to terminate with a null pointer, even if the opts are empty
+        opts_ptrs.push(ptr::null());
+        unsafe {
+            let out_ptr = proj_as_projjson(self.ctx, self.c_proj, opts_ptrs.as_ptr());
+            if out_ptr.is_null() {
+                // Not sure the best way to retrieve and return the error
+                todo!()
+            } else {
+                Ok(_string(out_ptr)?)
+            }
+        }
+    }
 }
 
 impl convert::TryFrom<&str> for Proj {
@@ -1475,5 +1517,22 @@ mod test {
         assert_eq!(area.east, 44.83);
         assert_eq!(area.north, 84.73);
         assert!(name.contains("Europe"));
+    }
+
+    #[test]
+    fn test_projjson() {
+        let from = "EPSG:2230";
+        let to = "EPSG:26946";
+        let ft_to_m = Proj::new_known_crs(from, to, None).unwrap();
+        // Because libproj has been fussy about passing empty options strings we're testing both
+        let _ = ft_to_m
+            .to_projjson(
+                Some(true),
+                None,
+                Some("https://proj.org/schemas/v0.7/projjson.schema.json"),
+            )
+            .unwrap();
+        let _ = ft_to_m.to_projjson(None, None, None).unwrap();
+        // TODO: do we want to compare one of the results to proj's output?
     }
 }
