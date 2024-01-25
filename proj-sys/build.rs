@@ -46,6 +46,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })?
     };
 
+    #[cfg(feature = "buildtime_bindgen")]
+    generate_bindings(include_path)?;
+    #[cfg(not(feature = "buildtime_bindgen"))]
+    let _ = include_path;
+
+    Ok(())
+}
+
+#[cfg(feature = "buildtime_bindgen")]
+fn generate_bindings(include_path: std::path::PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
     // the resulting bindings.
