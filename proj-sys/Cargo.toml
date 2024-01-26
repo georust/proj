@@ -14,7 +14,7 @@ rust-version = "1.70"
 [dependencies]
 
 [build-dependencies]
-bindgen = "0.68.1"
+bindgen = { version = "0.68.1", optional = true }
 pkg-config = "0.3.25"
 cmake = "0.1.50"
 flate2 = "1.0.24"
@@ -27,6 +27,7 @@ bundled_proj = []
 pkg_config = []
 network = ["tiff"]
 tiff = []
+buildtime_bindgen = ["dep:bindgen"]
 
 [package.metadata.docs.rs]
 features = [ "nobuild" ] # This feature will be enabled during the docs.rs build

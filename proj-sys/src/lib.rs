@@ -28,8 +28,11 @@
 //! implement your own set of callbacks if you wish to make use of them (see the
 //! [`proj`](https://crates.io/crates/proj) crate for an example).
 
-#[cfg(not(feature = "nobuild"))]
+#[cfg(all(not(feature = "nobuild"), feature = "buildtime_bindgen"))]
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
-#[cfg(feature = "nobuild")]
+#[cfg(all(feature = "nobuild", not(feature = "buildtime_bindgen")))]
 include!("bindings_docs-rs.rs");
+
+#[cfg(all(not(feature = "nobuild"), not(feature = "buildtime_bindgen")))]
+include!("bundled_bindings.rs");
