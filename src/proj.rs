@@ -486,6 +486,8 @@ pub struct Proj {
     area: Option<*mut PJ_AREA>,
 }
 
+unsafe impl Send for Proj {}
+
 impl Proj {
     /// Try to create a new transformation object
     ///
