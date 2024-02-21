@@ -36,7 +36,7 @@ use proj::Proj;
 
 let from = "EPSG:2230";
 let to = "EPSG:26946";
-let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+let ft_to_m = Proj::new_known_crs(from, to, None).unwrap();
 let result = ft_to_m
     .convert((4760096.421921f64, 3744293.729449f64))
     .unwrap();
@@ -183,7 +183,7 @@ let donut_shop = MyPointOfInterest { lat: 34.095620, lon: -118.283555 };
 
 let from = "EPSG:4326";
 let to = "EPSG:3309";
-let proj = Proj::new_known_crs(&from, &to, None).unwrap();
+let proj = Proj::new_known_crs(from, to, None).unwrap();
 
 let result = proj.convert(donut_shop).unwrap();
 
@@ -205,7 +205,7 @@ let my_point = Point::new(4760096.421921f64, 3744293.729449f64);
 
 let from = "EPSG:2230";
 let to = "EPSG:26946";
-let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+let nad_ft_to_m = Proj::new_known_crs(from, to, None).unwrap();
 
 let result = nad_ft_to_m.convert(my_point).unwrap();
 

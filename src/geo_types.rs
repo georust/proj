@@ -9,7 +9,7 @@ use geo_types::{coord, Geometry};
 ///
 /// let from = "EPSG:2230";
 /// let to = "EPSG:26946";
-/// let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+/// let nad_ft_to_m = Proj::new_known_crs(from, to, None).unwrap();
 /// let result = nad_ft_to_m
 ///     .convert(coord! { x: 4760096.421921f64, y: 3744293.729449f64 })
 ///     .unwrap();
@@ -36,7 +36,7 @@ impl<T: crate::proj::CoordinateType> crate::Coord<T> for geo_types::Coord<T> {
 ///
 /// let from = "EPSG:2230";
 /// let to = "EPSG:26946";
-/// let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+/// let nad_ft_to_m = Proj::new_known_crs(from, to, None).unwrap();
 /// let result = nad_ft_to_m
 ///     .convert(Point::new(4760096.421921f64, 3744293.729449f64))
 ///     .unwrap();
