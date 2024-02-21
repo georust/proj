@@ -186,7 +186,10 @@ fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
 }
 
 /// called by Proj::new and ProjBuilder::transform_new_crs
-fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Result<Proj, ProjCreateError> {
+fn transform_string(
+    ctx: *mut PJ_CONTEXT,
+    definition: impl Into<Vec<u8>>,
+) -> Result<Proj, ProjCreateError> {
     let c_definition = CString::new(definition).map_err(ProjCreateError::ArgumentNulError)?;
     let ptr = result_from_create(ctx, unsafe { proj_create(ctx, c_definition.as_ptr()) })
         .map_err(|e| ProjCreateError::ProjError(e.message(ctx)))?;
@@ -200,8 +203,8 @@ fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Result<Proj, Proj
 /// Called by new_known_crs and proj_known_crs
 fn transform_epsg(
     ctx: *mut PJ_CONTEXT,
-    from: &str,
-    to: &str,
+    from: impl Into<Vec<u8>>,
+    to: impl Into<Vec<u8>>,
     area: Option<Area>,
 ) -> Result<Proj, ProjCreateError> {
     let from_c = CString::new(from).map_err(ProjCreateError::ArgumentNulError)?;
@@ -523,7 +526,7 @@ impl Proj {
     // is signalled by the choice of enum used as input to the PJ_COORD union
     // PJ_LP signals projection of geodetic coordinates, with output being PJ_XY
     // and vice versa, or using PJ_XY for conversion operations
-    pub fn new(definition: &str) -> Result<Proj, ProjCreateError> {
+    pub fn new(definition: impl Into<Vec<u8>>) -> Result<Proj, ProjCreateError> {
         let ctx = unsafe { proj_context_create() };
         transform_string(ctx, definition)
     }
@@ -576,8 +579,8 @@ impl Proj {
     ///
     /// This method contains unsafe code.
     pub fn new_known_crs(
-        from: &str,
-        to: &str,
+        from: impl Into<Vec<u8>>,
+        to: impl Into<Vec<u8>>,
         area: Option<Area>,
     ) -> Result<Proj, ProjCreateError> {
         let ctx = unsafe { proj_context_create() };
