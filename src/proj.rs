@@ -433,7 +433,7 @@ impl ProjBuilder {
     ///
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
-    /// let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+    /// let nad_ft_to_m = Proj::new_known_crs(from, to, None).unwrap();
     /// let result = nad_ft_to_m
     ///     .convert((4760096.421921f64, 3744293.729449f64))
     ///     .unwrap();
@@ -476,7 +476,7 @@ impl Default for ProjBuilder {
 ///
 /// let from = "EPSG:2230";
 /// let to = "EPSG:26946";
-/// let nad_ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+/// let nad_ft_to_m = Proj::new_known_crs(from, to, None).unwrap();
 /// let result = nad_ft_to_m
 ///     .convert((4760096.421921f64, 3744293.729449f64))
 ///     .unwrap();
@@ -793,7 +793,7 @@ impl Proj {
     ///
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
-    /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+    /// let ft_to_m = Proj::new_known_crs(from, to, None).unwrap();
     /// let result = ft_to_m
     ///     .convert((4760096.421921, 3744293.729449))
     ///     .unwrap();
@@ -858,7 +858,7 @@ impl Proj {
     /// // Convert from NAD83(NSRS2007) to NAD83(2011)
     /// let from = "EPSG:4759";
     /// let to = "EPSG:4317";
-    /// let NAD83_old_to_new = Proj::new_known_crs(&from, &to, None).unwrap();
+    /// let NAD83_old_to_new = Proj::new_known_crs(from, to, None).unwrap();
     /// let mut v = vec![
     ///     (-98.5421515000, 39.2240867222),
     ///     (-98.3166503906, 38.7112325390),
@@ -891,7 +891,7 @@ impl Proj {
     /// # use approx::assert_relative_eq;
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
-    /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+    /// let ft_to_m = Proj::new_known_crs(from, to, None).unwrap();
     /// let mut v = vec![
     ///     (4760096.421921, 3744293.729449),
     ///     (4760197.421921, 3744394.729449),
@@ -939,7 +939,7 @@ impl Proj {
     ///
     /// let from = "EPSG:2230";
     /// let to = "EPSG:26946";
-    /// let ft_to_m = Proj::new_known_crs(&from, &to, None).unwrap();
+    /// let ft_to_m = Proj::new_known_crs(from, to, None).unwrap();
     /// let result = ft_to_m
     ///     .transform_bounds(4760096.421921, 3744293.729449, 4760196.421921, 3744393.729449, 21)
     ///     .unwrap();
