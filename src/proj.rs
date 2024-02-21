@@ -401,7 +401,7 @@ impl ProjBuilder {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn proj(mut self, definition: &str) -> Result<Proj, ProjCreateError> {
+    pub fn proj(mut self, definition: impl Into<Vec<u8>>) -> Result<Proj, ProjCreateError> {
         let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
         transform_string(ctx, definition)
     }
@@ -445,8 +445,8 @@ impl ProjBuilder {
     /// This method contains unsafe code.
     pub fn proj_known_crs(
         mut self,
-        from: &str,
-        to: &str,
+        from: impl Into<Vec<u8>>,
+        to: impl Into<Vec<u8>>,
         area: Option<Area>,
     ) -> Result<Proj, ProjCreateError> {
         let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
