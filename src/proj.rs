@@ -1242,6 +1242,12 @@ mod test {
     }
 
     #[test]
+    fn test_creation_from_string() {
+        let wgs84 = "+proj=longlat +datum=WGS84 +no_defs".to_owned();
+        Proj::new(wgs84).unwrap();
+    }
+
+    #[test]
     fn test_debug() {
         let wgs84 = "+proj=longlat +datum=WGS84 +no_defs";
         let proj = Proj::new(wgs84).unwrap();
