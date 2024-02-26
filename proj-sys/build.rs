@@ -98,14 +98,12 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
     config.define("BUILD_PROJINFO", "OFF");
     config.define("BUILD_PROJSYNC", "OFF");
     config.define("ENABLE_CURL", "OFF");
-    config.define(
-        "SQLITE3_INCLUDE_DIR",
-        std::env::var("DEP_SQLITE3_INCLUDE").expect("This is set by libsqlite3-sys"),
-    );
-    config.define(
-        "SQLITE3_LIBRARY",
-        format!("{}/libsqlite3.a", std::env::var("DEP_SQLITE3_LIB_DIR").unwrap()),
-    );
+    if let Ok(sqlite_include) = std::env::var("DEP_SQLITE3_INCLUDE") {
+        config.define("SQLITE3_INCLUDE_DIR", sqlite_include);
+    }
+    if let Ok(sqlite_lib_dir) = std::env::var("DEP_SQLITE3_LIB_DIR") {
+        config.define("SQLITE3_LIBRARY", format!("{sqlite_lib_dir}/libsqlite3.a",));
+    }
 
     if cfg!(feature = "tiff") {
         eprintln!("enabling tiff support");
