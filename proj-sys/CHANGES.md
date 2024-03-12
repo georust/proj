@@ -1,6 +1,6 @@
 # Unreleased
 
-- Update to PROJ 9.3.1
+- Update to PROJ 9.4.0
 - Bump MSRV to 1.65
 
 
