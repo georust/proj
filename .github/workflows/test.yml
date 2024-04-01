@@ -155,6 +155,7 @@ jobs:
       #
       # but it seems like it hasn't been deployed yet. At some point we should
       # be able to delete this step if CI passes.
+      - run: brew update
       - run: brew install pkg-config
       - run: brew install proj
       - run: cargo test
