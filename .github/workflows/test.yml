@@ -141,6 +141,7 @@ jobs:
     runs-on: macos-latest
     env:
       _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
+      HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: TRUE
     defaults:
       run:
         working-directory: proj-sys
