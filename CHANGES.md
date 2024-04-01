@@ -1,7 +1,7 @@
 # Changes
 
 ## Unreleased
-
+- Update to proj-sys 0.24.0 (libproj 9.4.0)
 - Bump MSRV to 1.65
 
 ## 0.27.2
