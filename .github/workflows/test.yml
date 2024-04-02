@@ -51,9 +51,9 @@ jobs:
       matrix:
         container_image:
           # Minimum supported rust (MSRV)
-          - "georust/proj-ci:proj-9.3.1-rust-1.70"
+          - "georust/proj-ci:proj-9.4.0-rust-1.70"
           # Latest stable rust
-          - "georust/proj-ci:proj-9.3.1-rust-1.75"
+          - "georust/proj-ci:proj-9.4.0-rust-1.75"
         features:
           - ""
           - "--features network"
@@ -98,34 +98,34 @@ jobs:
         include:
           # Minimum supported rust (MSRV)
           - container:
-              image: georust/proj-ci:proj-9.3.1-rust-1.70
+              image: georust/proj-ci:proj-9.4.0-rust-1.70
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
             features: ""
           - container:
-              image: georust/proj-ci:proj-9.3.1-rust-1.70
+              image: georust/proj-ci:proj-9.4.0-rust-1.70
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: "--features bundled_proj"
           - container:
-              image: georust/proj-ci-without-system-proj:proj-9.3.1-rust-1.70
+              image: georust/proj-ci-without-system-proj:proj-9.4.0-rust-1.70
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: ""
 
           # Latest stable rust
           - container:
-              image: georust/proj-ci:proj-9.3.1-rust-1.75
+              image: georust/proj-ci:proj-9.4.0-rust-1.75
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
             features: ""
           - container:
-              image: georust/proj-ci:proj-9.3.1-rust-1.75
+              image: georust/proj-ci:proj-9.4.0-rust-1.75
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: "--features bundled_proj"
           - container:
-              image: georust/proj-ci-without-system-proj:proj-9.3.1-rust-1.75
+              image: georust/proj-ci-without-system-proj:proj-9.4.0-rust-1.75
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: ""
@@ -141,6 +141,7 @@ jobs:
     runs-on: macos-latest
     env:
       _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
+      HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: TRUE
     defaults:
       run:
         working-directory: proj-sys
@@ -155,6 +156,7 @@ jobs:
       #
       # but it seems like it hasn't been deployed yet. At some point we should
       # be able to delete this step if CI passes.
+      - run: brew update
       - run: brew install pkg-config
       - run: brew install proj
       - run: cargo test

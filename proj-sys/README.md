@@ -1,4 +1,4 @@
-# Low-level bindings for PROJ v9.1.x
+# Low-level bindings for PROJ v9.4.x
 
 **This is a
 [`*-sys`](https://doc.rust-lang.org/cargo/reference/build-scripts.html#-sys-packages)
