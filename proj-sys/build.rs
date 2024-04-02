@@ -98,6 +98,14 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
     config.define("BUILD_PROJINFO", "OFF");
     config.define("BUILD_PROJSYNC", "OFF");
     config.define("ENABLE_CURL", "OFF");
+
+    // we check here whether or not these variables are set by cargo
+    // if they are set `libsqlite3-sys` was build with the bundled feature
+    // enabled, which in turn allows us to relay on the build libsqlite3 version
+    // and link it statically
+    //
+    // If these are not set it's necessary that libsqlite3 exists on the build system
+    // in a location accecible by cmake
     if let Ok(sqlite_include) = std::env::var("DEP_SQLITE3_INCLUDE") {
         config.define("SQLITE3_INCLUDE_DIR", sqlite_include);
     }
