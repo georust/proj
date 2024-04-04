@@ -56,9 +56,9 @@ jobs:
       matrix:
         container_image:
           # Minimum supported rust (MSRV)
-          - "ghcr.io/georust/proj-ci:proj-${{ env.LIBPROJ_VERSION }}-rust-${{ env.RUST_MSRV }}"
+          - ghcr.io/georust/proj-ci:proj-${{ env.LIBPROJ_VERSION }}-rust-${{ env.RUST_MSRV }}
           # Latest stable rust
-          - "ghcr.io/georust/proj-ci:proj-${{ env.LIBPROJ_VERSION }}-rust-${{ env.RUST_LATEST }}"
+          - ghcr.io/georust/proj-ci:proj-${{ env.LIBPROJ_VERSION }}-rust-${{ env.RUST_LATEST }}
         features:
           - ""
           - "--features network"
