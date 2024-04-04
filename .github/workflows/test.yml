@@ -15,6 +15,19 @@ env:
   RUST_LATEST: "1.77"
 
 jobs:
+  # work around GHA env strictness
+  compute:
+    runs-on: ubuntu-latest
+    outputs:
+      RUST_MSRV: ${{ env.RUST_MSRV }}
+      RUST_LATEST: ${{ env.RUST_LATEST }}
+      LIBPROJ_VERSION: ${{ env.LIBPROJ_VERSION }}
+    steps:
+      - name: Compute outputs
+        run: |
+          echo "RUST_MSRV=${{ env.RUST_MSRV }}" >> $GITHUB_OUTPUT
+          echo "RUST_LATEST=${{ env.RUST_LATEST }}" >> $GITHUB_OUTPUT
+          echo "LIBPROJ_VERSION=${{ env.LIBPROJ_VERSION }}" >> $GITHUB_OUTPUT
   # The `ci-result` job doesn't actually test anything - it just aggregates the
   # overall build status, otherwise the merge queue would need an entry
   # for each individual job produced by the job-matrix.
@@ -52,14 +65,15 @@ jobs:
     name: proj ubuntu
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
+    needs: compute
     strategy:
       fail-fast: false
       matrix:
         container_image:
           # Minimum supported rust (MSRV)
-          - ghcr.io/georust/proj-ci:proj-${{ env.LIBPROJ_VERSION }}-rust-${{ env.RUST_MSRV }}
+          - ghcr.io/georust/proj-ci:proj-${{ needs.compute.outputs.LIBPROJ_VERSION }}-rust-${{ needs.compute.outputs.RUST_MSRV }}
           # Latest stable rust
-          - ghcr.io/georust/proj-ci:proj-${{ env.LIBPROJ_VERSION }}-rust-${{ env.RUST_LATEST }}
+          - ghcr.io/georust/proj-ci:proj-${{ needs.compute.outputs.LIBPROJ_VERSION }}-rust-${{ needs.compute.outputs.RUST_LATEST }}
         features:
           - ""
           - "--features network"
@@ -95,6 +109,7 @@ jobs:
     name: proj-sys ubuntu
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
+    needs: compute
     defaults:
       run:
         working-directory: proj-sys
@@ -104,34 +119,34 @@ jobs:
         include:
           # Minimum supported rust (MSRV)
           - container:
-              image: ghcr.io/georust/proj-ci:proj-${{ env.LIBPROJ_VERSION }}-rust-${{ env.RUST_MSRV }}
+              image: ghcr.io/georust/proj-ci:proj-${{ needs.compute.outputs.LIBPROJ_VERSION }}-rust-${{ needs.compute.outputs.RUST_MSRV }}
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
             features: ""
           - container:
-              image: ghcr.io/georust/proj-ci:proj-${{ env.LIBPROJ_VERSION }}-rust-${{ env.RUST_MSRV }}
+              image: ghcr.io/georust/proj-ci:proj-${{ needs.compute.outputs.LIBPROJ_VERSION }}-rust-${{ needs.compute.outputs.RUST_MSRV }}
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: "--features bundled_proj"
           - container:
-              image: ghcr.io/georust/proj-ci-without-system-proj:proj-${{ env.LIBPROJ_VERSION }}-rust-${{ env.RUST_MSRV }}
+              image: ghcr.io/georust/proj-ci-without-system-proj:proj-${{ needs.compute.outputs.LIBPROJ_VERSION }}-rust-${{ needs.compute.outputs.RUST_MSRV }}
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: ""
 
           # Latest stable rust
           - container:
-              image: ghcr.io/georust/proj-ci:proj-${{ env.LIBPROJ_VERSION }}-rust-${{ env.RUST_LATEST }}
+              image: ghcr.io/georust/proj-ci:proj-${{ needs.compute.outputs.LIBPROJ_VERSION }}-rust-${{ needs.compute.outputs.RUST_LATEST }}
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
             features: ""
           - container:
-              image: ghcr.io/georust/proj-ci:proj-${{ env.LIBPROJ_VERSION }}-rust-${{ env.RUST_LATEST }}
+              image: ghcr.io/georust/proj-ci:proj-${{ needs.compute.outputs.LIBPROJ_VERSION }}-rust-${{ needs.compute.outputs.RUST_LATEST }}
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: "--features bundled_proj"
           - container:
-              image: ghcr.io/georust/proj-ci-without-system-proj:proj-${{ env.LIBPROJ_VERSION }}-rust-${{ env.RUST_LATEST }}
+              image: ghcr.io/georust/proj-ci-without-system-proj:proj-${{ needs.compute.outputs.LIBPROJ_VERSION }}-rust-${{ needs.compute.outputs.RUST_LATEST }}
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: ""
