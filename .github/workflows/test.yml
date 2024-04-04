@@ -125,7 +125,7 @@ jobs:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: "--features bundled_proj"
           - container:
-              image: ghcr.io/georust/proj-ci-without-system-proj:proj-9.4.0-rust-1.75
+              image: ghcr.io/georust/proj-ci-without-system-proj:proj-9.4.0-rust-1.77
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: ""
