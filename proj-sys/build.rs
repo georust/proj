@@ -86,8 +86,8 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
     let tar_gz = File::open(path)?;
     let tar = GzDecoder::new(tar_gz);
     let mut archive = Archive::new(tar);
-    archive.unpack("PROJSRC/proj")?;
-    let mut config = cmake::Config::new("PROJSRC/proj/proj-9.4.0");
+    archive.unpack(out_path.join("PROJSRC/proj"))?;
+    let mut config = cmake::Config::new(out_path.join("PROJSRC/proj/proj-9.4.0"));
     config.define("BUILD_SHARED_LIBS", "OFF");
     config.define("BUILD_TESTING", "OFF");
     config.define("BUILD_CCT", "OFF");
