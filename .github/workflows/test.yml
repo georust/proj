@@ -7,6 +7,11 @@ on:
   pull_request:
   merge_group:
 
+env:
+  LIBPROJ_VERSION: 9.4.0
+  RUST_MSRV: "1.70"
+  RUST_LATEST: "1.77"
+
 name: proj ci
 jobs:
   # The `ci-result` job doesn't actually test anything - it just aggregates the
@@ -51,9 +56,9 @@ jobs:
       matrix:
         container_image:
           # Minimum supported rust (MSRV)
-          - "ghcr.io/georust/proj-ci:proj-9.4.0-rust-1.70"
+          - "ghcr.io/georust/proj-ci:proj-${{ env.LIBPROJ_VERSION }}-rust-${{ env.RUST_MSRV }}"
           # Latest stable rust
-          - "ghcr.io/georust/proj-ci:proj-9.4.0-rust-1.77"
+          - "ghcr.io/georust/proj-ci:proj-${{ env.LIBPROJ_VERSION }}-rust-${{ env.RUST_LATEST }}"
         features:
           - ""
           - "--features network"
@@ -98,34 +103,34 @@ jobs:
         include:
           # Minimum supported rust (MSRV)
           - container:
-              image: ghcr.io/georust/proj-ci:proj-9.4.0-rust-1.70
+              image: ghcr.io/georust/proj-ci:proj-${{ env.LIBPROJ_VERSION }}-rust-${{ env.RUST_MSRV }}
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
             features: ""
           - container:
-              image: ghcr.io/georust/proj-ci:proj-9.4.0-rust-1.70
+              image: ghcr.io/georust/proj-ci:proj-${{ env.LIBPROJ_VERSION }}-rust-${{ env.RUST_MSRV }}
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: "--features bundled_proj"
           - container:
-              image: ghcr.io/georust/proj-ci-without-system-proj:proj-9.4.0-rust-1.70
+              image: ghcr.io/georust/proj-ci-without-system-proj:proj-${{ env.LIBPROJ_VERSION }}-rust-${{ env.RUST_MSRV }}
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: ""
 
           # Latest stable rust
           - container:
-              image: ghcr.io/georust/proj-ci:proj-9.4.0-rust-1.77
+              image: ghcr.io/georust/proj-ci:proj-${{ env.LIBPROJ_VERSION }}-rust-${{ env.RUST_LATEST }}
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
             features: ""
           - container:
-              image: ghcr.io/georust/proj-ci:proj-9.4.0-rust-1.77
+              image: ghcr.io/georust/proj-ci:proj-${{ env.LIBPROJ_VERSION }}-rust-${{ env.RUST_LATEST }}
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: "--features bundled_proj"
           - container:
-              image: ghcr.io/georust/proj-ci-without-system-proj:proj-9.4.0-rust-1.77
+              image: ghcr.io/georust/proj-ci-without-system-proj:proj-${{ env.LIBPROJ_VERSION }}-rust-${{ env.RUST_LATEST }}
               env:
                 _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
             features: ""
