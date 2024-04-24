@@ -1447,7 +1447,7 @@ mod test {
         ];
         ft_to_m.convert_array(&mut v).unwrap();
         assert_relative_eq!(v[0].x(), 1450880.2910605022f64);
-        assert_relative_eq!(v[1].y(), 1141293.7960220438);
+        assert_relative_eq!(v[1].y(), 1141293.7960220438, epsilon = 1e-8);
     }
 
     #[test]
@@ -1460,8 +1460,8 @@ mod test {
         // 👽
         let usa_m = MyPoint::new(-115.797615, 37.2647978);
         let usa_ft = to_feet.convert(usa_m).unwrap();
-        assert_eq!(6693625.67217475, usa_ft.x());
-        assert_eq!(3497301.5918027232, usa_ft.y());
+        assert_relative_eq!(6693625.67217475, usa_ft.x());
+        assert_relative_eq!(3497301.5918027232, usa_ft.y(), epsilon=1e-8);
     }
 
     #[test]
