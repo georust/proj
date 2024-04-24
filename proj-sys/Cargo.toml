@@ -12,6 +12,8 @@ links = "proj"
 rust-version = "1.70"
 
 [dependencies]
+libsqlite3-sys = "0.28"
+link-cplusplus = "1.0"
 
 [build-dependencies]
 bindgen = "0.68.1"
