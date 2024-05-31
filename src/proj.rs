@@ -6,9 +6,9 @@ use proj_sys::{
     proj_context_destroy, proj_context_errno, proj_context_get_url_endpoint,
     proj_context_is_network_enabled, proj_context_set_search_paths, proj_context_set_url_endpoint,
     proj_create, proj_create_crs_to_crs, proj_destroy, proj_errno_string, proj_get_area_of_use,
-    proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization, proj_pj_info,
-    proj_trans, proj_trans_array, proj_trans_bounds, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD,
-    PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_XYZT,
+    proj_get_id_code, proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization,
+    proj_pj_info, proj_trans, proj_trans_array, proj_trans_bounds, PJconsts, PJ, PJ_AREA,
+    PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_XYZT,
 };
 use std::{
     convert, ffi,
@@ -582,6 +582,17 @@ impl Proj {
     ) -> Result<Proj, ProjCreateError> {
         let ctx = unsafe { proj_context_create() };
         transform_epsg(ctx, from, to, area)
+    }
+
+    /// Returns epsg code for Proj
+    /// 
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn to_epsg(&self) -> Result<&str, str::Utf8Error> {
+        let pj = self.c_proj as *const PJ;
+        let c_char = unsafe { proj_get_id_code(pj, 0) };
+        let c_str = unsafe { CStr::from_ptr(c_char) };
+        c_str.to_str()
     }
 
     /// Set the bounding box of the area of use
@@ -1461,7 +1472,7 @@ mod test {
         let usa_m = MyPoint::new(-115.797615, 37.2647978);
         let usa_ft = to_feet.convert(usa_m).unwrap();
         assert_relative_eq!(6693625.67217475, usa_ft.x());
-        assert_relative_eq!(3497301.5918027232, usa_ft.y(), epsilon=1e-8);
+        assert_relative_eq!(3497301.5918027232, usa_ft.y(), epsilon = 1e-8);
     }
 
     #[test]
@@ -1475,5 +1486,11 @@ mod test {
         assert_eq!(area.east, 44.83);
         assert_eq!(area.north, 84.73);
         assert!(name.contains("Europe"));
+    }
+    #[test]
+    fn test_to_epsg() {
+        let proj = Proj::new("EPSG:3059").unwrap();
+        let epsg = proj.to_epsg().unwrap();
+        assert_eq!(epsg, "3059")
     }
 }
