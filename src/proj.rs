@@ -1,8 +1,21 @@
 use libc::c_int;
 use libc::{c_char, c_double};
 use num_traits::Float;
-use proj_sys::{proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_cleanup, proj_context_create, proj_context_destroy, proj_context_errno, proj_context_get_url_endpoint, proj_context_is_network_enabled, proj_context_set_search_paths, proj_context_set_url_endpoint, proj_create, proj_create_crs_to_crs, proj_destroy, proj_errno_string, proj_get_area_of_use, proj_get_id_code,proj_get_id_auth_name, proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization, proj_pj_info, proj_trans, proj_trans_array, proj_trans_bounds, PJconsts, PJ, PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_XYZT};
-use std::{convert, ffi, fmt::{self, Debug}, ptr, str};
+use proj_sys::{
+    proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_cleanup, proj_context_create,
+    proj_context_destroy, proj_context_errno, proj_context_get_url_endpoint,
+    proj_context_is_network_enabled, proj_context_set_search_paths, proj_context_set_url_endpoint,
+    proj_create, proj_create_crs_to_crs, proj_destroy, proj_errno_string, proj_get_area_of_use,
+    proj_get_id_auth_name, proj_get_id_code, proj_grid_cache_set_enable, proj_info,
+    proj_normalize_for_visualization, proj_pj_info, proj_trans, proj_trans_array,
+    proj_trans_bounds, PJconsts, PJ, PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD,
+    PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_XYZT,
+};
+use std::{
+    convert, ffi,
+    fmt::{self, Debug},
+    ptr, str,
+};
 
 #[cfg(feature = "network")]
 use proj_sys::proj_context_set_enable_network;
@@ -587,7 +600,7 @@ impl Proj {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn id_auth_name(&self)-> Result<&str, str::Utf8Error>{
+    pub fn id_auth_name(&self) -> Result<&str, str::Utf8Error> {
         let pj = self.c_proj as *const PJ;
         let c_char = unsafe { proj_get_id_auth_name(pj, 0) };
         let c_str = unsafe { CStr::from_ptr(c_char) };
