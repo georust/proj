@@ -1,20 +1,8 @@
 use libc::c_int;
 use libc::{c_char, c_double};
 use num_traits::Float;
-use proj_sys::{
-    proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_cleanup, proj_context_create,
-    proj_context_destroy, proj_context_errno, proj_context_get_url_endpoint,
-    proj_context_is_network_enabled, proj_context_set_search_paths, proj_context_set_url_endpoint,
-    proj_create, proj_create_crs_to_crs, proj_destroy, proj_errno_string, proj_get_area_of_use,
-    proj_get_id_code, proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization,
-    proj_pj_info, proj_trans, proj_trans_array, proj_trans_bounds, PJconsts, PJ, PJ_AREA,
-    PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_XYZT,
-};
-use std::{
-    convert, ffi,
-    fmt::{self, Debug},
-    str,
-};
+use proj_sys::{proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_cleanup, proj_context_create, proj_context_destroy, proj_context_errno, proj_context_get_url_endpoint, proj_context_is_network_enabled, proj_context_set_search_paths, proj_context_set_url_endpoint, proj_create, proj_create_crs_to_crs, proj_destroy, proj_errno_string, proj_get_area_of_use, proj_get_id_code,proj_get_id_auth_name, proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization, proj_pj_info, proj_trans, proj_trans_array, proj_trans_bounds, PJconsts, PJ, PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_XYZT};
+use std::{convert, ffi, fmt::{self, Debug}, ptr, str};
 
 #[cfg(feature = "network")]
 use proj_sys::proj_context_set_enable_network;
@@ -584,13 +572,24 @@ impl Proj {
         transform_epsg(ctx, from, to, area)
     }
 
-    /// Returns epsg code for Proj
-    /// 
+    /// Return Authority code for Proj
+    ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn to_epsg(&self) -> Result<&str, str::Utf8Error> {
+    pub fn id_code(&self) -> Result<&str, str::Utf8Error> {
         let pj = self.c_proj as *const PJ;
         let c_char = unsafe { proj_get_id_code(pj, 0) };
+        let c_str = unsafe { CStr::from_ptr(c_char) };
+        c_str.to_str()
+    }
+
+    /// Return Authority Name for Proj
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn id_auth_name(&self)-> Result<&str, str::Utf8Error>{
+        let pj = self.c_proj as *const PJ;
+        let c_char = unsafe { proj_get_id_auth_name(pj, 0) };
         let c_str = unsafe { CStr::from_ptr(c_char) };
         c_str.to_str()
     }
@@ -1488,9 +1487,15 @@ mod test {
         assert!(name.contains("Europe"));
     }
     #[test]
-    fn test_to_epsg() {
-        let proj = Proj::new("EPSG:3059").unwrap();
-        let epsg = proj.to_epsg().unwrap();
-        assert_eq!(epsg, "3059")
+    fn test_id_code() {
+        let proj = Proj::new("EPSG:3035").unwrap();
+        let code = proj.id_code().unwrap();
+        assert_eq!(code, "3035")
+    }
+    #[test]
+    fn test_id_auth_name() {
+        let proj = Proj::new("EPSG:3035").unwrap();
+        let auth_name = proj.id_auth_name().unwrap();
+        assert_eq!(auth_name, "EPSG")
     }
 }
