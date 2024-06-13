@@ -180,10 +180,9 @@ unsafe fn _network_open(
     // hand the response off to the error-handler, continue on success
     error_handler(&mut res, in_case_of_error)?;
     // Write the initial read length value into the pointer
-    let Some(Ok(contentlength)) = res.header("Content-Length").map(str::parse) else {
+    let Some(Ok(contentlength)) = res.header("Content-Length").map(str::parse::<usize>) else {
         return Err(ProjError::ContentLength);
     };
-    out_size_read.write(contentlength);
     let headers = res
         .headers_names()
         .into_iter()
@@ -200,6 +199,7 @@ unsafe fn _network_open(
     res.into_reader()
         .take(size_to_read as u64)
         .read_to_end(&mut buf)?;
+    out_size_read.write(buf.len());
     buf.as_ptr().copy_to_nonoverlapping(buffer.cast(), capacity);
     let hd = HandleData::new(url, headers, None);
     // heap-allocate the struct and cast it to a void pointer so it can be passed around to PROJ
