@@ -119,7 +119,7 @@ pub enum ProjError {
     HeaderError(String),
     #[cfg(feature = "network")]
     #[error("Couldn't read response to buffer")]
-    ReadError,
+    ReadError(#[from] std::io::Error),
     #[error("A {0} error occurred for url {1} after {2} retries")]
     DownloadError(String, String, u8),
     #[error("The current definition could not be retrieved")]

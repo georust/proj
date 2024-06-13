@@ -199,8 +199,7 @@ unsafe fn _network_open(
     let mut buf = Vec::with_capacity(capacity);
     res.into_reader()
         .take(size_to_read as u64)
-        .read_to_end(&mut buf)
-        .map_err(|_| ProjError::ReadError)?;
+        .read_to_end(&mut buf)?;
     buf.as_ptr().copy_to_nonoverlapping(buffer.cast(), capacity);
     let hd = HandleData::new(url, headers, None);
     // heap-allocate the struct and cast it to a void pointer so it can be passed around to PROJ
@@ -360,8 +359,7 @@ fn _network_read_range(
     let mut buf = Vec::with_capacity(capacity);
     res.into_reader()
         .take(size_to_read as u64)
-        .read_to_end(&mut buf)
-        .map_err(|_| ProjError::ReadError)?;
+        .read_to_end(&mut buf)?;
     unsafe {
         buf.as_ptr()
             .copy_to_nonoverlapping(buffer.cast::<u8>(), capacity);
