@@ -59,6 +59,9 @@ fn generate_bindings(include_path: std::path::PathBuf) -> Result<(), Box<dyn std
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
     // the resulting bindings.
+    // If you update the configuration here you also
+    // need to update the corresponding bindgen command in
+    // `DEVELOPMENT.md`
     let bindings = bindgen::Builder::default()
         .clang_arg(format!("-I{}", include_path.to_string_lossy()))
         .trust_clang_mangling(false)
