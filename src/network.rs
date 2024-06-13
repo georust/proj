@@ -370,7 +370,7 @@ fn _network_read_range(
         out_error_string.add(err_string.len()).write(0);
     }
     hd.headers = headers;
-    Ok(contentlength)
+    Ok(buf.len())
 }
 
 /// Set up and initialise the grid download callback functions for all subsequent PROJ contexts
