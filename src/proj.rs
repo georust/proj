@@ -84,6 +84,7 @@ impl<T: CoordinateType> Coord<T> for (T, T) {
 
 /// Errors originating in PROJ which can occur during projection and conversion
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum ProjError {
     /// A projection error
     #[error("The projection failed with the following error: {0}")]
