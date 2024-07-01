@@ -46,9 +46,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })?
     };
 
+    #[cfg(feature = "buildtime_bindgen")]
+    generate_bindings(include_path)?;
+    #[cfg(not(feature = "buildtime_bindgen"))]
+    let _ = include_path;
+
+    Ok(())
+}
+
+#[cfg(feature = "buildtime_bindgen")]
+fn generate_bindings(include_path: std::path::PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
     // the resulting bindings.
+    // If you update the configuration here you also
+    // need to update the corresponding bindgen command in
+    // `DEVELOPMENT.md`
     let bindings = bindgen::Builder::default()
         .clang_arg(format!("-I{}", include_path.to_string_lossy()))
         .trust_clang_mangling(false)

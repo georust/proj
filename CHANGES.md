@@ -2,6 +2,7 @@
 
 ## Unreleased
 - Update to proj-sys 0.24.0 (libproj 9.4.0)
+- Provide bundled bindings by default and move support for build time generated bindings behind the `buildtime_bindgen` feature of proj-sys
 - Bump MSRV to 1.65
 
 ## 0.27.2
