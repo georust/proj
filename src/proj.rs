@@ -125,6 +125,8 @@ pub enum ProjError {
     DownloadError(String, String, u8),
     #[error("The current definition could not be retrieved")]
     Definition,
+    #[error("The definition could not be represented in the requested JSON format")]
+    ExportToJson,
 }
 
 #[cfg(feature = "network")]
@@ -1107,8 +1109,7 @@ impl Proj {
         unsafe {
             let out_ptr = proj_as_projjson(self.ctx, self.c_proj, opts_ptrs.as_ptr());
             if out_ptr.is_null() {
-                // Not sure the best way to retrieve and return the error
-                todo!()
+                Err(ProjError::ExportToJson)
             } else {
                 Ok(_string(out_ptr)?)
             }
