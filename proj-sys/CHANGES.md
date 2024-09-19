@@ -1,7 +1,7 @@
-# Unreleased
+# 0.24.0
 
-- Update to PROJ 9.3.1
-- Bump MSRV to 1.65
+- Update to PROJ 9.4.0 (#196) 
+- Bump MSRV to 1.70 (#188)
 
 
 # 0.23.2
