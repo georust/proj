@@ -1072,6 +1072,90 @@ impl Proj {
             Err(ProjError::Projection(error_message(err)?))
         }
     }
+
+    pub fn convert_coords<'a, C: 'a, F, P>(&self, points: P) -> Result<(), ProjError>
+    where
+        P: Iterator<Item = &'a mut C>,
+        C: Coord<F>,
+        F: CoordinateType,
+    {
+        self.coords_general(points, Transformation::Conversion, false)
+    }
+
+    pub fn project_coords<'a, C: 'a, F, P>(&self, points: P, inverse: bool) -> Result<(), ProjError>
+    where
+        P: Iterator<Item = &'a mut C>,
+        C: Coord<F>,
+        F: CoordinateType,
+    {
+        self.coords_general(points, Transformation::Projection, inverse)
+    }
+
+    fn coords_general<'a, C: 'a, F, P>(
+        &self,
+        points: P,
+        op: Transformation,
+        inverse: bool,
+    ) -> Result<(), ProjError>
+    where
+        P: Iterator<Item = &'a mut C>,
+        C: Coord<F>,
+        F: CoordinateType,
+    {
+        let err;
+        let trans;
+        let inv = if inverse {
+            PJ_DIRECTION_PJ_INV
+        } else {
+            PJ_DIRECTION_PJ_FWD
+        };
+
+        let size = points.size_hint();
+        let mut pointers: Vec<&'a mut C> = Vec::with_capacity(size.1.unwrap_or(size.0));
+
+        // we need PJ_COORD to convert
+        let mut pj = points
+            .map(|point| {
+                let c_x: c_double = point.x().to_f64().ok_or(ProjError::FloatConversion)?;
+                let c_y: c_double = point.y().to_f64().ok_or(ProjError::FloatConversion)?;
+
+                pointers.push(point);
+                Ok(PJ_COORD {
+                    xy: PJ_XY { x: c_x, y: c_y },
+                })
+            })
+            .collect::<Result<Vec<_>, ProjError>>()?;
+        pj.shrink_to_fit();
+        // explicitly create the raw pointer to ensure it lives long enough
+        let mp = pj.as_mut_ptr();
+        // Transformation operations are slightly different
+        match op {
+            Transformation::Conversion => unsafe {
+                proj_errno_reset(self.c_proj);
+                trans = proj_trans_array(self.c_proj, PJ_DIRECTION_PJ_FWD, pj.len(), mp);
+                err = proj_errno(self.c_proj);
+            },
+            Transformation::Projection => unsafe {
+                proj_errno_reset(self.c_proj);
+                trans = proj_trans_array(self.c_proj, inv, pj.len(), mp);
+                err = proj_errno(self.c_proj);
+            },
+        }
+        if err == 0 && trans == 0 {
+            // re-fill original slice with Coords
+            for (i, point) in pointers.into_iter().enumerate() {
+                let coord = pj[i];
+                *point = Coord::from_xy(
+                    F::from(unsafe { coord.xy.x }).ok_or(ProjError::FloatConversion)?,
+                    F::from(unsafe { coord.xy.y }).ok_or(ProjError::FloatConversion)?,
+                )
+            }
+
+            Ok(())
+        } else {
+            Err(ProjError::Projection(error_message(err)?))
+        }
+    }
 }
 
 impl convert::TryFrom<&str> for Proj {
