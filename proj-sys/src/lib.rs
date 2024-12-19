@@ -2,7 +2,7 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![doc(html_logo_url = "https://raw.githubusercontent.com/georust/meta/master/logo/logo.png")]
-//! # Low-level bindings for PROJ v9.0.x
+//! # Low-level bindings for PROJ v9.4.x
 //!
 //! **This is a
 //! [`*-sys`](https://doc.rust-lang.org/cargo/reference/build-scripts.html#-sys-packages)
@@ -28,8 +28,16 @@
 //! implement your own set of callbacks if you wish to make use of them (see the
 //! [`proj`](https://crates.io/crates/proj) crate for an example).
 
-#[cfg(not(feature = "nobuild"))]
+#[cfg(bundled_build)]
+extern crate libsqlite3_sys;
+#[cfg(bundled_build)]
+extern crate link_cplusplus;
+
+#[cfg(all(not(feature = "nobuild"), feature = "buildtime_bindgen"))]
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
-#[cfg(feature = "nobuild")]
+#[cfg(all(feature = "nobuild", not(feature = "buildtime_bindgen")))]
 include!("bindings_docs-rs.rs");
+
+#[cfg(all(not(feature = "nobuild"), not(feature = "buildtime_bindgen")))]
+include!("bundled_bindings.rs");

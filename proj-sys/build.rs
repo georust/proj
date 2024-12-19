@@ -4,7 +4,7 @@ use std::fs::File;
 use std::path::PathBuf;
 use tar::Archive;
 
-const MINIMUM_PROJ_VERSION: &str = "9.2.0";
+const MINIMUM_PROJ_VERSION: &str = "9.4.0";
 
 #[cfg(feature = "nobuild")]
 fn main() {} // Skip the build script on docs.rs
@@ -46,9 +46,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })?
     };
 
+    #[cfg(feature = "buildtime_bindgen")]
+    generate_bindings(include_path)?;
+    #[cfg(not(feature = "buildtime_bindgen"))]
+    let _ = include_path;
+
+    Ok(())
+}
+
+#[cfg(feature = "buildtime_bindgen")]
+fn generate_bindings(include_path: std::path::PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
     // the resulting bindings.
+    // If you update the configuration here you also
+    // need to update the corresponding bindgen command in
+    // `DEVELOPMENT.md`
     let bindings = bindgen::Builder::default()
         .clang_arg(format!("-I{}", include_path.to_string_lossy()))
         .trust_clang_mangling(false)
@@ -72,6 +85,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 // returns the path of "include" for the built proj
 fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
     eprintln!("building libproj from source");
+    println!("cargo:rustc-cfg=bundled_build");
     if let Ok(val) = &env::var("_PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC") {
         if val == "0" {
             panic!(
@@ -80,14 +94,13 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
         }
     }
 
-    // NOTE: The PROJ build expects Sqlite3 to be present on the system.
-    let path = "PROJSRC/proj-9.2.1.tar.gz";
+    let path = "PROJSRC/proj-9.4.0.tar.gz";
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     let tar_gz = File::open(path)?;
     let tar = GzDecoder::new(tar_gz);
     let mut archive = Archive::new(tar);
-    archive.unpack("PROJSRC/proj")?;
-    let mut config = cmake::Config::new("PROJSRC/proj/proj-9.2.1");
+    archive.unpack(out_path.join("PROJSRC/proj"))?;
+    let mut config = cmake::Config::new(out_path.join("PROJSRC/proj/proj-9.4.0"));
     config.define("BUILD_SHARED_LIBS", "OFF");
     config.define("BUILD_TESTING", "OFF");
     config.define("BUILD_CCT", "OFF");
@@ -99,12 +112,35 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
     config.define("BUILD_PROJSYNC", "OFF");
     config.define("ENABLE_CURL", "OFF");
 
+    // we check here whether or not these variables are set by cargo
+    // if they are set, `libsqlite3-sys` was built with the bundled feature
+    // enabled, which in turn allows us to rely on the built libsqlite3 version
+    // and link it statically
+    //
+    // If these are not set, it's necessary that libsqlite3 exists on the build system
+    // in a location accessible by cmake
+    if let Ok(sqlite_include) = std::env::var("DEP_SQLITE3_INCLUDE") {
+        config.define("SQLITE3_INCLUDE_DIR", sqlite_include);
+    }
+    if let Ok(sqlite_lib_dir) = std::env::var("DEP_SQLITE3_LIB_DIR") {
+        config.define("SQLITE3_LIBRARY", format!("{sqlite_lib_dir}/libsqlite3.a",));
+    }
+
     if cfg!(feature = "tiff") {
         eprintln!("enabling tiff support");
         config.define("ENABLE_TIFF", "ON");
     } else {
         eprintln!("disabling tiff support");
         config.define("ENABLE_TIFF", "OFF");
+    }
+
+    if cfg!(target_env = "msvc") {
+        // rust links the release MVSC runtime
+        // also for debug builds. If we let
+        // cmake choose debug/release builds
+        // based on the underlying cargo build
+        // version that results in linker errors
+        config.profile("Release");
     }
 
     let proj = config.build();
@@ -132,9 +168,6 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
         &out_path.join("build/lib").display()
     );
 
-    // The PROJ library needs SQLite and the C++ standard library.
-    println!("cargo:rustc-link-lib=dylib=sqlite3");
-
     if cfg!(feature = "tiff") {
         // On platforms like apples aarch64, users are likely to have installed libtiff with homebrew,
         // which isn't in the default search path, so try to determine path from pkg-config
@@ -157,14 +190,6 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
             }
         }
         println!("cargo:rustc-link-lib=dylib=tiff");
-    }
-
-    if cfg!(target_os = "linux") {
-        println!("cargo:rustc-link-lib=dylib=stdc++");
-    } else if cfg!(target_os = "macos") {
-        println!("cargo:rustc-link-lib=dylib=c++");
-    } else {
-        println!("cargo:warning=proj-sys: Not configuring an explicit C++ standard library on this target.");
     }
 
     Ok(proj.join("include"))

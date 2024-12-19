@@ -103,6 +103,7 @@ impl<T: CoordinateType> Coord<T> for (T, T, T) {
 
 /// Errors originating in PROJ which can occur during projection and conversion
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum ProjError {
     /// A projection error
     #[error("The projection failed with the following error: {0}")]
@@ -126,9 +127,9 @@ pub enum ProjError {
     Network,
     #[error("Could not set remote grid download callbacks")]
     RemoteCallbacks,
-    #[error("Couldn't build request")]
+    #[error("Couldn't access the network")]
     #[cfg(feature = "network")]
-    BuilderError(#[from] reqwest::Error),
+    NetworkError(Box<ureq::Error>),
     #[error("Couldn't clone request")]
     RequestCloneError,
     #[error("Could not retrieve content length")]
@@ -136,12 +137,19 @@ pub enum ProjError {
     #[error("Couldn't retrieve header for key {0}")]
     HeaderError(String),
     #[cfg(feature = "network")]
-    #[error("Couldn't convert header value to str")]
-    HeaderConversion(#[from] reqwest::header::ToStrError),
+    #[error("Couldn't read response to buffer")]
+    ReadError(#[from] std::io::Error),
     #[error("A {0} error occurred for url {1} after {2} retries")]
     DownloadError(String, String, u8),
     #[error("The current definition could not be retrieved")]
     Definition,
+}
+
+#[cfg(feature = "network")]
+impl From<ureq::Error> for ProjError {
+    fn from(e: ureq::Error) -> Self {
+        Self::NetworkError(Box::new(e))
+    }
 }
 
 #[derive(Error, Debug)]
@@ -1492,7 +1500,7 @@ mod test {
         ];
         ft_to_m.convert_array(&mut v).unwrap();
         assert_relative_eq!(v[0].x(), 1450880.2910605022f64);
-        assert_relative_eq!(v[1].y(), 1141293.7960220438);
+        assert_relative_eq!(v[1].y(), 1141293.7960220438, epsilon = 1e-8);
     }
 
     #[test]
@@ -1505,8 +1513,8 @@ mod test {
         // 👽
         let usa_m = MyPoint::new(-115.797615, 37.2647978);
         let usa_ft = to_feet.convert(usa_m).unwrap();
-        assert_eq!(6693625.67217475, usa_ft.x());
-        assert_eq!(3497301.5918027232, usa_ft.y());
+        assert_relative_eq!(6693625.67217475, usa_ft.x());
+        assert_relative_eq!(3497301.5918027232, usa_ft.y(), epsilon = 1e-8);
     }
 
     #[test]
