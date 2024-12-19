@@ -56,8 +56,8 @@ fn result_from_create<T>(context: *mut PJ_CONTEXT, ptr: *mut T) -> Result<*mut T
 
 /// A point in two dimensional space. The primary unit of input/output for proj.
 ///
-/// By default, any numeric `(x, y)` tuple implements `Coord`, but you can conform your type to
-/// `Coord` to pass it directly into proj.
+/// By default, any numeric `(x, y)` or `(x, y, z)` tuple implements `Coord`, but you can conform
+/// your type to `Coord` to pass it directly into proj.
 ///
 /// See the [`geo-types` feature](#feature-flags) for interop with the [`geo-types`
 /// crate](https://docs.rs/crate/geo-types)
@@ -769,7 +769,7 @@ impl Proj {
         // This signals that we wish to project geodetic coordinates.
         // For conversion (i.e. between projected coordinates) you should use
         // PJ_XY {x: , y: }
-        // We also initialize z and t in case libproj tries to read them.
+        // We also initialize t in case libproj tries to read it.
         let coords = PJ_LPZT {
             lam: c_x,
             phi: c_y,
