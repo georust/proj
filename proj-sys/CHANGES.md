@@ -1,3 +1,8 @@
+# UNRELEASED
+
+- BREAKING: Update bindgen to 0.71.1
+
+
 # 0.24.0
 
 - Update to PROJ 9.4.0 (#196) 
