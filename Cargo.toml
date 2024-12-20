@@ -11,7 +11,7 @@ keywords = ["proj", "projection", "osgeo", "geo"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 edition = "2018"
-rust-version = "1.70"
+rust-version = "1.75"
 
 [dependencies]
 proj-sys = { version = "0.24.0", path = "proj-sys" }
