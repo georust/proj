@@ -1,7 +1,7 @@
 [package]
 name = "proj"
 description = "High-level Rust bindings for the latest stable version of PROJ"
-version = "0.27.2"
+version = "0.28.0"
 authors = [
     "The Georust Developers <mods@georust.org>"
 ]
@@ -11,10 +11,10 @@ keywords = ["proj", "projection", "osgeo", "geo"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 edition = "2018"
-rust-version = "1.70"
+rust-version = "1.75"
 
 [dependencies]
-proj-sys = { version = "0.24.0", path = "proj-sys" }
+proj-sys = { version = "0.25.0", path = "proj-sys" }
 geo-types = { version = "0.7.10", optional = true }
 libc = "0.2.119"
 num-traits = "0.2.14"

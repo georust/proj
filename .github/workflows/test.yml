@@ -11,8 +11,8 @@ on:
 
 env:
   LIBPROJ_VERSION: 9.4.0
-  RUST_MSRV: "1.70"
-  RUST_LATEST: "1.77"
+  RUST_MSRV: "1.75"
+  RUST_LATEST: "1.83"
 
 jobs:
   # work around GHA env strictness
