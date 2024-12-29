@@ -1,5 +1,4 @@
-![GitHub Workflow Status](https://img.shields.io/github/workflow/status/georust/proj/proj%20ci)
-
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/georust/proj/test.yml?branch=main)
 # PROJ
 
 Coordinate transformation via bindings to the [PROJ](https://proj.org) v9.4 API.
