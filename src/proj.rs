@@ -177,6 +177,9 @@ pub(crate) unsafe fn _string(raw_ptr: *const c_char) -> Result<String, str::Utf8
 
 /// Look up an error message using the error code
 fn error_message(code: c_int) -> Result<String, str::Utf8Error> {
+    // Ensure that if we ever get a 0 error code back from libroj, we throw an error
+    // the minimum error code should be 1024
+    assert_ne!(code, 0);
     unsafe {
         let rv = proj_errno_string(code);
         _string(rv)
@@ -1483,5 +1486,11 @@ mod test {
         assert_eq!(area.east, 44.83);
         assert_eq!(area.north, 84.73);
         assert!(name.contains("Europe"));
+    }
+
+    #[test]
+    #[should_panic]
+    fn error_message_zero_code() {
+        assert!(error_message(0).is_err());
     }
 }
