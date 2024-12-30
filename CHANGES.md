@@ -1,3 +1,7 @@
+## Unreleased
+
+- Update build status badge
+
 ## 0.28.0 - 2024-12-20
 
 - Update to proj-sys 0.25.0 (libproj 9.4.0)
