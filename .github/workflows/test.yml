@@ -65,6 +65,8 @@ jobs:
     name: proj ubuntu
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
+    permissions:
+      packages: read
     needs: compute
     strategy:
       fail-fast: false
@@ -95,6 +97,8 @@ jobs:
     name: proj macos
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: macos-latest
+    permissions:
+      packages: read
     strategy:
       fail-fast: false
       matrix:
@@ -109,6 +113,8 @@ jobs:
     name: proj-sys ubuntu
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
+    permissions:
+      packages: read
     needs: compute
     defaults:
       run:
@@ -160,6 +166,8 @@ jobs:
     name: proj-sys macos
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: macos-latest
+    permissions:
+      packages: read
     env:
       _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 0
       HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: TRUE
