@@ -12,7 +12,7 @@ links = "proj"
 rust-version = "1.70"
 
 [dependencies]
-libsqlite3-sys = ">=0.28,<0.32"
+libsqlite3-sys = ">=0.28,<0.33"
 link-cplusplus = "1.0.6"
 
 [build-dependencies]
@@ -33,3 +33,6 @@ buildtime_bindgen = ["dep:bindgen"]
 
 [package.metadata.docs.rs]
 features = [ "nobuild" ] # This feature will be enabled during the docs.rs build
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(bundled_build)'] }
