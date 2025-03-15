@@ -10,7 +10,7 @@ on:
   merge_group:
 
 env:
-  LIBPROJ_VERSION: 9.4.0
+  LIBPROJ_VERSION: 9.6.0
   RUST_MSRV: "1.81"
   RUST_LATEST: "1.83"
 
