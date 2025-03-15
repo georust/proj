@@ -11,7 +11,7 @@ on:
 
 env:
   LIBPROJ_VERSION: 9.4.0
-  RUST_MSRV: "1.75"
+  RUST_MSRV: "1.81"
   RUST_LATEST: "1.83"
 
 jobs:
