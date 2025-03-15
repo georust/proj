@@ -1,6 +1,6 @@
 # UNRELEASED
 
-- Your Change Here.
+- Update to PROJ 9.6.0
 
 # 0.25.0 - 2024-12-20
 
