@@ -1,6 +1,7 @@
 ## Unreleased
 
 - Update build status badge
+- Update MSRV to 1.81
 
 ## 0.28.0 - 2024-12-20
 

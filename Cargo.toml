@@ -11,8 +11,8 @@ keywords = ["proj", "projection", "osgeo", "geo"]
 categories = ["science::geo", "api-bindings"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
-edition = "2018"
-rust-version = "1.75"
+edition = "2021"
+rust-version = "1.81"
 
 [dependencies]
 proj-sys = { version = "0.25.0", path = "proj-sys" }
