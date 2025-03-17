@@ -2,6 +2,7 @@
 
 - Update build status badge
 - Update MSRV to 1.81
+- Add support for building with libsqlite3-sys 0.32
 
 ## 0.28.0 - 2024-12-20
 
