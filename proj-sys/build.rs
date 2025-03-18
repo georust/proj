@@ -4,7 +4,7 @@ use std::fs::File;
 use std::path::PathBuf;
 use tar::Archive;
 
-const MINIMUM_PROJ_VERSION: &str = "9.4.0";
+const MINIMUM_PROJ_VERSION: &str = "9.6.0";
 
 #[cfg(feature = "nobuild")]
 fn main() {} // Skip the build script on docs.rs
@@ -94,13 +94,14 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
         }
     }
 
-    let path = "PROJSRC/proj-9.4.0.tar.gz";
+    let path = format!("PROJSRC/proj-{MINIMUM_PROJ_VERSION}.tar.gz");
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     let tar_gz = File::open(path)?;
     let tar = GzDecoder::new(tar_gz);
     let mut archive = Archive::new(tar);
     archive.unpack(out_path.join("PROJSRC/proj"))?;
-    let mut config = cmake::Config::new(out_path.join("PROJSRC/proj/proj-9.4.0"));
+    let mut config =
+        cmake::Config::new(out_path.join(format!("PROJSRC/proj/proj-{MINIMUM_PROJ_VERSION}")));
     config.define("BUILD_SHARED_LIBS", "OFF");
     config.define("BUILD_TESTING", "OFF");
     config.define("BUILD_CCT", "OFF");

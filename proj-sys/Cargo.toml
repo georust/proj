@@ -1,6 +1,6 @@
 [package]
 name = "proj-sys"
-description = "Rust bindings for PROJ v9.4.x"
+description = "Rust bindings for PROJ v9.6.x"
 repository = "https://github.com/georust/proj"
 version = "0.25.0"
 readme = "README.md"

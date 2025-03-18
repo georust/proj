@@ -1,7 +1,7 @@
 ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/georust/proj/test.yml?branch=main)
 # PROJ
 
-Coordinate transformation via bindings to the [PROJ](https://proj.org) v9.4 API.
+Coordinate transformation via bindings to the [PROJ](https://proj.org) v9.6.x API.
 
 Two coordinate transformation operations are currently provided: _projection_ (and inverse
 projection) and _conversion_.
@@ -11,7 +11,7 @@ vice versa (inverse projection), while _conversion_ is intended for transformati
 projected coordinate systems. The PROJ [documentation](https://proj.org/operations/index.html)
 explains the distinction between these operations in more detail.
 
-This crate depends on [`libproj v9.4.x`](https://proj.org), accessed via the
+This crate depends on [`libproj v9.6.x`](https://proj.org), accessed via the
 [`proj-sys`](https://docs.rs/proj-sys) crate. By default, `proj-sys` will try to find a
 pre-existing installation of libproj on your system. If an appropriate version of libproj
 cannot be found, the build script will attempt to build libproj from source. You may specify a
