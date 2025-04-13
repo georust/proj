@@ -1,3 +1,6 @@
+# UNRELEASED
+- Add coordinate metadata creation and query functions
+
 ## 0.29.0 - 2025-03-17
 
 - Update build status badge
