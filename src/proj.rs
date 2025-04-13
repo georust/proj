@@ -6,11 +6,11 @@ use proj_sys::{
     proj_context_clone, proj_context_create, proj_context_destroy, proj_context_errno,
     proj_context_get_url_endpoint, proj_context_is_network_enabled, proj_context_set_search_paths,
     proj_context_set_url_endpoint, proj_coordinate_metadata_create,
-    proj_coordinate_metadata_get_epoch, proj_create, proj_create_crs_to_crs, proj_destroy,
-    proj_errno_string, proj_get_area_of_use, proj_grid_cache_set_enable, proj_info,
-    proj_normalize_for_visualization, proj_pj_info, proj_trans, proj_trans_array,
-    proj_trans_bounds, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD,
-    PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_XYZT,
+    proj_coordinate_metadata_get_epoch, proj_create, proj_create_crs_to_crs,
+    proj_create_crs_to_crs_from_pj, proj_destroy, proj_errno_string, proj_get_area_of_use,
+    proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization, proj_pj_info,
+    proj_trans, proj_trans_array, proj_trans_bounds, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD,
+    PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_XYZT,
 };
 use std::ptr;
 use std::{
@@ -242,6 +242,57 @@ fn transform_epsg(
     })
 }
 
+// called by Proj and ProjBuilder
+fn crs_to_crs_from_pj(
+    ctx: *mut PJ_CONTEXT,
+    source_crs: &Proj,
+    target_crs: &Proj,
+    area: Option<Area>,
+    options: Option<Vec<&str>>,
+) -> Result<Proj, ProjCreateError> {
+    let proj_area = unsafe { proj_area_create() };
+    area_set_bbox(proj_area, area);
+
+    // Convert options to C strings
+    let mut options_cstr: Vec<ffi::CString> = Vec::new();
+    let mut options_ptrs: Vec<*const c_char> = Vec::new();
+
+    if let Some(opts) = options {
+        for opt in opts {
+            match ffi::CString::new(opt) {
+                Ok(c_str) => {
+                    options_cstr.push(c_str);
+                }
+                Err(err) => return Err(ProjCreateError::ArgumentNulError(err)),
+            }
+        }
+
+        options_ptrs = options_cstr.iter().map(|s| s.as_ptr()).collect();
+        // Add null terminator
+        options_ptrs.push(ptr::null());
+    } else {
+        // If no options, just use a null pointer
+        options_ptrs.push(ptr::null());
+    }
+
+    let ptr = result_from_create(ctx, unsafe {
+        proj_create_crs_to_crs_from_pj(
+            ctx,
+            source_crs.c_proj,
+            target_crs.c_proj,
+            proj_area,
+            options_ptrs.as_ptr(),
+        )
+    })
+    .map_err(|e| ProjCreateError::ProjError(e.message(ctx)))?;
+
+    Ok(Proj {
+        c_proj: ptr,
+        ctx,
+        area: Some(proj_area),
+    })
+}
+
 macro_rules! define_info_methods {
     () => {
         fn ctx(&self) -> *mut PJ_CONTEXT {
@@ -390,7 +441,7 @@ pub struct Info {
 
 /// A `PROJ` Context instance, used to create a transformation object.
 ///
-/// Create a transformation object by calling `proj` or `proj_known_crs`.
+/// Create a transformation object by calling [`ProjBuilder::proj()`], [`ProjBuilder::proj_known_crs()`], [`ProjBuilder::proj_create_crs_to_crs_from_pj()`].
 pub struct ProjBuilder {
     ctx: *mut PJ_CONTEXT,
 }
@@ -463,6 +514,17 @@ impl ProjBuilder {
     ) -> Result<Proj, ProjCreateError> {
         let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
         transform_epsg(ctx, from, to, area)
+    }
+    /// Builder version of [`create_crs_to_crs_from_pj()`](fn@Proj::create_crs_to_crs_from_pj())
+    pub fn proj_create_crs_to_crs_from_pj(
+        mut self,
+        source_crs: &Proj,
+        target_crs: &Proj,
+        area: Option<Area>,
+        options: Option<Vec<&str>>,
+    ) -> Result<Proj, ProjCreateError> {
+        let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
+        crs_to_crs_from_pj(ctx, source_crs, target_crs, area, options)
     }
 }
 
@@ -647,6 +709,61 @@ impl Proj {
     ) -> Result<Proj, ProjCreateError> {
         let ctx = unsafe { proj_context_create() };
         transform_epsg(ctx, from, to, area)
+    }
+
+    /// Create a transformation object that is a pipeline _between_ two known coordinate reference systems.
+    ///
+    /// This is similar to using [`Proj::new_known_crs()`] except that it accepts existing [`Proj`] objects
+    /// instead of string identifiers.
+    ///
+    /// # Note on Coordinate Metadata
+    /// Starting with PROJ 9.4, both source **and** target can be `CoordinateMetadata` objects, allowing for
+    /// changes of coordinate epochs (though in practice this is limited to use of velocity grids
+    /// inside the same dynamic CRS). In the `proj` crate, `CoordinateMetadata` is
+    /// a [`Proj`] struct created with [`Proj::coordinate_metadata_create()`].
+    ///
+    /// # Arguments
+    ///
+    /// * `target_crs` - The target CRS or coordinate metadata object
+    /// * `area` - Optional area of use to help select the appropriate transformation
+    /// * `options` - Optional list of strings with "KEY=VALUE" format. Supported options include:
+    ///   * `AUTHORITY=name`: to restrict the authority of coordinate operations looked up in the database.
+    ///   * `ACCURACY=value`: to set the minimum desired accuracy (in metres) of the candidate coordinate operations.
+    ///   * `ALLOW_BALLPARK=YES/NO`: can be set to NO to disallow the use of Ballpark transformation.
+    ///   * `ONLY_BEST=YES/NO`: Can be set to YES to cause PROJ to error out if the best transformation cannot be used.
+    ///   * `FORCE_OVER=YES/NO`: can be set to YES to force the +over flag on the transformation.
+    ///
+    /// # Returns
+    ///
+    /// A new transformation object or an error if creation failed
+    ///
+    /// # Examples
+    ///
+    /// Constructing a `Proj` from a source CRS and target CRS:
+    ///
+    /// ```rust
+    /// // UTM Zone 6 US Survey Feet to Metres
+    /// # use approx::assert_relative_eq;
+    /// let from = proj::Proj::new("EPSG:2230").unwrap();
+    /// let to = proj::Proj::new("EPSG:26946").unwrap();
+    /// let transformer = from.create_crs_to_crs_from_pj(&to, None, None).unwrap();
+    /// let result = transformer
+    ///     .convert((4760096.421921, 3744293.729449))
+    ///     .unwrap();
+    /// assert_relative_eq!(result.0, 1450880.2910605022, epsilon = 1.0e-8);
+    /// assert_relative_eq!(result.1, 1141263.0111604782, epsilon = 1.0e-8);
+    /// ```
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn create_crs_to_crs_from_pj(
+        &self,
+        target_crs: &Proj,
+        area: Option<Area>,
+        options: Option<Vec<&str>>,
+    ) -> Result<Proj, ProjCreateError> {
+        // Clone the context to avoid double-free in Drop implementations
+        let ctx = unsafe { proj_context_clone(self.ctx) };
+        crs_to_crs_from_pj(ctx, self, target_crs, area, options)
     }
 
     /// Set the bounding box of the area of use
@@ -1350,6 +1467,61 @@ mod test {
         let proj = Proj::new(wgs84).unwrap();
         let np = proj.coordinate_metadata_create(epoch).unwrap();
         assert_eq!(np.coordinate_metadata_get_epoch(), 2021.3);
+    }
+
+    #[test]
+    fn test_create_crs_to_crs_from_pj() {
+        let from = Proj::new("EPSG:2230").unwrap();
+        let to = Proj::new("EPSG:26946").unwrap();
+
+        let transformer = from.create_crs_to_crs_from_pj(&to, None, None).unwrap();
+        let result = transformer
+            .convert(MyPoint::new(4760096.421921, 3744293.729449))
+            .unwrap();
+
+        assert_relative_eq!(result.x(), 1450880.2910605022, epsilon = 1.0e-8);
+        assert_relative_eq!(result.y(), 1141263.0111604782, epsilon = 1.0e-8);
+    }
+
+    #[cfg(feature = "network")]
+    #[test]
+    fn test_create_crs_to_crs_from_pj_using_builder_epoch() {
+        // kind of a kitchen-sink test:
+        // we test the epoch addition, metadata creation, and grid download functionality
+
+        // set up points and projections
+        let point = (53.333231, 353.729382);
+        // these are valid epochs for itrf2014
+        let epoch1 = 2010.0;
+        let epoch2 = 2022.66;
+        let itrf = "EPSG:9000";
+        let to = Proj::new("EPSG:7844").unwrap();
+
+        let proj1 = Proj::new(itrf).unwrap();
+        let old_epoch = proj1.coordinate_metadata_create(epoch1).unwrap();
+
+        let proj2 = Proj::new(itrf).unwrap();
+        let new_epoch = proj2.coordinate_metadata_create(epoch2).unwrap();
+
+        let mut builder1 = ProjBuilder::new();
+        builder1.enable_network(true).unwrap();
+        // Disable caching to ensure we're accessing the network if need be
+        builder1.grid_cache_enable(false);
+        let transformer1 = builder1
+            .proj_create_crs_to_crs_from_pj(&old_epoch, &to, None, None)
+            .unwrap();
+        let result1 = transformer1.convert(point).unwrap();
+
+        let mut builder2 = ProjBuilder::new();
+        builder2.enable_network(true).unwrap();
+        builder2.grid_cache_enable(false);
+        let transformer2 = builder2
+            .proj_create_crs_to_crs_from_pj(&new_epoch, &to, None, None)
+            .unwrap();
+        let result2 = transformer2.convert(point).unwrap();
+        // these transformation results should not match:
+        // the differing epochs introduce a small difference
+        assert_ne!(&result1, &result2);
     }
 
     #[test]
