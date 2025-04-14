@@ -1,6 +1,6 @@
 [package]
 name = "proj-sys"
-description = "Rust bindings for PROJ v9.4.x"
+description = "Rust bindings for PROJ v9.6.x"
 repository = "https://github.com/georust/proj"
 version = "0.25.0"
 readme = "README.md"
@@ -9,7 +9,7 @@ keywords = ["proj", "projection", "osgeo", "geo", "geospatial"]
 license = "MIT OR Apache-2.0"
 edition = "2021"
 links = "proj"
-rust-version = "1.70"
+rust-version = "1.82"
 
 [dependencies]
 libsqlite3-sys = ">=0.28,<0.33"
