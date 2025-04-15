@@ -3,12 +3,14 @@ use libc::{c_char, c_double};
 use num_traits::Float;
 use proj_sys::{
     proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_as_projjson, proj_cleanup,
-    proj_context_create, proj_context_destroy, proj_context_errno, proj_context_get_url_endpoint,
-    proj_context_is_network_enabled, proj_context_set_search_paths, proj_context_set_url_endpoint,
-    proj_create, proj_create_crs_to_crs, proj_destroy, proj_errno_string, proj_get_area_of_use,
-    proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization, proj_pj_info,
-    proj_trans, proj_trans_array, proj_trans_bounds, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD,
-    PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_XYZT,
+    proj_context_clone, proj_context_create, proj_context_destroy, proj_context_errno,
+    proj_context_get_url_endpoint, proj_context_is_network_enabled, proj_context_set_search_paths,
+    proj_context_set_url_endpoint, proj_coordinate_metadata_create,
+    proj_coordinate_metadata_get_epoch, proj_create, proj_create_crs_to_crs, proj_destroy,
+    proj_errno_string, proj_get_area_of_use, proj_grid_cache_set_enable, proj_info,
+    proj_normalize_for_visualization, proj_pj_info, proj_trans, proj_trans_array,
+    proj_trans_bounds, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD,
+    PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_XYZT,
 };
 use std::ptr;
 use std::{
@@ -142,6 +144,8 @@ pub enum ProjCreateError {
     ArgumentNulError(ffi::NulError),
     #[error("The underlying PROJ call failed: {0}")]
     ProjError(String),
+    #[error("Pipeline objects cannot be used to produce a MetadataObject. Try assigning the epoch to one of the input projections")]
+    MetadataObjectCreation,
 }
 
 /// The bounding box of an area of use
@@ -498,6 +502,56 @@ pub struct Proj {
 }
 
 impl Proj {
+    /// Create a coordinate metadata object to be used in coordinate operations.
+    ///
+    /// This creates a coordinate metadata object that can be used in coordinate operations,
+    /// such as transformations. The coordinate metadata object contains information
+    /// about the coordinates, such as the epoch they are referenced to.
+    ///
+    /// # Note
+    /// Only **transformation objects** (e.g. those created by calling [`new()`](fn@Proj::new())) can be
+    /// converted to metadata objects. They cannot be created from pipelines.
+    ///
+    /// # Arguments
+    ///
+    /// * `epoch` - The epoch that the coordinates are referenced to.
+    ///
+    /// # Returns
+    ///
+    /// A new coordinate metadata object or an error if creation failed.
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn coordinate_metadata_create(&self, epoch: f64) -> Result<Proj, ProjCreateError> {
+        // Clone the context to avoid double-free in Drop implementations
+        let cloned_ctx = unsafe { proj_context_clone(self.ctx) };
+
+        let ptr = result_from_create(cloned_ctx, unsafe {
+            proj_coordinate_metadata_create(cloned_ctx, self.c_proj, epoch)
+        })
+        .map_err(|_| ProjCreateError::MetadataObjectCreation)?;
+
+        Ok(Proj {
+            c_proj: ptr,
+            ctx: cloned_ctx,
+            area: None,
+        })
+    }
+
+    /// Get the epoch from a coordinate metadata object.
+    ///
+    /// This retrieves the epoch associated with a coordinate metadata object.
+    ///
+    /// # Returns
+    ///
+    /// The epoch value as a float, or [`f64::NAN`] if the object doesn't have an associated epoch.
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn coordinate_metadata_get_epoch(&self) -> f64 {
+        unsafe { proj_coordinate_metadata_get_epoch(self.ctx, self.c_proj) }
+    }
+
     /// Try to create a new transformation object
     ///
     /// **Note:** for projection operations, `definition` specifies
@@ -1287,6 +1341,15 @@ mod test {
             proj.def().unwrap(),
             "proj=longlat datum=WGS84 no_defs ellps=WGS84 towgs84=0,0,0"
         );
+    }
+
+    #[test]
+    fn test_metadata_creation() {
+        let wgs84 = "EPSG:4326";
+        let epoch = 2021.3;
+        let proj = Proj::new(wgs84).unwrap();
+        let np = proj.coordinate_metadata_create(epoch).unwrap();
+        assert_eq!(np.coordinate_metadata_get_epoch(), 2021.3);
     }
 
     #[test]
