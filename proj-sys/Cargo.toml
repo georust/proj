@@ -19,7 +19,7 @@ link-cplusplus = "1.0.6"
 bindgen = { version = "0.71.1", optional = true }
 pkg-config = "0.3.25"
 cmake = "0.1.50"
-flate2 = "1.0.24"
+flate2 = "1.1.1"
 tar = "0.4.40"
 
 [features]
