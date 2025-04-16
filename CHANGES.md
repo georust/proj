@@ -1,6 +1,7 @@
 # UNRELEASED
 - Add coordinate metadata creation and query functions
 - Add method for Proj creation from existing Proj instances, optionally containing epochs
+- Update ureq to 3.x and adapt network functionality to its new API
 
 ## 0.29.0 - 2025-03-17
 
