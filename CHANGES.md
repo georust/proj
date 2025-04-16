@@ -1,5 +1,6 @@
 # UNRELEASED
 - Add coordinate metadata creation and query functions
+- Add method for Proj creation from existing Proj instances, optionally containing epochs
 
 ## 0.29.0 - 2025-03-17
 

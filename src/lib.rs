@@ -79,15 +79,15 @@
 //! There are two options for creating a transformation:
 //!
 //! 1. If you don't require additional [grids](#grid-file-download) or other customisation:
-//!     - Call `Proj::new` or `Proj::new_known_crs`. This creates a transformation instance ([`Proj`](proj/struct.Proj.html))
+//!     - Call [`Proj::new()`], [`Proj::new_known_crs()`] or [`Proj::create_crs_to_crs_from_pj()`].
+//!       This creates a transformation instance ([`Proj`])
 //! 2. If you require a grid for the transformation you wish to carry out, or you need to customise
 //!    the search path or the grid endpoint:
-//!    - Create a new [`ProjBuilder`](proj/struct.ProjBuilder.html) by calling
+//!    - Create a new [`ProjBuilder`] by calling
 //!      `ProjBuilder::new()`. It may be modified to enable network downloads, disable the grid,
 //!      cache or modify search paths;
-//!    - Call [`ProjBuilder.proj()`](proj/struct.ProjBuilder.html#method.proj) or
-//!      [`ProjBuilder.proj_known_crs()`](proj/struct.ProjBuilder.html#method.proj_known_crs). This
-//!      creates a transformation instance (`Proj`)
+//!    - Call [`ProjBuilder::proj()`], [`ProjBuilder::proj_known_crs()`], or
+//!     [`ProjBuilder::proj_create_crs_to_crs_from_pj()`]. This creates a transformation instance ([`Proj`])
 //!
 //! **Note**:
 //!
