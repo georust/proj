@@ -1,6 +1,7 @@
 # UNRELEASED
 
 - Update to PROJ 9.6.0
+- Update flate2 dependency for ureq 3.x compat
 
 # 0.25.0 - 2024-12-20
 
