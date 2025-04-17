@@ -15,7 +15,7 @@ edition = "2021"
 rust-version = "1.82"
 
 [dependencies]
-proj-sys = { version = "0.25.0", path = "proj-sys" }
+proj-sys = { version = "0.26.0", path = "proj-sys" }
 geo-types = { version = "0.7.10", optional = true }
 libc = "0.2.172"
 num-traits = "0.2.14"
