@@ -8,6 +8,7 @@ on:
       - trying
   pull_request:
   merge_group:
+  schedule: [cron: "45 6 * * *"]
 
 env:
   LIBPROJ_VERSION: 9.6.0
