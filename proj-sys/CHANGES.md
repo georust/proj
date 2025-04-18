@@ -1,7 +1,8 @@
-# UNRELEASED
+# 0.26.0 - 2025-04-18
 
 - Update to PROJ 9.6.0
 - Update flate2 dependency for ureq 3.x compat
+- Bump MSRV to 1.82
 
 # 0.25.0 - 2024-12-20
 

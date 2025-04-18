@@ -117,7 +117,7 @@ There are two options for creating a transformation:
 
 ## Requirements
 
-By default, the crate requires `libproj` 9.2.x to be present on your system. While it may be
+By default, the crate requires `libproj` 9.6.x to be present on your system. While it may be
 backwards-compatible with older PROJ 6 versions, this is neither tested nor supported. If a suitable library can't be found, `proj` will attempt to build `libproj` from source.
 
 ## Feature Flags
