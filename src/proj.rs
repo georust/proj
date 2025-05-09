@@ -12,7 +12,7 @@ use proj_sys::{
     proj_trans, proj_trans_array, proj_trans_bounds, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD,
     PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_WKT_TYPE_PJ_WKT1_ESRI,
     PJ_WKT_TYPE_PJ_WKT1_GDAL, PJ_WKT_TYPE_PJ_WKT2_2015, PJ_WKT_TYPE_PJ_WKT2_2015_SIMPLIFIED,
-    PJ_WKT_TYPE_PJ_WKT2_2019, PJ_XYZT,
+    PJ_WKT_TYPE_PJ_WKT2_2019, PJ_WKT_TYPE_PJ_WKT2_2019_SIMPLIFIED, PJ_XYZT,
 };
 use std::ptr;
 use std::{
@@ -1365,6 +1365,7 @@ impl Proj {
             WktVersion::Wkt2_2015 => PJ_WKT_TYPE_PJ_WKT2_2015,
             WktVersion::Wkt2_2015_Simplified => PJ_WKT_TYPE_PJ_WKT2_2015_SIMPLIFIED,
             WktVersion::Wkt2_2019 => PJ_WKT_TYPE_PJ_WKT2_2019,
+            WktVersion::Wkt2_2019_Simplified => PJ_WKT_TYPE_PJ_WKT2_2019_SIMPLIFIED,
             WktVersion::Wkt1_Gdal => PJ_WKT_TYPE_PJ_WKT1_GDAL,
             WktVersion::Wkt1_Esri => PJ_WKT_TYPE_PJ_WKT1_ESRI,
         };
@@ -1422,6 +1423,7 @@ pub enum WktVersion {
     Wkt2_2015,
     Wkt2_2015_Simplified,
     Wkt2_2019,
+    Wkt2_2019_Simplified,
     Wkt1_Gdal,
     Wkt1_Esri,
 }
