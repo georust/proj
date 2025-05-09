@@ -2,15 +2,17 @@ use libc::c_int;
 use libc::{c_char, c_double};
 use num_traits::Float;
 use proj_sys::{
-    proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_as_projjson, proj_cleanup,
-    proj_context_clone, proj_context_create, proj_context_destroy, proj_context_errno,
-    proj_context_get_url_endpoint, proj_context_is_network_enabled, proj_context_set_search_paths,
-    proj_context_set_url_endpoint, proj_coordinate_metadata_create,
+    proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_as_projjson, proj_as_wkt,
+    proj_cleanup, proj_context_clone, proj_context_create, proj_context_destroy,
+    proj_context_errno, proj_context_get_url_endpoint, proj_context_is_network_enabled,
+    proj_context_set_search_paths, proj_context_set_url_endpoint, proj_coordinate_metadata_create,
     proj_coordinate_metadata_get_epoch, proj_create, proj_create_crs_to_crs,
     proj_create_crs_to_crs_from_pj, proj_destroy, proj_errno_string, proj_get_area_of_use,
     proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization, proj_pj_info,
     proj_trans, proj_trans_array, proj_trans_bounds, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD,
-    PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_XYZT,
+    PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_WKT_TYPE_PJ_WKT1_ESRI,
+    PJ_WKT_TYPE_PJ_WKT1_GDAL, PJ_WKT_TYPE_PJ_WKT2_2015, PJ_WKT_TYPE_PJ_WKT2_2015_SIMPLIFIED,
+    PJ_WKT_TYPE_PJ_WKT2_2019, PJ_WKT_TYPE_PJ_WKT2_2019_SIMPLIFIED, PJ_XYZT,
 };
 use std::ptr;
 use std::{
@@ -1286,6 +1288,144 @@ impl Proj {
             }
         }
     }
+
+    pub fn as_wkt(
+        &self,
+        version: Option<WktVersion>,
+        options: Option<WktOptions>,
+    ) -> Result<String, ProjError> {
+        let options_str = if let Some(ref options) = options {
+            let mut opts = vec![];
+            if let Some(multiline) = options.multiline {
+                opts.push(CString::new(format!(
+                    "MULTILINE={}",
+                    if multiline { "YES" } else { "NO" }
+                ))?)
+            };
+
+            if let Some(indentation_width) = options.indentation_width {
+                opts.push(CString::new(format!(
+                    "INDENTATION_WIDTH={}",
+                    indentation_width
+                ))?)
+            }
+
+            if let Some(ref output_axis) = options.output_axis {
+                opts.push(CString::new(format!(
+                    "OUTPUT_AXIS={}",
+                    match output_axis {
+                        WktOutputAxis::Auto => "AUTO",
+                        WktOutputAxis::Yes => "YES",
+                        WktOutputAxis::No => "NO",
+                    }
+                ))?);
+            }
+
+            if let Some(strict) = options.strict {
+                opts.push(CString::new(format!(
+                    "STRICT={}",
+                    if strict { "YES" } else { "NO" }
+                ))?);
+            }
+
+            if let Some(allow_ellipsoidal_height_as_vertical_crs) =
+                options.allow_ellipsoidal_height_as_vertical_crs
+            {
+                opts.push(CString::new(format!(
+                    "ALLOW_ELLIPSOIDAL_HEIGHT_AS_VERTICAL_CRS={}",
+                    if allow_ellipsoidal_height_as_vertical_crs {
+                        "YES"
+                    } else {
+                        "NO"
+                    }
+                ))?);
+            }
+
+            if let Some(allow_linunit_node) = options.allow_linunit_node {
+                opts.push(CString::new(format!(
+                    "ALLOW_LINUNIT_NODE={}",
+                    if allow_linunit_node { "YES" } else { "NO" }
+                ))?);
+            }
+
+            if opts.is_empty() {
+                None
+            } else {
+                Some(opts)
+            }
+        } else {
+            None
+        };
+
+        let opts_ptrs = options_str
+            .as_ref()
+            .map(|o| o.iter().map(|cs| cs.as_ptr()).collect::<Vec<_>>());
+
+        let wkt_type = match version.unwrap_or(WktVersion::Wkt2_2019) {
+            WktVersion::Wkt2_2015 => PJ_WKT_TYPE_PJ_WKT2_2015,
+            WktVersion::Wkt2_2015_Simplified => PJ_WKT_TYPE_PJ_WKT2_2015_SIMPLIFIED,
+            WktVersion::Wkt2_2019 => PJ_WKT_TYPE_PJ_WKT2_2019,
+            WktVersion::Wkt2_2019_Simplified => PJ_WKT_TYPE_PJ_WKT2_2019_SIMPLIFIED,
+            WktVersion::Wkt1_Gdal => PJ_WKT_TYPE_PJ_WKT1_GDAL,
+            WktVersion::Wkt1_Esri => PJ_WKT_TYPE_PJ_WKT1_ESRI,
+        };
+
+        unsafe {
+            let wkt = proj_as_wkt(
+                self.ctx,
+                self.c_proj,
+                wkt_type,
+                opts_ptrs
+                    .as_ref()
+                    .map(|c| c.as_ptr())
+                    .unwrap_or(ptr::null()),
+            );
+
+            Ok(_string(wkt)?)
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct WktOptions {
+    /// Defaults to YES, except for WKT1_ESRI
+    multiline: Option<bool>,
+
+    /// Defaults to 4 (when multiline output is on).
+    indentation_width: Option<usize>,
+
+    /// In AUTO mode, axis will be output for WKT2 variants, for WKT1_GDAL for ProjectedCRS with
+    /// easting/northing ordering (otherwise stripped), but not for WKT1_ESRI. Setting to YES will
+    /// output them unconditionally, and to NO will omit them unconditionally.
+    output_axis: Option<WktOutputAxis>,
+
+    /// Default is YES. If NO, a Geographic 3D CRS can be for example exported as WKT1_GDAL with
+    /// 3 axes, whereas this is normally not allowed.
+    strict: Option<bool>,
+
+    /// Default is NO. If set to YES and type == PJ_WKT1_GDAL, a Geographic 3D CRS or a Projected 3D
+    /// CRS will be exported as a compound CRS whose vertical part represents an ellipsoidal height
+    /// (for example for use with LAS 1.4 WKT1).
+    allow_ellipsoidal_height_as_vertical_crs: Option<bool>,
+
+    /// Default is YES starting with PROJ 9.1. Only taken into account with type == PJ_WKT1_ESRI on a Geographic 3D CRS.
+    allow_linunit_node: Option<bool>,
+}
+
+pub enum WktOutputAxis {
+    Auto,
+    Yes,
+    No,
+}
+
+#[allow(non_camel_case_types)]
+pub enum WktVersion {
+    Wkt2_2015,
+    Wkt2_2015_Simplified,
+    Wkt2_2019,
+    Wkt2_2019_Simplified,
+    Wkt1_Gdal,
+    Wkt1_Esri,
 }
 
 impl convert::TryFrom<&str> for Proj {
@@ -1778,5 +1918,24 @@ mod test {
             .unwrap();
         let _ = ft_to_m.to_projjson(None, None, None).unwrap();
         // TODO: do we want to compare one of the results to proj's output?
+    }
+
+    #[test]
+    fn test_wkt() {
+        let proj = Proj::new("EPSG:4326").unwrap();
+        let wkt = proj
+            .as_wkt(
+                Some(WktVersion::Wkt2_2019),
+                Some(WktOptions {
+                    multiline: Some(false),
+                    ..Default::default()
+                }),
+            )
+            .unwrap();
+
+        assert_eq!(
+            wkt,
+            r#"GEOGCRS["WGS 84",ENSEMBLE["World Geodetic System 1984 ensemble",MEMBER["World Geodetic System 1984 (Transit)"],MEMBER["World Geodetic System 1984 (G730)"],MEMBER["World Geodetic System 1984 (G873)"],MEMBER["World Geodetic System 1984 (G1150)"],MEMBER["World Geodetic System 1984 (G1674)"],MEMBER["World Geodetic System 1984 (G1762)"],MEMBER["World Geodetic System 1984 (G2139)"],MEMBER["World Geodetic System 1984 (G2296)"],ELLIPSOID["WGS 84",6378137,298.257223563,LENGTHUNIT["metre",1]],ENSEMBLEACCURACY[2.0]],PRIMEM["Greenwich",0,ANGLEUNIT["degree",0.0174532925199433]],CS[ellipsoidal,2],AXIS["geodetic latitude (Lat)",north,ORDER[1],ANGLEUNIT["degree",0.0174532925199433]],AXIS["geodetic longitude (Lon)",east,ORDER[2],ANGLEUNIT["degree",0.0174532925199433]],USAGE[SCOPE["Horizontal component of 3D system."],AREA["World."],BBOX[-90,-180,90,180]],ID["EPSG",4326]]"#
+        );
     }
 }

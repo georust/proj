@@ -253,3 +253,9 @@ pub use crate::proj::ProjBuilder;
 pub use crate::proj::ProjCreateError;
 pub use crate::proj::ProjError;
 pub use crate::proj::ProjInfo;
+
+pub mod wkt {
+    pub use crate::proj::WktOptions;
+    pub use crate::proj::WktOutputAxis;
+    pub use crate::proj::WktVersion;
+}

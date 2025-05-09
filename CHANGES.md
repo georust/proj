@@ -1,3 +1,5 @@
+- Add Proj::as_wkt() function
+
 # 0.30.0 - 2025-04-18
 
 - Add coordinate metadata creation and query functions
