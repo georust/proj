@@ -565,6 +565,8 @@ pub struct Proj {
     area: Option<*mut PJ_AREA>,
 }
 
+unsafe impl Send for Proj {}
+
 impl Proj {
     /// Create a coordinate metadata object to be used in coordinate operations.
     ///
