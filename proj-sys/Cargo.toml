@@ -12,7 +12,7 @@ links = "proj"
 rust-version = "1.82"
 
 [dependencies]
-libsqlite3-sys = ">=0.28,<0.33"
+libsqlite3-sys = ">=0.28,<0.35"
 link-cplusplus = "1.0.6"
 
 [build-dependencies]

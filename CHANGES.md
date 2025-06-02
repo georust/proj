@@ -1,4 +1,5 @@
 - Add Proj::as_wkt() function
+- Add support for building with libsqlite3-sys 0.33, 0.34
 
 # 0.30.0 - 2025-04-18
 
