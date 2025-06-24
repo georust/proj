@@ -1,4 +1,14 @@
 ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/georust/proj/test.yml?branch=main)
+
+## Maintenance note
+
+This fork exists for:
+
+* `drone-ground-crossing` repository, see the homonymous branch.
+
+  Note, that branch starts from the commit supporting PROJ 9.4.0, as the
+  respective Nix package does not support PROJ 9.6.0 at the moment of writing.
+
 # PROJ
 
 Coordinate transformation via bindings to the [PROJ](https://proj.org) v9.6.x API.
