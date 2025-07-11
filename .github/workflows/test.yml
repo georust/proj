@@ -11,9 +11,9 @@ on:
   schedule: [cron: "45 6 * * *"]
 
 env:
-  LIBPROJ_VERSION: 9.6.0
-  RUST_MSRV: "1.82"
-  RUST_LATEST: "1.86"
+  LIBPROJ_VERSION: 9.6.2
+  RUST_MSRV: "1.85"
+  RUST_LATEST: "1.88"
 
 jobs:
   # work around GHA env strictness

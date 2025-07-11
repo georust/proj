@@ -4,7 +4,7 @@ use std::fs::File;
 use std::path::PathBuf;
 use tar::Archive;
 
-const MINIMUM_PROJ_VERSION: &str = "9.6.0";
+const MINIMUM_PROJ_VERSION: &str = "9.6.2";
 
 #[cfg(feature = "nobuild")]
 fn main() {} // Skip the build script on docs.rs
