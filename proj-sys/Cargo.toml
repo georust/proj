@@ -2,14 +2,14 @@
 name = "proj-sys"
 description = "Rust bindings for PROJ v9.6.x"
 repository = "https://github.com/georust/proj"
-version = "0.26.0"
+version = "0.27.0"
 readme = "README.md"
 authors = ["The Georust developers <mods@georust.org>"]
 keywords = ["proj", "projection", "osgeo", "geo", "geospatial"]
 license = "MIT OR Apache-2.0"
-edition = "2021"
+edition = "2024"
 links = "proj"
-rust-version = "1.82"
+rust-version = "1.85"
 
 [dependencies]
 libsqlite3-sys = ">=0.28,<0.36"
