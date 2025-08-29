@@ -1,5 +1,7 @@
 # Unreleased
 
+# 0.31.0 - 2025-08-29
+
 - Add Proj::as_wkt() function
 - Update to proj-sys 0.27.0:
   - Update to PROJ 9.6.2
