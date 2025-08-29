@@ -1,4 +1,10 @@
+# Unreleased
+
 - Add Proj::as_wkt() function
+- Update to proj-sys 0.27.0:
+  - Update to PROJ 9.6.2
+  - Update MSRV to 1.85
+  - Update edition to 2024
 
 # 0.30.0 - 2025-04-18
 

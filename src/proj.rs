@@ -179,9 +179,11 @@ impl Area {
 
 /// Easily get a String from the external library
 pub(crate) unsafe fn _string(raw_ptr: *const c_char) -> Result<String, str::Utf8Error> {
-    assert!(!raw_ptr.is_null());
-    let c_str = CStr::from_ptr(raw_ptr);
-    Ok(str::from_utf8(c_str.to_bytes())?.to_string())
+    unsafe {
+        assert!(!raw_ptr.is_null());
+        let c_str = CStr::from_ptr(raw_ptr);
+        Ok(str::from_utf8(c_str.to_bytes())?.to_string())
+    }
 }
 
 /// Look up an error message using the error code
@@ -1269,12 +1271,11 @@ impl Proj {
         };
         if let Some(indentation_width) = indentation_width {
             opts.push(CString::new(format!(
-                "INDENTATION_WIDTH={}",
-                indentation_width
+                "INDENTATION_WIDTH={indentation_width}"
             ))?)
         }
         if let Some(schema) = schema {
-            opts.push(CString::new(format!("SCHEMA={}", schema))?)
+            opts.push(CString::new(format!("SCHEMA={schema}"))?)
         }
         let mut opts_ptrs: Vec<_> = opts.iter().map(|cs| cs.as_ptr()).collect();
         // we always have to terminate with a null pointer, even if the opts are empty
@@ -1305,8 +1306,7 @@ impl Proj {
 
             if let Some(indentation_width) = options.indentation_width {
                 opts.push(CString::new(format!(
-                    "INDENTATION_WIDTH={}",
-                    indentation_width
+                    "INDENTATION_WIDTH={indentation_width}"
                 ))?)
             }
 

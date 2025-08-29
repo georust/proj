@@ -11,12 +11,12 @@ keywords = ["proj", "projection", "osgeo", "geo"]
 categories = ["science::geo", "api-bindings"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
-edition = "2021"
-rust-version = "1.82"
+edition = "2024"
+rust-version = "1.85"
 
 [dependencies]
-proj-sys = { version = "0.26.0", path = "proj-sys" }
-geo-types = { version = "0.7.10", optional = true }
+proj-sys = { version = "0.27.0", path = "proj-sys" }
+geo-types = { version = "0.7.16", optional = true }
 libc = "0.2.172"
 num-traits = "0.2.14"
 thiserror = "2.0.0"
@@ -35,7 +35,7 @@ network = ["ureq", "http", "proj-sys/network"]
 [dev-dependencies]
 # approx version must match the one used in geo-types
 approx = "0.5"
-geo-types = { version = "0.7.10", features = ["approx"] }
+geo-types = { version = "0.7.16", features = ["approx"] }
 
 [package.metadata.docs.rs]
 features = [ "proj-sys/nobuild", "network", "geo-types" ]
