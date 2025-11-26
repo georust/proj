@@ -1,3 +1,20 @@
+# 0.27.0 - 2025-07-11
+
+- Update to PROJ 9.6.2
+- Update MSRV to 1.85
+- Update edition to 2024
+
+# 0.26.0 - 2025-04-18
+
+- Update to PROJ 9.6.0
+- Update flate2 dependency for ureq 3.x compat
+- Bump MSRV to 1.82
+
+# 0.25.0 - 2024-12-20
+
+- BREAKING: Update bindgen to 0.71.1
+
+
 # 0.24.0
 
 - Update to PROJ 9.4.0 (#196) 

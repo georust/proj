@@ -8,11 +8,12 @@ on:
       - trying
   pull_request:
   merge_group:
+  schedule: [cron: "45 6 * * *"]
 
 env:
-  LIBPROJ_VERSION: 9.4.0
-  RUST_MSRV: "1.70"
-  RUST_LATEST: "1.77"
+  LIBPROJ_VERSION: 9.6.2
+  RUST_MSRV: "1.85"
+  RUST_LATEST: "1.88"
 
 jobs:
   # work around GHA env strictness
@@ -69,27 +70,37 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        container_image:
+        rust_version:
           # Minimum supported rust (MSRV)
-          - ghcr.io/georust/proj-ci:proj-${{ needs.compute.outputs.LIBPROJ_VERSION }}-rust-${{ needs.compute.outputs.RUST_MSRV }}
+          - ${{ needs.compute.outputs.RUST_MSRV }}
           # Latest stable rust
-          - ghcr.io/georust/proj-ci:proj-${{ needs.compute.outputs.LIBPROJ_VERSION }}-rust-${{ needs.compute.outputs.RUST_LATEST }}
+          - ${{ needs.compute.outputs.RUST_LATEST }}
         features:
           - ""
           - "--features network"
           - "--features bundled_proj"
           - "--no-default-features"
-          - "--features \"network bundled_proj\""
-          - "--features \"network geo-types\""
-          - "--features \"bundled_proj geo-types\""
-          - "--features \"network bundled_proj geo-types\""
+          - '--features "network bundled_proj"'
+          - '--features "network geo-types"'
+          - '--features "bundled_proj geo-types"'
+          - '--features "network bundled_proj geo-types"'
     container:
-      image: ${{ matrix.container_image }}
+      image: ghcr.io/georust/proj-ci:proj-${{ needs.compute.outputs.LIBPROJ_VERSION }}-rust-${{ matrix.rust_version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - run: cargo build ${{ matrix.features }}
-      - run: cargo test ${{ matrix.features }}
+      - if: matrix.rust_version  == env.RUST_LATEST
+        run: |
+          cargo build ${{ matrix.features }}
+          cargo test ${{ matrix.features }}
+      - uses: taiki-e/install-action@cargo-hack
+        if: matrix.rust_version == env.RUST_MSRV
+      - uses: taiki-e/install-action@cargo-minimal-versions
+        if: matrix.rust_version == env.RUST_MSRV
+      - if: matrix.rust_version == env.RUST_MSRV
+        run: |
+          cargo minimal-versions build ${{ matrix.features }} --direct
+          cargo minimal-versions test ${{ matrix.features }} --direct
 
   proj-macos:
     name: proj macos
@@ -153,8 +164,18 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - run: cargo build ${{ matrix.features }}
-      - run: cargo test ${{ matrix.features }}
+      - if: matrix.rust_version  == env.RUST_LATEST
+        run: |
+          cargo build ${{ matrix.features }}
+          cargo test ${{ matrix.features }}
+      - uses: taiki-e/install-action@cargo-hack
+        if: matrix.rust_version == env.RUST_MSRV
+      - uses: taiki-e/install-action@cargo-minimal-versions
+        if: matrix.rust_version == env.RUST_MSRV
+      - if: matrix.rust_version == env.RUST_MSRV
+        run: |
+          cargo minimal-versions build ${{ matrix.features }} --direct
+          cargo minimal-versions test ${{ matrix.features }} --direct
 
   proj-sys-macos:
     name: proj-sys macos

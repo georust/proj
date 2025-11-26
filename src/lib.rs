@@ -1,5 +1,5 @@
 #![doc(html_logo_url = "https://raw.githubusercontent.com/georust/meta/master/logo/logo.png")]
-//! Coordinate transformation via bindings to the [PROJ](https://proj.org) v9.4.x API.
+//! Coordinate transformation via bindings to the [PROJ](https://proj.org) v9.6.x API.
 //!
 //! Two coordinate transformation operations are currently provided: _projection_ (and inverse
 //! projection) and _conversion_.
@@ -9,7 +9,7 @@
 //! projected coordinate systems. The PROJ [documentation](https://proj.org/operations/index.html)
 //! explains the distinction between these operations in more detail.
 //!
-//! This crate depends on [`libproj v9.4.x`](https://proj.org), accessed via the
+//! This crate depends on [`libproj v9.6.x`](https://proj.org), accessed via the
 //! [`proj-sys`](https://docs.rs/proj-sys) crate. By default, `proj-sys` will try to find a
 //! pre-existing installation of libproj on your system. If an appropriate version of libproj
 //! cannot be found, the build script will attempt to build libproj from source. You may specify a
@@ -79,15 +79,15 @@
 //! There are two options for creating a transformation:
 //!
 //! 1. If you don't require additional [grids](#grid-file-download) or other customisation:
-//!     - Call `Proj::new` or `Proj::new_known_crs`. This creates a transformation instance ([`Proj`](proj/struct.Proj.html))
+//!     - Call [`Proj::new()`], [`Proj::new_known_crs()`] or [`Proj::create_crs_to_crs_from_pj()`].
+//!       This creates a transformation instance ([`Proj`])
 //! 2. If you require a grid for the transformation you wish to carry out, or you need to customise
 //!    the search path or the grid endpoint:
-//!    - Create a new [`ProjBuilder`](proj/struct.ProjBuilder.html) by calling
+//!    - Create a new [`ProjBuilder`] by calling
 //!      `ProjBuilder::new()`. It may be modified to enable network downloads, disable the grid,
 //!      cache or modify search paths;
-//!    - Call [`ProjBuilder.proj()`](proj/struct.ProjBuilder.html#method.proj) or
-//!      [`ProjBuilder.proj_known_crs()`](proj/struct.ProjBuilder.html#method.proj_known_crs). This
-//!      creates a transformation instance (`Proj`)
+//!    - Call [`ProjBuilder::proj()`], [`ProjBuilder::proj_known_crs()`], or
+//!     [`ProjBuilder::proj_create_crs_to_crs_from_pj()`]. This creates a transformation instance ([`Proj`])
 //!
 //! **Note**:
 //!
@@ -98,7 +98,7 @@
 //!
 //! # Requirements
 //!
-//! By default, the crate requires `libproj` 9.2.x to be present on your system and will use `pkg-config`
+//! By default, the crate requires `libproj` 9.6.x to be present on your system and will use `pkg-config`
 //! to attempt to locate it. If this fails, the crate will attempt to build libproj from its bundled source.
 //!
 //! # Feature Flags
@@ -256,3 +256,9 @@ pub use crate::proj::ProjBuilder;
 pub use crate::proj::ProjCreateError;
 pub use crate::proj::ProjError;
 pub use crate::proj::ProjInfo;
+
+pub mod wkt {
+    pub use crate::proj::WktOptions;
+    pub use crate::proj::WktOutputAxis;
+    pub use crate::proj::WktVersion;
+}

@@ -2,14 +2,19 @@ use libc::c_int;
 use libc::{c_char, c_double};
 use num_traits::Float;
 use proj_sys::{
-    proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_cleanup, proj_context_create,
-    proj_context_destroy, proj_context_errno, proj_context_get_url_endpoint,
-    proj_context_is_network_enabled, proj_context_set_search_paths, proj_context_set_url_endpoint,
-    proj_create, proj_create_crs_to_crs, proj_destroy, proj_errno_string, proj_get_area_of_use,
+    proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_as_projjson, proj_as_wkt,
+    proj_cleanup, proj_context_clone, proj_context_create, proj_context_destroy,
+    proj_context_errno, proj_context_get_url_endpoint, proj_context_is_network_enabled,
+    proj_context_set_search_paths, proj_context_set_url_endpoint, proj_coordinate_metadata_create,
+    proj_coordinate_metadata_get_epoch, proj_create, proj_create_crs_to_crs,
+    proj_create_crs_to_crs_from_pj, proj_destroy, proj_errno_string, proj_get_area_of_use,
     proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization, proj_pj_info,
     proj_trans, proj_trans_array, proj_trans_bounds, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD,
-    PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_XYZT,
+    PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_WKT_TYPE_PJ_WKT1_ESRI,
+    PJ_WKT_TYPE_PJ_WKT1_GDAL, PJ_WKT_TYPE_PJ_WKT2_2015, PJ_WKT_TYPE_PJ_WKT2_2015_SIMPLIFIED,
+    PJ_WKT_TYPE_PJ_WKT2_2019, PJ_WKT_TYPE_PJ_WKT2_2019_SIMPLIFIED, PJ_XYZT,
 };
+use std::ptr;
 use std::{
     convert, ffi,
     fmt::{self, Debug},
@@ -143,6 +148,8 @@ pub enum ProjError {
     DownloadError(String, String, u8),
     #[error("The current definition could not be retrieved")]
     Definition,
+    #[error("The definition could not be represented in the requested JSON format")]
+    ExportToJson,
 }
 
 #[cfg(feature = "network")]
@@ -158,6 +165,8 @@ pub enum ProjCreateError {
     ArgumentNulError(ffi::NulError),
     #[error("The underlying PROJ call failed: {0}")]
     ProjError(String),
+    #[error("Pipeline objects cannot be used to produce a MetadataObject. Try assigning the epoch to one of the input projections")]
+    MetadataObjectCreation,
 }
 
 /// The bounding box of an area of use
@@ -189,9 +198,11 @@ impl Area {
 
 /// Easily get a String from the external library
 pub(crate) unsafe fn _string(raw_ptr: *const c_char) -> Result<String, str::Utf8Error> {
-    assert!(!raw_ptr.is_null());
-    let c_str = CStr::from_ptr(raw_ptr);
-    Ok(str::from_utf8(c_str.to_bytes())?.to_string())
+    unsafe {
+        assert!(!raw_ptr.is_null());
+        let c_str = CStr::from_ptr(raw_ptr);
+        Ok(str::from_utf8(c_str.to_bytes())?.to_string())
+    }
 }
 
 /// Look up an error message using the error code
@@ -249,6 +260,57 @@ fn transform_epsg(
     };
     Ok(Proj {
         c_proj: normalised,
+        ctx,
+        area: Some(proj_area),
+    })
+}
+
+// called by Proj and ProjBuilder
+fn crs_to_crs_from_pj(
+    ctx: *mut PJ_CONTEXT,
+    source_crs: &Proj,
+    target_crs: &Proj,
+    area: Option<Area>,
+    options: Option<Vec<&str>>,
+) -> Result<Proj, ProjCreateError> {
+    let proj_area = unsafe { proj_area_create() };
+    area_set_bbox(proj_area, area);
+
+    // Convert options to C strings
+    let mut options_cstr: Vec<ffi::CString> = Vec::new();
+    let mut options_ptrs: Vec<*const c_char> = Vec::new();
+
+    if let Some(opts) = options {
+        for opt in opts {
+            match ffi::CString::new(opt) {
+                Ok(c_str) => {
+                    options_cstr.push(c_str);
+                }
+                Err(err) => return Err(ProjCreateError::ArgumentNulError(err)),
+            }
+        }
+
+        options_ptrs = options_cstr.iter().map(|s| s.as_ptr()).collect();
+        // Add null terminator
+        options_ptrs.push(ptr::null());
+    } else {
+        // If no options, just use a null pointer
+        options_ptrs.push(ptr::null());
+    }
+
+    let ptr = result_from_create(ctx, unsafe {
+        proj_create_crs_to_crs_from_pj(
+            ctx,
+            source_crs.c_proj,
+            target_crs.c_proj,
+            proj_area,
+            options_ptrs.as_ptr(),
+        )
+    })
+    .map_err(|e| ProjCreateError::ProjError(e.message(ctx)))?;
+
+    Ok(Proj {
+        c_proj: ptr,
         ctx,
         area: Some(proj_area),
     })
@@ -402,7 +464,7 @@ pub struct Info {
 
 /// A `PROJ` Context instance, used to create a transformation object.
 ///
-/// Create a transformation object by calling `proj` or `proj_known_crs`.
+/// Create a transformation object by calling [`ProjBuilder::proj()`], [`ProjBuilder::proj_known_crs()`], [`ProjBuilder::proj_create_crs_to_crs_from_pj()`].
 pub struct ProjBuilder {
     ctx: *mut PJ_CONTEXT,
 }
@@ -476,6 +538,17 @@ impl ProjBuilder {
         let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
         transform_epsg(ctx, from, to, area)
     }
+    /// Builder version of [`create_crs_to_crs_from_pj()`](fn@Proj::create_crs_to_crs_from_pj())
+    pub fn proj_create_crs_to_crs_from_pj(
+        mut self,
+        source_crs: &Proj,
+        target_crs: &Proj,
+        area: Option<Area>,
+        options: Option<Vec<&str>>,
+    ) -> Result<Proj, ProjCreateError> {
+        let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
+        crs_to_crs_from_pj(ctx, source_crs, target_crs, area, options)
+    }
 }
 
 impl Default for ProjBuilder {
@@ -514,6 +587,56 @@ pub struct Proj {
 }
 
 impl Proj {
+    /// Create a coordinate metadata object to be used in coordinate operations.
+    ///
+    /// This creates a coordinate metadata object that can be used in coordinate operations,
+    /// such as transformations. The coordinate metadata object contains information
+    /// about the coordinates, such as the epoch they are referenced to.
+    ///
+    /// # Note
+    /// Only **transformation objects** (e.g. those created by calling [`new()`](fn@Proj::new())) can be
+    /// converted to metadata objects. They cannot be created from pipelines.
+    ///
+    /// # Arguments
+    ///
+    /// * `epoch` - The epoch that the coordinates are referenced to.
+    ///
+    /// # Returns
+    ///
+    /// A new coordinate metadata object or an error if creation failed.
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn coordinate_metadata_create(&self, epoch: f64) -> Result<Proj, ProjCreateError> {
+        // Clone the context to avoid double-free in Drop implementations
+        let cloned_ctx = unsafe { proj_context_clone(self.ctx) };
+
+        let ptr = result_from_create(cloned_ctx, unsafe {
+            proj_coordinate_metadata_create(cloned_ctx, self.c_proj, epoch)
+        })
+        .map_err(|_| ProjCreateError::MetadataObjectCreation)?;
+
+        Ok(Proj {
+            c_proj: ptr,
+            ctx: cloned_ctx,
+            area: None,
+        })
+    }
+
+    /// Get the epoch from a coordinate metadata object.
+    ///
+    /// This retrieves the epoch associated with a coordinate metadata object.
+    ///
+    /// # Returns
+    ///
+    /// The epoch value as a float, or [`f64::NAN`] if the object doesn't have an associated epoch.
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn coordinate_metadata_get_epoch(&self) -> f64 {
+        unsafe { proj_coordinate_metadata_get_epoch(self.ctx, self.c_proj) }
+    }
+
     /// Try to create a new transformation object
     ///
     /// **Note:** for projection operations, `definition` specifies
@@ -609,6 +732,61 @@ impl Proj {
     ) -> Result<Proj, ProjCreateError> {
         let ctx = unsafe { proj_context_create() };
         transform_epsg(ctx, from, to, area)
+    }
+
+    /// Create a transformation object that is a pipeline _between_ two known coordinate reference systems.
+    ///
+    /// This is similar to using [`Proj::new_known_crs()`] except that it accepts existing [`Proj`] objects
+    /// instead of string identifiers.
+    ///
+    /// # Note on Coordinate Metadata
+    /// Starting with PROJ 9.4, both source **and** target can be `CoordinateMetadata` objects, allowing for
+    /// changes of coordinate epochs (though in practice this is limited to use of velocity grids
+    /// inside the same dynamic CRS). In the `proj` crate, `CoordinateMetadata` is
+    /// a [`Proj`] struct created with [`Proj::coordinate_metadata_create()`].
+    ///
+    /// # Arguments
+    ///
+    /// * `target_crs` - The target CRS or coordinate metadata object
+    /// * `area` - Optional area of use to help select the appropriate transformation
+    /// * `options` - Optional list of strings with "KEY=VALUE" format. Supported options include:
+    ///   * `AUTHORITY=name`: to restrict the authority of coordinate operations looked up in the database.
+    ///   * `ACCURACY=value`: to set the minimum desired accuracy (in metres) of the candidate coordinate operations.
+    ///   * `ALLOW_BALLPARK=YES/NO`: can be set to NO to disallow the use of Ballpark transformation.
+    ///   * `ONLY_BEST=YES/NO`: Can be set to YES to cause PROJ to error out if the best transformation cannot be used.
+    ///   * `FORCE_OVER=YES/NO`: can be set to YES to force the +over flag on the transformation.
+    ///
+    /// # Returns
+    ///
+    /// A new transformation object or an error if creation failed
+    ///
+    /// # Examples
+    ///
+    /// Constructing a `Proj` from a source CRS and target CRS:
+    ///
+    /// ```rust
+    /// // UTM Zone 6 US Survey Feet to Metres
+    /// # use approx::assert_relative_eq;
+    /// let from = proj::Proj::new("EPSG:2230").unwrap();
+    /// let to = proj::Proj::new("EPSG:26946").unwrap();
+    /// let transformer = from.create_crs_to_crs_from_pj(&to, None, None).unwrap();
+    /// let result = transformer
+    ///     .convert((4760096.421921, 3744293.729449))
+    ///     .unwrap();
+    /// assert_relative_eq!(result.0, 1450880.2910605022, epsilon = 1.0e-8);
+    /// assert_relative_eq!(result.1, 1141263.0111604782, epsilon = 1.0e-8);
+    /// ```
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn create_crs_to_crs_from_pj(
+        &self,
+        target_crs: &Proj,
+        area: Option<Area>,
+        options: Option<Vec<&str>>,
+    ) -> Result<Proj, ProjCreateError> {
+        // Clone the context to avoid double-free in Drop implementations
+        let ctx = unsafe { proj_context_clone(self.ctx) };
+        crs_to_crs_from_pj(ctx, self, target_crs, area, options)
     }
 
     /// Set the bounding box of the area of use
@@ -801,17 +979,17 @@ impl Proj {
     ///
     /// Input and output CRS may be specified in two ways:
     /// 1. Using the PROJ `pipeline` operator. This method makes use of the [`pipeline`](http://proj4.org/operations/pipeline.html)
-    /// functionality available since `PROJ` 5.
-    /// This has the advantage of being able to chain an arbitrary combination of projection, conversion,
-    /// and transformation steps, allowing for extremely complex operations ([`new`](#method.new))
+    ///    functionality available since `PROJ` 5.
+    ///    This has the advantage of being able to chain an arbitrary combination of projection, conversion,
+    ///    and transformation steps, allowing for extremely complex operations ([`new`](#method.new))
     /// 2. Using EPSG codes or `PROJ` strings to define input and output CRS ([`new_known_crs`](#method.new_known_crs))
     ///
     /// ## A Note on Coordinate Order
     /// Depending on the method used to instantiate the `Proj` object, coordinate input and output order may vary:
     /// - If you have used [`new`](#method.new), it is assumed that you've specified the order using the input string,
-    /// or that you are aware of the required input order and expected output order.
+    ///   or that you are aware of the required input order and expected output order.
     /// - If you have used [`new_known_crs`](#method.new_known_crs), input and output order are **normalised**
-    /// to Longitude, Latitude / Easting, Northing.
+    ///   to Longitude, Latitude / Easting, Northing.
     ///
     /// The following example converts from NAD83 US Survey Feet (EPSG 2230) to NAD83 Metres (EPSG 26946)
     ///
@@ -879,9 +1057,9 @@ impl Proj {
     /// ## A Note on Coordinate Order
     /// Depending on the method used to instantiate the `Proj` object, coordinate input and output order may vary:
     /// - If you have used [`new`](#method.new), it is assumed that you've specified the order using the input string,
-    /// or that you are aware of the required input order and expected output order.
+    ///   or that you are aware of the required input order and expected output order.
     /// - If you have used [`new_known_crs`](#method.new_known_crs), input and output order are **normalised**
-    /// to Longitude, Latitude / Easting, Northing.
+    ///   to Longitude, Latitude / Easting, Northing.
     ///
     /// ```rust
     /// use proj::{Proj, Coord};
@@ -954,9 +1132,9 @@ impl Proj {
     ///
     /// Input and output CRS may be specified in two ways:
     /// 1. Using the PROJ `pipeline` operator. This method makes use of the [`pipeline`](http://proj4.org/operations/pipeline.html)
-    /// functionality available since `PROJ` 5.
-    /// This has the advantage of being able to chain an arbitrary combination of projection, conversion,
-    /// and transformation steps, allowing for extremely complex operations ([`new`](#method.new))
+    ///    functionality available since `PROJ` 5.
+    ///    This has the advantage of being able to chain an arbitrary combination of projection, conversion,
+    ///    and transformation steps, allowing for extremely complex operations ([`new`](#method.new))
     /// 2. Using EPSG codes or `PROJ` strings to define input and output CRS ([`new_known_crs`](#method.new_known_crs))
     ///
     /// The `densify_pts` parameter describes the number of points to add to each edge to account
@@ -1101,6 +1279,182 @@ impl Proj {
             Err(ProjError::Projection(error_message(err)?))
         }
     }
+
+    /// Return the projjson representation of a transformation
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn to_projjson(
+        &self,
+        multiline: Option<bool>,
+        indentation_width: Option<usize>,
+        schema: Option<&str>,
+    ) -> Result<String, ProjError> {
+        let mut opts = vec![];
+        if let Some(multiline) = multiline {
+            if multiline {
+                opts.push(CString::new(String::from("MULTILINE=YES"))?)
+            } else {
+                opts.push(CString::new(String::from("MULTILINE=NO"))?)
+            }
+        };
+        if let Some(indentation_width) = indentation_width {
+            opts.push(CString::new(format!(
+                "INDENTATION_WIDTH={indentation_width}"
+            ))?)
+        }
+        if let Some(schema) = schema {
+            opts.push(CString::new(format!("SCHEMA={schema}"))?)
+        }
+        let mut opts_ptrs: Vec<_> = opts.iter().map(|cs| cs.as_ptr()).collect();
+        // we always have to terminate with a null pointer, even if the opts are empty
+        opts_ptrs.push(ptr::null());
+        unsafe {
+            let out_ptr = proj_as_projjson(self.ctx, self.c_proj, opts_ptrs.as_ptr());
+            if out_ptr.is_null() {
+                Err(ProjError::ExportToJson)
+            } else {
+                Ok(_string(out_ptr)?)
+            }
+        }
+    }
+
+    pub fn as_wkt(
+        &self,
+        version: Option<WktVersion>,
+        options: Option<WktOptions>,
+    ) -> Result<String, ProjError> {
+        let options_str = if let Some(ref options) = options {
+            let mut opts = vec![];
+            if let Some(multiline) = options.multiline {
+                opts.push(CString::new(format!(
+                    "MULTILINE={}",
+                    if multiline { "YES" } else { "NO" }
+                ))?)
+            };
+
+            if let Some(indentation_width) = options.indentation_width {
+                opts.push(CString::new(format!(
+                    "INDENTATION_WIDTH={indentation_width}"
+                ))?)
+            }
+
+            if let Some(ref output_axis) = options.output_axis {
+                opts.push(CString::new(format!(
+                    "OUTPUT_AXIS={}",
+                    match output_axis {
+                        WktOutputAxis::Auto => "AUTO",
+                        WktOutputAxis::Yes => "YES",
+                        WktOutputAxis::No => "NO",
+                    }
+                ))?);
+            }
+
+            if let Some(strict) = options.strict {
+                opts.push(CString::new(format!(
+                    "STRICT={}",
+                    if strict { "YES" } else { "NO" }
+                ))?);
+            }
+
+            if let Some(allow_ellipsoidal_height_as_vertical_crs) =
+                options.allow_ellipsoidal_height_as_vertical_crs
+            {
+                opts.push(CString::new(format!(
+                    "ALLOW_ELLIPSOIDAL_HEIGHT_AS_VERTICAL_CRS={}",
+                    if allow_ellipsoidal_height_as_vertical_crs {
+                        "YES"
+                    } else {
+                        "NO"
+                    }
+                ))?);
+            }
+
+            if let Some(allow_linunit_node) = options.allow_linunit_node {
+                opts.push(CString::new(format!(
+                    "ALLOW_LINUNIT_NODE={}",
+                    if allow_linunit_node { "YES" } else { "NO" }
+                ))?);
+            }
+
+            if opts.is_empty() {
+                None
+            } else {
+                Some(opts)
+            }
+        } else {
+            None
+        };
+
+        let opts_ptrs = options_str
+            .as_ref()
+            .map(|o| o.iter().map(|cs| cs.as_ptr()).collect::<Vec<_>>());
+
+        let wkt_type = match version.unwrap_or(WktVersion::Wkt2_2019) {
+            WktVersion::Wkt2_2015 => PJ_WKT_TYPE_PJ_WKT2_2015,
+            WktVersion::Wkt2_2015_Simplified => PJ_WKT_TYPE_PJ_WKT2_2015_SIMPLIFIED,
+            WktVersion::Wkt2_2019 => PJ_WKT_TYPE_PJ_WKT2_2019,
+            WktVersion::Wkt2_2019_Simplified => PJ_WKT_TYPE_PJ_WKT2_2019_SIMPLIFIED,
+            WktVersion::Wkt1_Gdal => PJ_WKT_TYPE_PJ_WKT1_GDAL,
+            WktVersion::Wkt1_Esri => PJ_WKT_TYPE_PJ_WKT1_ESRI,
+        };
+
+        unsafe {
+            let wkt = proj_as_wkt(
+                self.ctx,
+                self.c_proj,
+                wkt_type,
+                opts_ptrs
+                    .as_ref()
+                    .map(|c| c.as_ptr())
+                    .unwrap_or(ptr::null()),
+            );
+
+            Ok(_string(wkt)?)
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct WktOptions {
+    /// Defaults to YES, except for WKT1_ESRI
+    multiline: Option<bool>,
+
+    /// Defaults to 4 (when multiline output is on).
+    indentation_width: Option<usize>,
+
+    /// In AUTO mode, axis will be output for WKT2 variants, for WKT1_GDAL for ProjectedCRS with
+    /// easting/northing ordering (otherwise stripped), but not for WKT1_ESRI. Setting to YES will
+    /// output them unconditionally, and to NO will omit them unconditionally.
+    output_axis: Option<WktOutputAxis>,
+
+    /// Default is YES. If NO, a Geographic 3D CRS can be for example exported as WKT1_GDAL with
+    /// 3 axes, whereas this is normally not allowed.
+    strict: Option<bool>,
+
+    /// Default is NO. If set to YES and type == PJ_WKT1_GDAL, a Geographic 3D CRS or a Projected 3D
+    /// CRS will be exported as a compound CRS whose vertical part represents an ellipsoidal height
+    /// (for example for use with LAS 1.4 WKT1).
+    allow_ellipsoidal_height_as_vertical_crs: Option<bool>,
+
+    /// Default is YES starting with PROJ 9.1. Only taken into account with type == PJ_WKT1_ESRI on a Geographic 3D CRS.
+    allow_linunit_node: Option<bool>,
+}
+
+pub enum WktOutputAxis {
+    Auto,
+    Yes,
+    No,
+}
+
+#[allow(non_camel_case_types)]
+pub enum WktVersion {
+    Wkt2_2015,
+    Wkt2_2015_Simplified,
+    Wkt2_2019,
+    Wkt2_2019_Simplified,
+    Wkt1_Gdal,
+    Wkt1_Esri,
 }
 
 impl convert::TryFrom<&str> for Proj {
@@ -1277,6 +1631,70 @@ mod test {
             proj.def().unwrap(),
             "proj=longlat datum=WGS84 no_defs ellps=WGS84 towgs84=0,0,0"
         );
+    }
+
+    #[test]
+    fn test_metadata_creation() {
+        let wgs84 = "EPSG:4326";
+        let epoch = 2021.3;
+        let proj = Proj::new(wgs84).unwrap();
+        let np = proj.coordinate_metadata_create(epoch).unwrap();
+        assert_eq!(np.coordinate_metadata_get_epoch(), 2021.3);
+    }
+
+    #[test]
+    fn test_create_crs_to_crs_from_pj() {
+        let from = Proj::new("EPSG:2230").unwrap();
+        let to = Proj::new("EPSG:26946").unwrap();
+
+        let transformer = from.create_crs_to_crs_from_pj(&to, None, None).unwrap();
+        let result = transformer
+            .convert(MyPoint::new(4760096.421921, 3744293.729449))
+            .unwrap();
+
+        assert_relative_eq!(result.x(), 1450880.2910605022, epsilon = 1.0e-8);
+        assert_relative_eq!(result.y(), 1141263.0111604782, epsilon = 1.0e-8);
+    }
+
+    #[cfg(feature = "network")]
+    #[test]
+    fn test_create_crs_to_crs_from_pj_using_builder_epoch() {
+        // kind of a kitchen-sink test:
+        // we test the epoch addition, metadata creation, and grid download functionality
+
+        // set up points and projections
+        let point = (53.333231, 353.729382);
+        // these are valid epochs for itrf2014
+        let epoch1 = 2010.0;
+        let epoch2 = 2022.66;
+        let itrf = "EPSG:9000";
+        let to = Proj::new("EPSG:7844").unwrap();
+
+        let proj1 = Proj::new(itrf).unwrap();
+        let old_epoch = proj1.coordinate_metadata_create(epoch1).unwrap();
+
+        let proj2 = Proj::new(itrf).unwrap();
+        let new_epoch = proj2.coordinate_metadata_create(epoch2).unwrap();
+
+        let mut builder1 = ProjBuilder::new();
+        builder1.enable_network(true).unwrap();
+        // Disable caching to ensure we're accessing the network if need be
+        builder1.grid_cache_enable(false);
+        let transformer1 = builder1
+            .proj_create_crs_to_crs_from_pj(&old_epoch, &to, None, None)
+            .unwrap();
+        let result1 = transformer1.convert(point).unwrap();
+
+        let mut builder2 = ProjBuilder::new();
+        builder2.enable_network(true).unwrap();
+        builder2.grid_cache_enable(false);
+        let transformer2 = builder2
+            .proj_create_crs_to_crs_from_pj(&new_epoch, &to, None, None)
+            .unwrap();
+        let result2 = transformer2.convert(point).unwrap();
+        // these transformation results should not match:
+        // the differing epochs introduce a small difference
+        assert_ne!(&result1, &result2);
     }
 
     #[test]
@@ -1528,5 +1946,41 @@ mod test {
         assert_eq!(area.east, 44.83);
         assert_eq!(area.north, 84.73);
         assert!(name.contains("Europe"));
+    }
+
+    #[test]
+    fn test_projjson() {
+        let from = "EPSG:2230";
+        let to = "EPSG:26946";
+        let ft_to_m = Proj::new_known_crs(from, to, None).unwrap();
+        // Because libproj has been fussy about passing empty options strings we're testing both
+        let _ = ft_to_m
+            .to_projjson(
+                Some(true),
+                None,
+                Some("https://proj.org/schemas/v0.7/projjson.schema.json"),
+            )
+            .unwrap();
+        let _ = ft_to_m.to_projjson(None, None, None).unwrap();
+        // TODO: do we want to compare one of the results to proj's output?
+    }
+
+    #[test]
+    fn test_wkt() {
+        let proj = Proj::new("EPSG:4326").unwrap();
+        let wkt = proj
+            .as_wkt(
+                Some(WktVersion::Wkt2_2019),
+                Some(WktOptions {
+                    multiline: Some(false),
+                    ..Default::default()
+                }),
+            )
+            .unwrap();
+
+        assert_eq!(
+            wkt,
+            r#"GEOGCRS["WGS 84",ENSEMBLE["World Geodetic System 1984 ensemble",MEMBER["World Geodetic System 1984 (Transit)"],MEMBER["World Geodetic System 1984 (G730)"],MEMBER["World Geodetic System 1984 (G873)"],MEMBER["World Geodetic System 1984 (G1150)"],MEMBER["World Geodetic System 1984 (G1674)"],MEMBER["World Geodetic System 1984 (G1762)"],MEMBER["World Geodetic System 1984 (G2139)"],MEMBER["World Geodetic System 1984 (G2296)"],ELLIPSOID["WGS 84",6378137,298.257223563,LENGTHUNIT["metre",1]],ENSEMBLEACCURACY[2.0]],PRIMEM["Greenwich",0,ANGLEUNIT["degree",0.0174532925199433]],CS[ellipsoidal,2],AXIS["geodetic latitude (Lat)",north,ORDER[1],ANGLEUNIT["degree",0.0174532925199433]],AXIS["geodetic longitude (Lon)",east,ORDER[2],ANGLEUNIT["degree",0.0174532925199433]],USAGE[SCOPE["Horizontal component of 3D system."],AREA["World."],BBOX[-90,-180,90,180]],ID["EPSG",4326]]"#
+        );
     }
 }

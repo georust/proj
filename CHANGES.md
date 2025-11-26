@@ -1,9 +1,30 @@
-# Changes
+# Unreleased
 
-## Unreleased
-- Update to proj-sys 0.24.0 (libproj 9.4.0)
-- Provide bundled bindings by default and move support for build time generated bindings behind the `buildtime_bindgen` feature of proj-sys
-- Bump MSRV to 1.65
+# 0.31.0 - 2025-08-29
+
+- Add Proj::as_wkt() function
+- Update to proj-sys 0.27.0:
+  - Update to PROJ 9.6.2
+  - Update MSRV to 1.85
+  - Update edition to 2024
+
+# 0.30.0 - 2025-04-18
+
+- Add coordinate metadata creation and query functions
+- Add method for Proj creation from existing Proj instances, optionally containing epochs
+- Update ureq to 3.x and adapt network functionality to its new API
+
+## 0.29.0 - 2025-03-17
+
+- Update build status badge
+- Update MSRV to 1.81
+- Add support for building with libsqlite3-sys 0.32
+
+## 0.28.0 - 2024-12-20
+
+- Update to proj-sys 0.25.0 (libproj 9.4.0)
+- BREAKING: Provide bundled bindings by default and move support for build time generated bindings behind the `buildtime_bindgen` feature of proj-sys
+- Bump MSRV to 1.70
 
 ## 0.27.2
 

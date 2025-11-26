@@ -18,7 +18,7 @@ The process of updating bindings looks like:
 ```
 cd proj-sys
 cargo clean
-cargo build
+cargo build --features=buildtime_bindgen
 find ../target/debug/build/proj-sys* -name bindings.rs
 ```
 

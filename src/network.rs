@@ -20,7 +20,7 @@ use std::io::Read;
 use std::ops::Range;
 use std::os::raw::c_ulonglong;
 use std::ptr::{self, NonNull};
-use ureq::{Agent, Request, Response};
+use ureq::Agent;
 
 use crate::proj::{ProjError, _string};
 use libc::c_char;
@@ -63,10 +63,10 @@ impl Drop for HandleData {
     }
 }
 
-/// Return an exponential wait time based on the number of retries
+/// Return a quadratically-increasing wait time based on the number of retries
 ///
 /// Example: a value of 8 allows up to 6400 ms of retry delay, for a cumulative total of 25500 ms
-fn get_wait_time_exp(retrycount: i32) -> u64 {
+fn get_wait_time_quad(retrycount: i32) -> u64 {
     if retrycount == 0 {
         return 0;
     }
@@ -75,34 +75,46 @@ fn get_wait_time_exp(retrycount: i32) -> u64 {
 
 /// Process CDN response: handle retries in case of server error, or early return for client errors
 /// Successful retry data is stored into res
-fn error_handler(res: &mut Response, rb: Request) -> Result<&Response, ProjError> {
+fn error_handler<'a>(
+    res: &'a mut http::Response<ureq::Body>,
+    url: &str,
+    headers: &[(&str, &str)],
+    clt: Agent,
+) -> Result<&'a mut http::Response<ureq::Body>, ProjError> {
     let mut retries = 0;
     // Check whether something went wrong on the server, or if it's an S3 retry code
-    if SERVER_ERROR_CODES.contains(&res.status()) || RETRY_CODES.contains(&res.status()) {
+    if SERVER_ERROR_CODES.contains(&res.status().as_u16())
+        || RETRY_CODES.contains(&res.status().as_u16())
+    {
         // Start retrying: up to MAX_RETRIES
-        while (SERVER_ERROR_CODES.contains(&res.status()) || RETRY_CODES.contains(&res.status()))
+        while (SERVER_ERROR_CODES.contains(&res.status().as_u16())
+            || RETRY_CODES.contains(&res.status().as_u16()))
             && retries <= MAX_RETRIES
         {
             retries += 1;
-            let wait = time::Duration::from_millis(get_wait_time_exp(retries as i32));
+            let wait = time::Duration::from_millis(get_wait_time_quad(retries as i32));
             thread::sleep(wait);
-            let retry = rb.clone();
-            *res = retry.call()?;
+            let mut req = clt.get(url);
+            // Apply all headers
+            for (name, value) in headers {
+                req = req.header(*name, *value);
+            }
+            *res = req.call()?;
         }
     // Not a timeout or known S3 retry code: bail out
-    } else if CLIENT_ERROR_CODES.contains(&res.status()) {
+    } else if CLIENT_ERROR_CODES.contains(&res.status().as_u16()) {
         return Err(ProjError::DownloadError(
-            res.status_text().to_string(),
-            res.get_url().to_string(),
+            res.status().to_string(),
+            url.to_string(),
             retries,
         ));
     }
     // Retries have been exhausted OR
     // The loop ended prematurely due to a different error
-    if !SUCCESS_ERROR_CODES.contains(&res.status()) {
+    if !SUCCESS_ERROR_CODES.contains(&res.status().as_u16()) {
         return Err(ProjError::DownloadError(
-            res.status_text().to_string(),
-            res.get_url().to_string(),
+            res.status().to_string(),
+            url.to_string(),
             retries,
         ));
     }
@@ -148,7 +160,7 @@ pub(crate) unsafe extern "C" fn network_open(
             let err_string = e.to_string();
             out_error_string.copy_from_nonoverlapping(err_string.as_ptr().cast(), err_string.len());
             out_error_string.add(err_string.len()).write(0);
-            ptr::null_mut() as *mut PROJ_NETWORK_HANDLE
+            ptr::null_mut()
         }
     }
 }
@@ -172,44 +184,62 @@ unsafe fn _network_open(
     // RANGE header definition is "bytes=x-y"
     let hvalue = format!("bytes={offset}-{end}");
     // Create a new client that can be reused for subsequent queries
-    let clt = Agent::new();
-    let req = clt.get(&url);
-    let with_headers = req.set("Range", &hvalue).set("Client", CLIENT);
-    let in_case_of_error = with_headers.clone();
-    let mut res = with_headers.call()?;
+    let clt = Agent::new_with_defaults();
+    let req = clt
+        .get(&url)
+        .header("Range", &hvalue)
+        .header("Client", CLIENT);
+
+    let mut res = req.call()?;
+
+    // Define headers for potential retries
+    let headers = [("Range", hvalue.as_str()), ("Client", CLIENT)];
+
     // hand the response off to the error-handler, continue on success
-    error_handler(&mut res, in_case_of_error)?;
+    error_handler(&mut res, &url, &headers, clt.clone())?;
+
     // Write the initial read length value into the pointer
-    let Some(Ok(contentlength)) = res.header("Content-Length").map(str::parse::<usize>) else {
-        return Err(ProjError::ContentLength);
-    };
+    let contentlength = res
+        .headers()
+        .get("Content-Length")
+        .and_then(|val| val.to_str().ok())
+        .and_then(|s| s.parse::<usize>().ok())
+        .ok_or(ProjError::ContentLength)?;
+
     let headers = res
-        .headers_names()
-        .into_iter()
-        .filter_map(|h| {
-            Some({
-                let v = res.header(&h)?.to_string();
-                (h, v)
-            })
+        .headers()
+        .iter()
+        .filter_map(|(h, v)| {
+            let header_name = h.to_string();
+            let header_value = v.to_str().ok()?.to_string();
+            Some((header_name, header_value))
         })
         .collect();
+
     // Copy the downloaded bytes into the buffer so it can be passed around
     let capacity = contentlength.min(size_to_read);
-    let mut buf = Vec::with_capacity(capacity);
-    res.into_reader()
+    let mut buf = Vec::<u8>::with_capacity(capacity);
+
+    // Read from body into our buffer
+    let body_reader = res.body_mut().as_reader();
+    body_reader
         .take(size_to_read as u64)
         .read_to_end(&mut buf)?;
+
     out_size_read.write(buf.len());
     buf.as_ptr().copy_to_nonoverlapping(buffer.cast(), capacity);
+
     let hd = HandleData::new(url, headers, None);
     // heap-allocate the struct and cast it to a void pointer so it can be passed around to PROJ
     let hd_boxed = Box::new(hd);
     let void: *mut c_void = Box::into_raw(hd_boxed).cast::<libc::c_void>();
     let opaque: *mut PROJ_NETWORK_HANDLE = void.cast::<proj_sys::PROJ_NETWORK_HANDLE>();
+
     // If everything's OK, set the error string to empty
     let err_string = "";
     out_error_string.copy_from_nonoverlapping(err_string.as_ptr().cast(), err_string.len());
     out_error_string.add(err_string.len()).write(0);
+
     Ok(opaque)
 }
 
@@ -334,41 +364,58 @@ fn _network_read_range(
     let end = offset as usize + size_to_read - 1;
     let hvalue = format!("bytes={offset}-{end}");
     let hd = unsafe { &mut *(handle as *const c_void as *mut HandleData) };
-    let clt = Agent::new();
-    let initial = clt.get(&hd.url);
-    let in_case_of_error = initial.clone().set("Range", &hvalue).set("Client", CLIENT);
-    let req = in_case_of_error.clone();
+    let clt = Agent::new_with_defaults();
+    let req = clt
+        .get(&hd.url)
+        .header("Range", &hvalue)
+        .header("Client", CLIENT);
+
     let mut res = req.call()?;
-    // hand the response and retry instance off to the error-handler, continue on success
-    error_handler(&mut res, in_case_of_error)?;
+
+    // Define headers for potential retries
+    let headers = [("Range", hvalue.as_str()), ("Client", CLIENT)];
+
+    // hand the response off to the error-handler, continue on success
+    error_handler(&mut res, &hd.url, &headers, clt.clone())?;
+
     let headers = res
-        .headers_names()
-        .into_iter()
-        .filter_map(|h| {
-            Some({
-                let v = res.header(&h)?.to_string();
-                (h, v)
-            })
+        .headers()
+        .iter()
+        .filter_map(|(h, v)| {
+            let header_name = h.to_string();
+            let header_value = v.to_str().ok()?.to_string();
+            Some((header_name, header_value))
         })
         .collect();
-    let Some(Ok(contentlength)) = res.header("Content-Length").map(str::parse::<usize>) else {
-        return Err(ProjError::ContentLength);
-    };
+
+    let contentlength = res
+        .headers()
+        .get("Content-Length")
+        .and_then(|val| val.to_str().ok())
+        .and_then(|s| s.parse::<usize>().ok())
+        .ok_or(ProjError::ContentLength)?;
+
     // Copy the downloaded bytes into the buffer so it can be passed around
     let capacity = contentlength.min(size_to_read);
-    let mut buf = Vec::with_capacity(capacity);
-    res.into_reader()
+    let mut buf = Vec::<u8>::with_capacity(capacity);
+
+    // Read from body into our buffer
+    let body_reader = res.body_mut().as_reader();
+    body_reader
         .take(size_to_read as u64)
         .read_to_end(&mut buf)?;
+
     unsafe {
         buf.as_ptr()
             .copy_to_nonoverlapping(buffer.cast::<u8>(), capacity);
     }
+
     let err_string = "";
     unsafe {
         out_error_string.copy_from_nonoverlapping(err_string.as_ptr().cast(), err_string.len());
         out_error_string.add(err_string.len()).write(0);
     }
+
     hd.headers = headers;
     Ok(buf.len())
 }
