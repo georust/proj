@@ -40,24 +40,27 @@ const SERVER_ERROR_CODES: Range<u16> = 500..600;
 struct HandleData {
     url: String,
     headers: HashMap<String, String>,
-    // this raw pointer is handed out to libproj but never returned,
-    // so a copy of the pointer (raw pointers are Copy) is stored here.
-    // Note to future self: are you 100% sure that the pointer is never read again
-    // after network_close returns?
-    hptr: Option<NonNull<c_char>>,
+    // These raw pointers are handed out to libproj but never returned,
+    // so copies of the pointers (raw pointers are Copy) are stored here.
+    // Multiple calls to network_get_header_value allocate separate CStrings,
+    // all of which must be freed when the handle is closed.
+    hptrs: Vec<NonNull<c_char>>,
 }
 
 impl HandleData {
-    fn new(url: String, headers: HashMap<String, String>, hptr: Option<NonNull<c_char>>) -> Self {
-        Self { url, headers, hptr }
+    fn new(url: String, headers: HashMap<String, String>) -> Self {
+        Self {
+            url,
+            headers,
+            hptrs: Vec::new(),
+        }
     }
 }
 
 impl Drop for HandleData {
-    // whenever HandleData is dropped we check whether it has a pointer,
-    // dereferencing it if need be so the resource is freed
+    // Whenever HandleData is dropped we free all allocated header pointers
     fn drop(&mut self) {
-        if let Some(header) = self.hptr {
+        for header in self.hptrs.drain(..) {
             let _ = unsafe { CString::from_raw(header.as_ptr().cast()) };
         }
     }
@@ -232,7 +235,7 @@ unsafe fn _network_open(
     out_size_read.write(buf.len());
     buf.as_ptr().copy_to_nonoverlapping(buffer.cast(), capacity);
 
-    let hd = HandleData::new(url, headers, None);
+    let hd = HandleData::new(url, headers);
     // heap-allocate the struct and cast it to a void pointer so it can be passed around to PROJ
     let hd_boxed = Box::new(hd);
     let void: *mut c_void = Box::into_raw(hd_boxed).cast::<libc::c_void>();
@@ -277,7 +280,8 @@ pub(crate) unsafe extern "C" fn network_get_header_value(
             // unwrapping an empty str is fine
             let cstr = CString::new(hvalue).unwrap();
             let err = cstr.into_raw();
-            hd.hptr = Some(NonNull::new(err).expect("Failed to create non-Null pointer"));
+            hd.hptrs
+                .push(NonNull::new(err).expect("Failed to create non-Null pointer"));
             err
         }
     }
@@ -301,8 +305,8 @@ unsafe fn _network_get_header_value(
     let header = cstr.into_raw();
     // Raw pointers are Copy: the pointer returned by this function is never returned by libproj so
     // in order to avoid a memory leak the pointer is copied and stored in the HandleData struct,
-    // which is dropped when close_network returns. As part of that drop, the pointer in hptr is returned to Rust
-    hd.hptr = Some(
+    // which is dropped when close_network returns. As part of that drop, all pointers in hptrs are freed.
+    hd.hptrs.push(
         NonNull::new(header).expect("Failed to create non-Null pointer when building header value"),
     );
     Ok(header)
