@@ -1,4 +1,5 @@
 # Unreleased
+- Add fixes for buffer overflow and incorrect char replacement 
 
 - Refactored options logic
 
