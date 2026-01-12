@@ -1,4 +1,5 @@
 # Unreleased
+- Add fixes for buffer overflow and incorrect char replacement 
 
 # 0.31.0 - 2025-08-29
 
