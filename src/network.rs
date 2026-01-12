@@ -12,7 +12,7 @@
 /// **Note**: `error_string_max_size` is set to 128 by libproj.
 // TODO: build some length checks for the errors that are stuffed into it
 // This functionality based on https://github.com/OSGeo/PROJ/blob/master/src/networkfilemanager.cpp#L1675
-use proj_sys::{proj_context_set_network_callbacks, PJ_CONTEXT, PROJ_NETWORK_HANDLE};
+use proj_sys::{PJ_CONTEXT, PROJ_NETWORK_HANDLE, proj_context_set_network_callbacks};
 
 use std::collections::HashMap;
 use std::ffi::CString;
@@ -22,7 +22,7 @@ use std::os::raw::c_ulonglong;
 use std::ptr::{self, NonNull};
 use ureq::Agent;
 
-use crate::proj::{ProjError, _string};
+use crate::proj::{_string, ProjError};
 use libc::c_char;
 use libc::c_void;
 use std::boxed::Box;
@@ -161,8 +161,11 @@ pub(crate) unsafe extern "C" fn network_open(
         #[allow(clippy::ptr_as_ptr)]
         Err(e) => {
             let err_string = e.to_string();
-            out_error_string.copy_from_nonoverlapping(err_string.as_ptr().cast(), err_string.len());
-            out_error_string.add(err_string.len()).write(0);
+            let len = err_string
+                .len()
+                .min(error_string_max_size.saturating_sub(1));
+            out_error_string.copy_from_nonoverlapping(err_string.as_ptr().cast(), len);
+            out_error_string.add(len).write(0);
             ptr::null_mut()
         }
     }
@@ -344,9 +347,12 @@ pub(crate) unsafe extern "C" fn network_read_range(
         Err(e) => {
             // The assumption here is that if 0 is returned, whatever error is in out_error_string is displayed by libproj
             // since this isn't a conversion using CString, nul chars must be manually stripped
-            let err_string = e.to_string().replace('0', "nought");
-            out_error_string.copy_from_nonoverlapping(err_string.as_ptr().cast(), err_string.len());
-            out_error_string.add(err_string.len()).write(0);
+            let err_string = e.to_string().replace('\0', "");
+            let len = err_string
+                .len()
+                .min(error_string_max_size.saturating_sub(1));
+            out_error_string.copy_from_nonoverlapping(err_string.as_ptr().cast(), len);
+            out_error_string.add(len).write(0);
             0usize
         }
     }
