@@ -45,6 +45,7 @@ jobs:
       - proj-sys-ubuntu
       - proj-macos
       - proj-sys-macos
+      - proj-windows
     steps:
       - name: Mark the job as a success
         run: exit 0
@@ -58,6 +59,7 @@ jobs:
       - proj-sys-ubuntu
       - proj-macos
       - proj-sys-macos
+      - proj-windows
     steps:
       - name: Mark the job as a failure
         run: exit 1
@@ -202,3 +204,18 @@ jobs:
       - run: brew install pkg-config
       - run: brew install proj
       - run: cargo test
+
+  proj-windows:
+    name: proj windows
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Currently, Windows build doesn't work without the bundled features.
+        features: ["--features bundled_proj_sqlite"]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - run: cargo build ${{ matrix.features }}
+      - run: cargo test ${{ matrix.features }}
