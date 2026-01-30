@@ -24,7 +24,7 @@ tar = "0.4.40"
 
 [features]
 nobuild = []
-bundled_proj = []
+bundled_proj = ["libsqlite3-sys/bundled-windows"]
 # `pkg_config` feature is deprecated and does nothing
 pkg_config = []
 network = ["tiff"]
