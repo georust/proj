@@ -217,5 +217,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - run: choco install sqlite # Even if we bundle libsqlite, we still need the SQLite binary
       - run: cargo build ${{ matrix.features }}
       - run: cargo test ${{ matrix.features }}
