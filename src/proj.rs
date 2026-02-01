@@ -1357,14 +1357,9 @@ impl Proj {
             None
         };
 
-        let opts_ptrs = options_str.as_ref().map(|o| {
-            // Each option is a CString (null-terminated string), but PROJ also expects
-            // the *array* of option pointers itself to be null-terminated (char* const*).
-            let mut ptrs: Vec<_> = o.iter().map(|cs| cs.as_ptr()).collect();
-            // Add a trailing NULL pointer to terminate the list.
-            ptrs.push(ptr::null());
-            ptrs
-        });
+        let opts_ptrs = options_str
+            .as_ref()
+            .map(|o| o.iter().map(|cs| cs.as_ptr()).collect::<Vec<_>>());
 
         let wkt_type = match version.unwrap_or(WktVersion::Wkt2_2019) {
             WktVersion::Wkt2_2015 => PJ_WKT_TYPE_PJ_WKT2_2015,
