@@ -1524,8 +1524,9 @@ impl Drop for ProjBuilder {
 #[cfg(test)]
 mod test {
     use super::*;
+    use approx::{AbsDiffEq, RelativeEq};
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
     struct MyPoint {
         x: f64,
         y: f64,
@@ -1548,6 +1549,34 @@ mod test {
 
         fn from_xy(x: f64, y: f64) -> Self {
             MyPoint { x, y }
+        }
+    }
+
+    impl AbsDiffEq<Self> for MyPoint {
+        type Epsilon = f64;
+
+        fn default_epsilon() -> Self::Epsilon {
+            f64::default_epsilon()
+        }
+
+        fn abs_diff_eq(&self, other: &Self, epsilon: Self::Epsilon) -> bool {
+            self.x().abs_diff_eq(&other.x(), epsilon) && self.y().abs_diff_eq(&other.y(), epsilon)
+        }
+    }
+
+    impl RelativeEq for MyPoint {
+        fn default_max_relative() -> Self::Epsilon {
+            f64::default_max_relative()
+        }
+
+        fn relative_eq(
+            &self,
+            other: &Self,
+            epsilon: Self::Epsilon,
+            max_relative: Self::Epsilon,
+        ) -> bool {
+            self.x().relative_eq(&other.x(), epsilon, max_relative)
+                && self.y().relative_eq(&other.y(), epsilon, max_relative)
         }
     }
 
@@ -1626,6 +1655,35 @@ mod test {
 
         assert_relative_eq!(result.x(), 1450880.2910605022, epsilon = 1.0e-8);
         assert_relative_eq!(result.y(), 1141263.0111604782, epsilon = 1.0e-8);
+    }
+
+    #[test]
+    fn test_create_crs_to_crs_from_pj_with_options() {
+        // WGS 84 / Equal Earth Americas
+        let to = Proj::new("EPSG:8858").unwrap();
+        // WGS 84 / Equal Earth Asia-Pacific
+        let from = Proj::new("EPSG:8859").unwrap();
+
+        let input = MyPoint::new(0.0, 0.0);
+
+        let transformer = from.create_crs_to_crs_from_pj(&to, None, None).unwrap();
+        let result = transformer.convert(input).unwrap();
+        assert_relative_eq!(
+            result,
+            MyPoint::new(-11495972.708144628, 0.0),
+            epsilon = 1.0e-8
+        );
+
+        let options = vec!["FORCE_OVER=YES"];
+        let transformer = from
+            .create_crs_to_crs_from_pj(&to, None, Some(options))
+            .unwrap();
+        let result = transformer.convert(input).unwrap();
+        assert_relative_eq!(
+            result,
+            MyPoint::new(22991945.416289266, 0.0),
+            epsilon = 1.0e-8
+        );
     }
 
     #[cfg(feature = "network")]
@@ -1913,16 +1971,23 @@ mod test {
         let from = "EPSG:2230";
         let to = "EPSG:26946";
         let ft_to_m = Proj::new_known_crs(from, to, None).unwrap();
+
+        let default_output = ft_to_m.to_projjson(None, None, None).unwrap();
+        assert!(default_output.contains("\n"));
+        // NOTE: Brittle! This will break if the default schema version gets bumped.
+        // Just bump the tests expectation here when that happens.
+        assert!(default_output.contains("https://proj.org/schemas/v0.7/projjson.schema.json"));
+
         // Because libproj has been fussy about passing empty options strings we're testing both
-        let _ = ft_to_m
+        let options_output = ft_to_m
             .to_projjson(
-                Some(true),
+                Some(false),
                 None,
-                Some("https://proj.org/schemas/v0.7/projjson.schema.json"),
+                Some("https://proj.org/schemas/v0.6/projjson.schema.json"),
             )
             .unwrap();
-        let _ = ft_to_m.to_projjson(None, None, None).unwrap();
-        // TODO: do we want to compare one of the results to proj's output?
+        assert!(!options_output.contains("\n"));
+        assert!(options_output.contains("https://proj.org/schemas/v0.6/projjson.schema.json"));
     }
 
     #[test]
