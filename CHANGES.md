@@ -1,5 +1,7 @@
 # Unreleased
 
+- Refactored options logic
+
 # 0.31.0 - 2025-08-29
 
 - Add Proj::as_wkt() function

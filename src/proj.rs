@@ -14,12 +14,13 @@ use proj_sys::{
     PJ_WKT_TYPE_PJ_WKT1_GDAL, PJ_WKT_TYPE_PJ_WKT2_2015, PJ_WKT_TYPE_PJ_WKT2_2015_SIMPLIFIED,
     PJ_WKT_TYPE_PJ_WKT2_2019, PJ_WKT_TYPE_PJ_WKT2_2019_SIMPLIFIED, PJ_XYZT,
 };
-use std::ptr;
 use std::{
     convert, ffi,
     fmt::{self, Debug},
     str,
 };
+
+use crate::cstring_array::CStringArray;
 
 #[cfg(feature = "network")]
 use proj_sys::proj_context_set_enable_network;
@@ -257,26 +258,13 @@ fn crs_to_crs_from_pj(
     let proj_area = unsafe { proj_area_create() };
     area_set_bbox(proj_area, area);
 
-    // Convert options to C strings
-    let mut options_cstr: Vec<ffi::CString> = Vec::new();
-    let mut options_ptrs: Vec<*const c_char> = Vec::new();
-
-    if let Some(opts) = options {
-        for opt in opts {
-            match ffi::CString::new(opt) {
-                Ok(c_str) => {
-                    options_cstr.push(c_str);
-                }
-                Err(err) => return Err(ProjCreateError::ArgumentNulError(err)),
-            }
+    let mut proj_options = CStringArray::new();
+    if let Some(options) = options {
+        for option in options {
+            proj_options
+                .push(option)
+                .map_err(ProjCreateError::ArgumentNulError)?;
         }
-
-        options_ptrs = options_cstr.iter().map(|s| s.as_ptr()).collect();
-        // Add null terminator
-        options_ptrs.push(ptr::null());
-    } else {
-        // If no options, just use a null pointer
-        options_ptrs.push(ptr::null());
     }
 
     let ptr = result_from_create(ctx, unsafe {
@@ -285,7 +273,7 @@ fn crs_to_crs_from_pj(
             source_crs.c_proj,
             target_crs.c_proj,
             proj_area,
-            options_ptrs.as_ptr(),
+            proj_options.as_ptr(),
         )
     })
     .map_err(|e| ProjCreateError::ProjError(e.message(ctx)))?;
@@ -1261,27 +1249,22 @@ impl Proj {
         indentation_width: Option<usize>,
         schema: Option<&str>,
     ) -> Result<String, ProjError> {
-        let mut opts = vec![];
+        let mut proj_options = CStringArray::new();
         if let Some(multiline) = multiline {
             if multiline {
-                opts.push(CString::new(String::from("MULTILINE=YES"))?)
+                proj_options.push("MULTILINE=YES")?;
             } else {
-                opts.push(CString::new(String::from("MULTILINE=NO"))?)
+                proj_options.push("MULTILINE=NO")?;
             }
-        };
+        }
         if let Some(indentation_width) = indentation_width {
-            opts.push(CString::new(format!(
-                "INDENTATION_WIDTH={indentation_width}"
-            ))?)
+            proj_options.push(format!("INDENTATION_WIDTH={indentation_width}"))?;
         }
         if let Some(schema) = schema {
-            opts.push(CString::new(format!("SCHEMA={schema}"))?)
+            proj_options.push(format!("SCHEMA={schema}"))?;
         }
-        let mut opts_ptrs: Vec<_> = opts.iter().map(|cs| cs.as_ptr()).collect();
-        // we always have to terminate with a null pointer, even if the opts are empty
-        opts_ptrs.push(ptr::null());
         unsafe {
-            let out_ptr = proj_as_projjson(self.ctx, self.c_proj, opts_ptrs.as_ptr());
+            let out_ptr = proj_as_projjson(self.ctx, self.c_proj, proj_options.as_ptr());
             if out_ptr.is_null() {
                 Err(ProjError::ExportToJson)
             } else {
@@ -1295,76 +1278,54 @@ impl Proj {
         version: Option<WktVersion>,
         options: Option<WktOptions>,
     ) -> Result<String, ProjError> {
-        let options_str = if let Some(ref options) = options {
-            let mut opts = vec![];
+        let mut proj_options = CStringArray::new();
+        if let Some(options) = options {
             if let Some(multiline) = options.multiline {
-                opts.push(CString::new(format!(
+                proj_options.push(format!(
                     "MULTILINE={}",
                     if multiline { "YES" } else { "NO" }
-                ))?)
-            };
+                ))?;
+            }
 
             if let Some(indentation_width) = options.indentation_width {
-                opts.push(CString::new(format!(
-                    "INDENTATION_WIDTH={indentation_width}"
-                ))?)
+                proj_options.push(format!("INDENTATION_WIDTH={indentation_width}"))?;
             }
 
             if let Some(ref output_axis) = options.output_axis {
-                opts.push(CString::new(format!(
+                proj_options.push(format!(
                     "OUTPUT_AXIS={}",
                     match output_axis {
                         WktOutputAxis::Auto => "AUTO",
                         WktOutputAxis::Yes => "YES",
                         WktOutputAxis::No => "NO",
                     }
-                ))?);
+                ))?;
             }
 
             if let Some(strict) = options.strict {
-                opts.push(CString::new(format!(
-                    "STRICT={}",
-                    if strict { "YES" } else { "NO" }
-                ))?);
+                proj_options.push(format!("STRICT={}", if strict { "YES" } else { "NO" }))?;
             }
 
             if let Some(allow_ellipsoidal_height_as_vertical_crs) =
                 options.allow_ellipsoidal_height_as_vertical_crs
             {
-                opts.push(CString::new(format!(
+                proj_options.push(format!(
                     "ALLOW_ELLIPSOIDAL_HEIGHT_AS_VERTICAL_CRS={}",
                     if allow_ellipsoidal_height_as_vertical_crs {
                         "YES"
                     } else {
                         "NO"
                     }
-                ))?);
+                ))?;
             }
 
             if let Some(allow_linunit_node) = options.allow_linunit_node {
-                opts.push(CString::new(format!(
+                proj_options.push(format!(
                     "ALLOW_LINUNIT_NODE={}",
                     if allow_linunit_node { "YES" } else { "NO" }
-                ))?);
+                ))?;
             }
-
-            if opts.is_empty() {
-                None
-            } else {
-                Some(opts)
-            }
-        } else {
-            None
-        };
-
-        let opts_ptrs = options_str.as_ref().map(|o| {
-            // Each option is a CString (null-terminated string), but PROJ also expects
-            // the *array* of option pointers itself to be null-terminated (char* const*).
-            let mut ptrs: Vec<_> = o.iter().map(|cs| cs.as_ptr()).collect();
-            // Add a trailing NULL pointer to terminate the list.
-            ptrs.push(ptr::null());
-            ptrs
-        });
+        }
 
         let wkt_type = match version.unwrap_or(WktVersion::Wkt2_2019) {
             WktVersion::Wkt2_2015 => PJ_WKT_TYPE_PJ_WKT2_2015,
@@ -1376,16 +1337,7 @@ impl Proj {
         };
 
         unsafe {
-            let wkt = proj_as_wkt(
-                self.ctx,
-                self.c_proj,
-                wkt_type,
-                opts_ptrs
-                    .as_ref()
-                    .map(|c| c.as_ptr())
-                    .unwrap_or(ptr::null()),
-            );
-
+            let wkt = proj_as_wkt(self.ctx, self.c_proj, wkt_type, proj_options.as_ptr());
             Ok(_string(wkt)?)
         }
     }
