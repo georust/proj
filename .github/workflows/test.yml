@@ -46,6 +46,7 @@ jobs:
       - proj-macos
       - proj-sys-macos
       - proj-windows
+      - proj-sys-ubuntu-asan
     steps:
       - name: Mark the job as a success
         run: exit 0
@@ -60,6 +61,7 @@ jobs:
       - proj-macos
       - proj-sys-macos
       - proj-windows
+      - proj-sys-ubuntu-asan
     steps:
       - name: Mark the job as a failure
         run: exit 1
@@ -220,3 +222,28 @@ jobs:
       - run: choco install sqlite # Even if we bundle libsqlite, we still need the SQLite binary
       - run: cargo build ${{ matrix.features }}
       - run: cargo test ${{ matrix.features }}
+  # Build PROJ from the bundled source to enable ASAN. In order to link against
+  # the ASAN-enabled library, "-Z sanitizer=address" flag needs to be passed to
+  # the Rust compiler. So, this job requires the nightly toolchain.
+  proj-sys-ubuntu-asan:
+    name: proj-sys ubuntu asan
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    runs-on: ubuntu-latest
+    needs: compute
+    container:
+      image: ghcr.io/georust/proj-ci-without-system-proj:proj-${{ needs.compute.outputs.LIBPROJ_VERSION }}-rust-${{ needs.compute.outputs.RUST_LATEST }}
+    env:
+      _PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC: 1
+      CC: clang
+      CXX: clang++
+      CFLAGS: "-O1 -g -fsanitize=address -fno-omit-frame-pointer"
+      CXXFLAGS: "-O1 -g -fsanitize=address -fno-omit-frame-pointer"
+      LDFLAGS: "-fsanitize=address"
+      RUSTFLAGS: "-Z sanitizer=address"
+      RUSTDOCFLAGS: "-Z sanitizer=address"
+      ASAN_OPTIONS: "detect_leaks=0"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo +nightly test --features bundled_proj --target x86_64-unknown-linux-gnu

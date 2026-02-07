@@ -241,6 +241,7 @@ mod geo_types;
 #[macro_use]
 extern crate approx;
 
+mod cstring_array;
 mod proj;
 mod transform;
 pub use transform::{Transform, TransformError};
