@@ -1,5 +1,5 @@
 use crate::{Proj, ProjError, Transform};
-use geo_types::{coord, Geometry};
+use geo_types::{Geometry, coord};
 
 ///```rust
 /// # use approx::assert_relative_eq;
@@ -308,7 +308,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use geo_types::{point, MultiPoint, Rect};
+    use geo_types::{MultiPoint, Rect, point};
 
     #[test]
     fn test_point() {
