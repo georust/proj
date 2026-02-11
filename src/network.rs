@@ -1,13 +1,13 @@
 #![deny(
     clippy::cast_slice_from_raw_parts,
     clippy::cast_slice_different_sizes,
-    clippy::invalid_null_arguments,
+    invalid_null_arguments,
     clippy::ptr_as_ptr,
     clippy::transmute_ptr_to_ref
 )]
-/// A module for native grid network functionality, so we don't have to depend on libcurl
-/// The crate-public functions are facades – they're designed for interaction with libproj –
-/// delegating actual functionality to non-public versions, prefixed by an underscore.
+/// A module for native grid network functionality, so we don't have to depend on libcurl.
+/// The crate-public functions are callbacks designed for interaction with libproj,
+/// delegating actual functionality to `NetworkClient`.
 ///
 /// **Note**: `error_string_max_size` is set to 128 by libproj.
 // TODO: build some length checks for the errors that are stuffed into it
@@ -19,7 +19,7 @@ use std::ffi::CString;
 use std::io::Read;
 use std::ops::Range;
 use std::os::raw::c_ulonglong;
-use std::ptr::{self, NonNull};
+use std::ptr;
 use ureq::Agent;
 
 use crate::proj::{_string, ProjError};
@@ -36,55 +36,106 @@ const SUCCESS_ERROR_CODES: Range<u16> = 200..300;
 const CLIENT_ERROR_CODES: Range<u16> = 400..500;
 const SERVER_ERROR_CODES: Range<u16> = 500..600;
 
-/// This struct is cast to `c_void`, then to `PROJ_NETWORK_HANDLE` so it can be passed around
-struct HandleData {
+/// HTTP client for a single resource URL, persisted across requests so that the underlying
+/// connection can be reused. Cast to `PROJ_NETWORK_HANDLE` for passing through libproj callbacks.
+struct NetworkClient {
+    agent: Agent,
     url: String,
-    headers: HashMap<String, String>,
-    // These raw pointers are handed out to libproj but never returned,
-    // so copies of the pointers (raw pointers are Copy) are stored here.
-    // Multiple calls to network_get_header_value allocate separate CStrings,
-    // all of which must be freed when the handle is closed.
-    hptrs: Vec<NonNull<c_char>>,
+    /// Response headers from the most recent request, keyed by lowercase header name.
+    /// Values are stored as `CString` for returning a stable pointer to libproj via
+    /// `network_get_header_value`.
+    most_recent_response_headers: HashMap<String, CString>,
 }
 
-impl HandleData {
-    fn new(url: String, headers: HashMap<String, String>) -> Self {
+impl NetworkClient {
+    /// Create a new client for `url` and perform the initial read at `offset`.
+    /// The number of bytes read is written to `out_size_read`.
+    fn open(
+        url: String,
+        offset: u64,
+        buffer: &mut [u8],
+        out_size_read: &mut usize,
+    ) -> Result<Self, ProjError> {
+        let mut client = Self::new(url);
+        *out_size_read = client.read(offset, buffer)?;
+        Ok(client)
+    }
+
+    /// Create a new client for `url` with a fresh HTTP agent and empty headers.
+    fn new(url: String) -> Self {
+        let agent = Agent::new_with_defaults();
         Self {
+            agent,
             url,
-            headers,
-            hptrs: Vec::new(),
+            most_recent_response_headers: HashMap::new(),
         }
     }
-}
 
-impl Drop for HandleData {
-    // Whenever HandleData is dropped we free all allocated header pointers
-    fn drop(&mut self) {
-        for header in self.hptrs.drain(..) {
-            let _ = unsafe { CString::from_raw(header.as_ptr().cast()) };
-        }
+    /// Perform an HTTP range request starting at `offset` for `output_buffer.len()` bytes.
+    /// The response body is written into `output_buffer` and the response headers are
+    /// cached in `most_recent_response_headers`. Returns the number of bytes read.
+    fn read(&mut self, offset: u64, output_buffer: &mut [u8]) -> Result<usize, ProjError> {
+        // - 1 is used because the HTTP convention is to use inclusive start and end offsets
+        let end = offset as usize + output_buffer.len() - 1;
+        let agent = self.agent.clone();
+        let url = self.url.clone();
+        let mut response_ok = request_with_retries(&self.url, move || {
+            let response = agent
+                .get(url.clone())
+                .header("Range", format!("bytes={offset}-{end}"))
+                .header("Client", CLIENT)
+                .call()?;
+            Ok(response)
+        })?;
+        debug_assert!(response_ok.status().is_success());
+
+        self.most_recent_response_headers = response_ok
+            .headers()
+            .iter()
+            .filter_map(|(h, v)| {
+                let header_name = h.to_string().to_lowercase();
+                let header_value = v.to_str().ok()?;
+                let header_value_cstring = CString::new(header_value).ok()?;
+                Some((header_name, header_value_cstring))
+            })
+            .collect();
+
+        let content_length = response_ok
+            .headers()
+            .get("Content-Length")
+            .and_then(|val| val.to_str().ok())
+            .and_then(|s| s.parse::<usize>().ok())
+            .ok_or(ProjError::ContentLength)?;
+
+        let len_to_write = content_length.min(output_buffer.len());
+        let resized_output_buffer = &mut output_buffer[..len_to_write];
+        // Note: this will (rightfully) error if the body reader is longer than the declared Content-Length
+        response_ok
+            .body_mut()
+            .as_reader()
+            .read_exact(resized_output_buffer)?;
+        Ok(len_to_write)
     }
 }
 
 /// Return a quadratically-increasing wait time based on the number of retries
 ///
 /// Example: a value of 8 allows up to 6400 ms of retry delay, for a cumulative total of 25500 ms
-fn get_wait_time_quad(retrycount: i32) -> u64 {
-    if retrycount == 0 {
-        return 0;
-    }
-    (retrycount as u64).pow(2) * 100u64
+fn get_wait_time(retrycount: u8) -> time::Duration {
+    let millis = if retrycount == 0 {
+        0
+    } else {
+        (retrycount as u64).pow(2) * 100u64
+    };
+    time::Duration::from_millis(millis)
 }
 
-/// Process CDN response: handle retries in case of server error, or early return for client errors
-/// Successful retry data is stored into res
-fn error_handler<'a>(
-    res: &'a mut http::Response<ureq::Body>,
+fn request_with_retries(
     url: &str,
-    headers: &[(&str, &str)],
-    clt: Agent,
-) -> Result<&'a mut http::Response<ureq::Body>, ProjError> {
+    mut make_request: impl FnMut() -> Result<http::Response<ureq::Body>, ProjError>,
+) -> Result<http::Response<ureq::Body>, ProjError> {
     let mut retries = 0;
+    let mut res = make_request()?;
     // Check whether something went wrong on the server, or if it's an S3 retry code
     if SERVER_ERROR_CODES.contains(&res.status().as_u16())
         || RETRY_CODES.contains(&res.status().as_u16())
@@ -95,14 +146,9 @@ fn error_handler<'a>(
             && retries <= MAX_RETRIES
         {
             retries += 1;
-            let wait = time::Duration::from_millis(get_wait_time_quad(retries as i32));
+            let wait = get_wait_time(retries);
             thread::sleep(wait);
-            let mut req = clt.get(url);
-            // Apply all headers
-            for (name, value) in headers {
-                req = req.header(*name, *value);
-            }
-            *res = req.call()?;
+            res = make_request()?;
         }
     // Not a timeout or known S3 retry code: bail out
     } else if CLIENT_ERROR_CODES.contains(&res.status().as_u16()) {
@@ -133,10 +179,8 @@ fn error_handler<'a>(
 /// able to respond to `proj_network_get_header_value_cbk_type` callback.
 /// `error_string_max_size` should be the maximum size that can be written into the `out_error_string`
 /// buffer (including terminating nul character).
-///
-/// Note that this function is a facade for _network_open
 pub(crate) unsafe extern "C" fn network_open(
-    pc: *mut PJ_CONTEXT,
+    _pc: *mut PJ_CONTEXT,
     url: *const c_char,
     offset: c_ulonglong,
     size_to_read: usize,
@@ -144,116 +188,36 @@ pub(crate) unsafe extern "C" fn network_open(
     out_size_read: *mut usize,
     error_string_max_size: usize,
     out_error_string: *mut c_char,
-    ud: *mut c_void,
+    _user_data: *mut c_void,
 ) -> *mut PROJ_NETWORK_HANDLE {
-    let result = unsafe {
-        _network_open(
-            pc,
-            url,
-            offset,
-            size_to_read,
-            buffer,
-            out_size_read,
-            error_string_max_size,
-            out_error_string,
-            ud,
-        )
-    };
-    match result {
-        Ok(res) => res,
-        #[allow(clippy::ptr_as_ptr)]
+    // Given a start and a length, we can create a rust slice
+    let output_buffer =
+        unsafe { std::slice::from_raw_parts_mut(buffer.cast::<u8>(), size_to_read) };
+
+    match unsafe { _string(url) }
+        .map_err(ProjError::from)
+        .and_then(|url| {
+            NetworkClient::open(url, offset, output_buffer, unsafe { &mut *out_size_read })
+        }) {
+        Ok(network_client) => {
+            // clear out any error message when successful
+            unsafe {
+                *out_error_string = 0;
+            }
+            Box::into_raw(Box::new(network_client)).cast::<PROJ_NETWORK_HANDLE>()
+        }
         Err(e) => {
             let err_string = e.to_string();
+            let len = err_string
+                .len()
+                .min(error_string_max_size.saturating_sub(1));
             unsafe {
-                out_error_string
-                    .copy_from_nonoverlapping(err_string.as_ptr().cast(), err_string.len());
-                out_error_string.add(err_string.len()).write(0);
+                out_error_string.copy_from_nonoverlapping(err_string.as_ptr().cast(), len);
+                out_error_string.add(len).write(0);
             }
             ptr::null_mut()
         }
     }
-}
-
-/// Where the ACTUAL work happens, taking advantage of Rust error-handling etc
-#[allow(clippy::too_many_arguments)]
-unsafe fn _network_open(
-    _: *mut PJ_CONTEXT,
-    url: *const c_char,
-    offset: c_ulonglong,
-    size_to_read: usize,
-    buffer: *mut c_void,
-    out_size_read: *mut usize,
-    _: usize,
-    out_error_string: *mut c_char,
-    _: *mut c_void,
-) -> Result<*mut PROJ_NETWORK_HANDLE, ProjError> {
-    let url = unsafe { _string(url) }?;
-    // - 1 is used because the HTTP convention is to use inclusive start and end offsets
-    let end = offset as usize + size_to_read - 1;
-    // RANGE header definition is "bytes=x-y"
-    let hvalue = format!("bytes={offset}-{end}");
-    // Create a new client that can be reused for subsequent queries
-    let clt = Agent::new_with_defaults();
-    let req = clt
-        .get(&url)
-        .header("Range", &hvalue)
-        .header("Client", CLIENT);
-
-    let mut res = req.call()?;
-
-    // Define headers for potential retries
-    let headers = [("Range", hvalue.as_str()), ("Client", CLIENT)];
-
-    // hand the response off to the error-handler, continue on success
-    error_handler(&mut res, &url, &headers, clt.clone())?;
-
-    // Write the initial read length value into the pointer
-    let contentlength = res
-        .headers()
-        .get("Content-Length")
-        .and_then(|val| val.to_str().ok())
-        .and_then(|s| s.parse::<usize>().ok())
-        .ok_or(ProjError::ContentLength)?;
-
-    let headers = res
-        .headers()
-        .iter()
-        .filter_map(|(h, v)| {
-            let header_name = h.to_string();
-            let header_value = v.to_str().ok()?.to_string();
-            Some((header_name, header_value))
-        })
-        .collect();
-
-    // Copy the downloaded bytes into the buffer so it can be passed around
-    let capacity = contentlength.min(size_to_read);
-    let mut buf = Vec::<u8>::with_capacity(capacity);
-
-    // Read from body into our buffer
-    let body_reader = res.body_mut().as_reader();
-    body_reader
-        .take(size_to_read as u64)
-        .read_to_end(&mut buf)?;
-
-    unsafe {
-        out_size_read.write(buf.len());
-        buf.as_ptr().copy_to_nonoverlapping(buffer.cast(), capacity);
-    }
-
-    let hd = HandleData::new(url, headers);
-    // heap-allocate the struct and cast it to a void pointer so it can be passed around to PROJ
-    let hd_boxed = Box::new(hd);
-    let void: *mut c_void = Box::into_raw(hd_boxed).cast::<libc::c_void>();
-    let opaque: *mut PROJ_NETWORK_HANDLE = void.cast::<proj_sys::PROJ_NETWORK_HANDLE>();
-
-    // If everything's OK, set the error string to empty
-    let err_string = "";
-    unsafe {
-        out_error_string.copy_from_nonoverlapping(err_string.as_ptr().cast(), err_string.len());
-        out_error_string.add(err_string.len()).write(0);
-    }
-
-    Ok(opaque)
 }
 
 /// Network callback: close connection and drop handle data (client and headers)
@@ -263,60 +227,31 @@ pub(crate) unsafe extern "C" fn network_close(
     _: *mut c_void,
 ) {
     // Because we created the raw pointer from a Box, we have to re-constitute the Box
-    // This is the exact reverse order seen in _network_open
-    let void = handle.cast::<libc::c_void>();
-    let hd = void.cast::<HandleData>();
-    let _: Box<HandleData> = unsafe { Box::from_raw(hd) };
+    // so that it can be dropped.
+    // This is the exact reverse order seen in network_open
+    let network_client = handle.cast::<NetworkClient>();
+    let _ = unsafe { Box::from_raw(network_client) };
 }
 
 /// Network callback: get header value
-///
-/// Note that this function is a facade for _network_get_header_value
 pub(crate) unsafe extern "C" fn network_get_header_value(
-    pc: *mut PJ_CONTEXT,
+    _pc: *mut PJ_CONTEXT,
     handle: *mut PROJ_NETWORK_HANDLE,
     header_name: *const c_char,
-    ud: *mut c_void,
+    _user_data: *mut c_void,
 ) -> *const c_char {
-    let hd = unsafe { &mut *(handle as *const c_void as *mut HandleData) };
-    match unsafe { _network_get_header_value(pc, handle, header_name, ud) } {
-        Ok(res) => res,
-        Err(_) => {
-            // an empty value will cause an error upstream in libproj, which is the intention
-            let hvalue = "";
-            // unwrapping an empty str is fine
-            let cstr = CString::new(hvalue).unwrap();
-            let err = cstr.into_raw();
-            hd.hptrs
-                .push(NonNull::new(err).expect("Failed to create non-Null pointer"));
-            err
-        }
-    }
-}
+    let network_client = unsafe { &mut *handle.cast::<NetworkClient>() };
+    let Ok(header_name) = (unsafe { _string(header_name) }) else {
+        debug_assert!(false, "bad header name passed to network_get_header_value");
+        return ptr::null();
+    };
+    let header_name = header_name.to_lowercase();
 
-/// Network callback: get header value
-unsafe fn _network_get_header_value(
-    _: *mut PJ_CONTEXT,
-    handle: *mut PROJ_NETWORK_HANDLE,
-    header_name: *const c_char,
-    _: *mut c_void,
-) -> Result<*const c_char, ProjError> {
-    let lookup = unsafe { _string(header_name) }?.to_lowercase();
-    let void = handle.cast::<libc::c_void>();
-    let hd = unsafe { &mut *(void.cast::<HandleData>()) };
-    let hvalue = hd
-        .headers
-        .get(&lookup)
-        .ok_or_else(|| ProjError::HeaderError(lookup.to_string()))?;
-    let cstr = CString::new(&**hvalue).unwrap();
-    let header = cstr.into_raw();
-    // Raw pointers are Copy: the pointer returned by this function is never returned by libproj so
-    // in order to avoid a memory leak the pointer is copied and stored in the HandleData struct,
-    // which is dropped when close_network returns. As part of that drop, all pointers in hptrs are freed.
-    hd.hptrs.push(
-        NonNull::new(header).expect("Failed to create non-Null pointer when building header value"),
-    );
-    Ok(header)
+    network_client
+        .most_recent_response_headers
+        .get(&header_name)
+        .map(|cstring| cstring.as_ptr().cast())
+        .unwrap_or(ptr::null())
 }
 
 /// Network: read range
@@ -328,113 +263,39 @@ unsafe fn _network_get_header_value(
 /// `out_error_string` buffer (including terminating nul character).
 ///
 /// Return value should be the actual number of bytes read, 0 in case of error.
-///
-/// Note that this function is a facade for _network_read_range
 pub(crate) unsafe extern "C" fn network_read_range(
-    pc: *mut PJ_CONTEXT,
+    _pc: *mut PJ_CONTEXT,
     handle: *mut PROJ_NETWORK_HANDLE,
     offset: c_ulonglong,
     size_to_read: usize,
     buffer: *mut c_void,
     error_string_max_size: usize,
     out_error_string: *mut c_char,
-    ud: *mut c_void,
+    _user_data: *mut c_void,
 ) -> usize {
-    match _network_read_range(
-        pc,
-        handle,
-        offset,
-        size_to_read,
-        buffer,
-        error_string_max_size,
-        out_error_string,
-        ud,
-    ) {
-        Ok(res) => res,
-        Err(e) => {
-            // The assumption here is that if 0 is returned, whatever error is in out_error_string is displayed by libproj
-            // since this isn't a conversion using CString, nul chars must be manually stripped
-            let err_string = e.to_string().replace('0', "nought");
+    let network_client = unsafe { &mut *handle.cast::<NetworkClient>() };
+    // Given a start and a length, we can create a rust slice
+    let output_buffer =
+        unsafe { std::slice::from_raw_parts_mut(buffer.cast::<u8>(), size_to_read) };
+    match network_client.read(offset, output_buffer) {
+        Ok(read) => {
             unsafe {
-                out_error_string
-                    .copy_from_nonoverlapping(err_string.as_ptr().cast(), err_string.len());
-                out_error_string.add(err_string.len()).write(0);
+                *out_error_string = 0;
             }
-            0usize
+            read
+        }
+        Err(e) => {
+            let err_string = e.to_string();
+            let len = err_string
+                .len()
+                .min(error_string_max_size.saturating_sub(1));
+            unsafe {
+                out_error_string.copy_from_nonoverlapping(err_string.as_ptr().cast(), len);
+                out_error_string.add(len).write(0);
+            }
+            0
         }
     }
-}
-
-/// Where the ACTUAL work happens
-#[allow(clippy::too_many_arguments)]
-fn _network_read_range(
-    _: *mut PJ_CONTEXT,
-    handle: *mut PROJ_NETWORK_HANDLE,
-    offset: c_ulonglong,
-    size_to_read: usize,
-    buffer: *mut c_void,
-    _: usize,
-    out_error_string: *mut c_char,
-    _: *mut c_void,
-) -> Result<usize, ProjError> {
-    // - 1 is used because the HTTP convention is to use inclusive start and end offsets
-    let end = offset as usize + size_to_read - 1;
-    let hvalue = format!("bytes={offset}-{end}");
-    let hd = unsafe { &mut *(handle as *const c_void as *mut HandleData) };
-    let clt = Agent::new_with_defaults();
-    let req = clt
-        .get(&hd.url)
-        .header("Range", &hvalue)
-        .header("Client", CLIENT);
-
-    let mut res = req.call()?;
-
-    // Define headers for potential retries
-    let headers = [("Range", hvalue.as_str()), ("Client", CLIENT)];
-
-    // hand the response off to the error-handler, continue on success
-    error_handler(&mut res, &hd.url, &headers, clt.clone())?;
-
-    let headers = res
-        .headers()
-        .iter()
-        .filter_map(|(h, v)| {
-            let header_name = h.to_string();
-            let header_value = v.to_str().ok()?.to_string();
-            Some((header_name, header_value))
-        })
-        .collect();
-
-    let contentlength = res
-        .headers()
-        .get("Content-Length")
-        .and_then(|val| val.to_str().ok())
-        .and_then(|s| s.parse::<usize>().ok())
-        .ok_or(ProjError::ContentLength)?;
-
-    // Copy the downloaded bytes into the buffer so it can be passed around
-    let capacity = contentlength.min(size_to_read);
-    let mut buf = Vec::<u8>::with_capacity(capacity);
-
-    // Read from body into our buffer
-    let body_reader = res.body_mut().as_reader();
-    body_reader
-        .take(size_to_read as u64)
-        .read_to_end(&mut buf)?;
-
-    unsafe {
-        buf.as_ptr()
-            .copy_to_nonoverlapping(buffer.cast::<u8>(), capacity);
-    }
-
-    let err_string = "";
-    unsafe {
-        out_error_string.copy_from_nonoverlapping(err_string.as_ptr().cast(), err_string.len());
-        out_error_string.add(err_string.len()).write(0);
-    }
-
-    hd.headers = headers;
-    Ok(buf.len())
 }
 
 /// Set up and initialise the grid download callback functions for all subsequent PROJ contexts

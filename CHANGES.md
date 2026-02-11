@@ -1,5 +1,9 @@
 # Unreleased
 
+- Add fixes for buffer overflow and incorrect char replacement
+- Persist network client between requests, which should speed up grid
+  operations that require multiple network requests.
+
 - Refactored options logic
 
 # 0.31.0 - 2025-08-29
