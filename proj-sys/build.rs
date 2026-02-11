@@ -46,6 +46,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })?
     };
 
+    // Link Windows system libs, which are used in cargo test
+    if cfg!(target_env = "msvc") {
+        println!("cargo:rustc-link-lib=ole32");
+        println!("cargo:rustc-link-lib=shell32");
+    }
+
     #[cfg(feature = "buildtime_bindgen")]
     generate_bindings(include_path)?;
     #[cfg(not(feature = "buildtime_bindgen"))]

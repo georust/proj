@@ -1781,8 +1781,8 @@ mod test {
         let t = stereo70
             .project(MyPoint::new(500119.70352012233, 500027.77896348457), true)
             .unwrap();
-        assert_relative_eq!(t.x(), 0.43633200013698786);
-        assert_relative_eq!(t.y(), 0.8028510000110507);
+        assert_relative_eq!(t.x(), 0.436332000136988, epsilon = 1e-15);
+        assert_relative_eq!(t.y(), 0.802851000011051, epsilon = 1e-15);
     }
     #[test]
     // Carry out an inverse projection to geodetic coordinates

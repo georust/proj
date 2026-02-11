@@ -45,6 +45,7 @@ jobs:
       - proj-sys-ubuntu
       - proj-macos
       - proj-sys-macos
+      - proj-windows
       - proj-sys-ubuntu-asan
     steps:
       - name: Mark the job as a success
@@ -59,6 +60,7 @@ jobs:
       - proj-sys-ubuntu
       - proj-macos
       - proj-sys-macos
+      - proj-windows
       - proj-sys-ubuntu-asan
     steps:
       - name: Mark the job as a failure
@@ -205,6 +207,21 @@ jobs:
       - run: brew install proj
       - run: cargo test
 
+  proj-windows:
+    name: proj windows
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Currently, Windows build doesn't work without the bundled features.
+        features: ["--features bundled_proj_sqlite"]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - run: choco install sqlite # Even if we bundle libsqlite, we still need the SQLite binary
+      - run: cargo build ${{ matrix.features }}
+      - run: cargo test ${{ matrix.features }}
   # Build PROJ from the bundled source to enable ASAN. In order to link against
   # the ASAN-enabled library, "-Z sanitizer=address" flag needs to be passed to
   # the Rust compiler. So, this job requires the nightly toolchain.
