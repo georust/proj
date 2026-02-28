@@ -33,8 +33,9 @@ use std::mem::MaybeUninit;
 use std::path::Path;
 use thiserror::Error;
 
-pub trait CoordinateType: Float + Copy + PartialOrd + Debug {}
-impl<T: Float + Copy + PartialOrd + Debug> CoordinateType for T {}
+/// Base numeric type. This should match CoordFloat trait in the geo-types crate.
+pub trait CoordinateType: Float + Copy + PartialOrd + Debug + Default {}
+impl<T: Float + Copy + PartialOrd + Debug + Default> CoordinateType for T {}
 
 /// An error number returned from a PROJ call.
 pub(crate) struct Errno(pub libc::c_int);
