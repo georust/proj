@@ -1,7 +1,7 @@
 #![deny(
     clippy::cast_slice_from_raw_parts,
     clippy::cast_slice_different_sizes,
-    clippy::invalid_null_ptr_usage,
+    clippy::invalid_null_arguments,
     clippy::ptr_as_ptr,
     clippy::transmute_ptr_to_ref
 )]
@@ -12,7 +12,7 @@
 /// **Note**: `error_string_max_size` is set to 128 by libproj.
 // TODO: build some length checks for the errors that are stuffed into it
 // This functionality based on https://github.com/OSGeo/PROJ/blob/master/src/networkfilemanager.cpp#L1675
-use proj_sys::{proj_context_set_network_callbacks, PJ_CONTEXT, PROJ_NETWORK_HANDLE};
+use proj_sys::{PJ_CONTEXT, PROJ_NETWORK_HANDLE, proj_context_set_network_callbacks};
 
 use std::collections::HashMap;
 use std::ffi::CString;
@@ -22,7 +22,7 @@ use std::os::raw::c_ulonglong;
 use std::ptr::{self, NonNull};
 use ureq::Agent;
 
-use crate::proj::{ProjError, _string};
+use crate::proj::{_string, ProjError};
 use libc::c_char;
 use libc::c_void;
 use std::boxed::Box;
@@ -146,23 +146,29 @@ pub(crate) unsafe extern "C" fn network_open(
     out_error_string: *mut c_char,
     ud: *mut c_void,
 ) -> *mut PROJ_NETWORK_HANDLE {
-    match _network_open(
-        pc,
-        url,
-        offset,
-        size_to_read,
-        buffer,
-        out_size_read,
-        error_string_max_size,
-        out_error_string,
-        ud,
-    ) {
+    let result = unsafe {
+        _network_open(
+            pc,
+            url,
+            offset,
+            size_to_read,
+            buffer,
+            out_size_read,
+            error_string_max_size,
+            out_error_string,
+            ud,
+        )
+    };
+    match result {
         Ok(res) => res,
         #[allow(clippy::ptr_as_ptr)]
         Err(e) => {
             let err_string = e.to_string();
-            out_error_string.copy_from_nonoverlapping(err_string.as_ptr().cast(), err_string.len());
-            out_error_string.add(err_string.len()).write(0);
+            unsafe {
+                out_error_string
+                    .copy_from_nonoverlapping(err_string.as_ptr().cast(), err_string.len());
+                out_error_string.add(err_string.len()).write(0);
+            }
             ptr::null_mut()
         }
     }
@@ -181,7 +187,7 @@ unsafe fn _network_open(
     out_error_string: *mut c_char,
     _: *mut c_void,
 ) -> Result<*mut PROJ_NETWORK_HANDLE, ProjError> {
-    let url = _string(url)?;
+    let url = unsafe { _string(url) }?;
     // - 1 is used because the HTTP convention is to use inclusive start and end offsets
     let end = offset as usize + size_to_read - 1;
     // RANGE header definition is "bytes=x-y"
@@ -229,8 +235,10 @@ unsafe fn _network_open(
         .take(size_to_read as u64)
         .read_to_end(&mut buf)?;
 
-    out_size_read.write(buf.len());
-    buf.as_ptr().copy_to_nonoverlapping(buffer.cast(), capacity);
+    unsafe {
+        out_size_read.write(buf.len());
+        buf.as_ptr().copy_to_nonoverlapping(buffer.cast(), capacity);
+    }
 
     let hd = HandleData::new(url, headers);
     // heap-allocate the struct and cast it to a void pointer so it can be passed around to PROJ
@@ -240,8 +248,10 @@ unsafe fn _network_open(
 
     // If everything's OK, set the error string to empty
     let err_string = "";
-    out_error_string.copy_from_nonoverlapping(err_string.as_ptr().cast(), err_string.len());
-    out_error_string.add(err_string.len()).write(0);
+    unsafe {
+        out_error_string.copy_from_nonoverlapping(err_string.as_ptr().cast(), err_string.len());
+        out_error_string.add(err_string.len()).write(0);
+    }
 
     Ok(opaque)
 }
@@ -256,7 +266,7 @@ pub(crate) unsafe extern "C" fn network_close(
     // This is the exact reverse order seen in _network_open
     let void = handle.cast::<libc::c_void>();
     let hd = void.cast::<HandleData>();
-    let _: Box<HandleData> = Box::from_raw(hd);
+    let _: Box<HandleData> = unsafe { Box::from_raw(hd) };
 }
 
 /// Network callback: get header value
@@ -268,8 +278,8 @@ pub(crate) unsafe extern "C" fn network_get_header_value(
     header_name: *const c_char,
     ud: *mut c_void,
 ) -> *const c_char {
-    let hd = &mut *(handle as *const c_void as *mut HandleData);
-    match _network_get_header_value(pc, handle, header_name, ud) {
+    let hd = unsafe { &mut *(handle as *const c_void as *mut HandleData) };
+    match unsafe { _network_get_header_value(pc, handle, header_name, ud) } {
         Ok(res) => res,
         Err(_) => {
             // an empty value will cause an error upstream in libproj, which is the intention
@@ -291,9 +301,9 @@ unsafe fn _network_get_header_value(
     header_name: *const c_char,
     _: *mut c_void,
 ) -> Result<*const c_char, ProjError> {
-    let lookup = _string(header_name)?.to_lowercase();
+    let lookup = unsafe { _string(header_name) }?.to_lowercase();
     let void = handle.cast::<libc::c_void>();
-    let hd = &mut *(void.cast::<HandleData>());
+    let hd = unsafe { &mut *(void.cast::<HandleData>()) };
     let hvalue = hd
         .headers
         .get(&lookup)
@@ -345,8 +355,11 @@ pub(crate) unsafe extern "C" fn network_read_range(
             // The assumption here is that if 0 is returned, whatever error is in out_error_string is displayed by libproj
             // since this isn't a conversion using CString, nul chars must be manually stripped
             let err_string = e.to_string().replace('0', "nought");
-            out_error_string.copy_from_nonoverlapping(err_string.as_ptr().cast(), err_string.len());
-            out_error_string.add(err_string.len()).write(0);
+            unsafe {
+                out_error_string
+                    .copy_from_nonoverlapping(err_string.as_ptr().cast(), err_string.len());
+                out_error_string.add(err_string.len()).write(0);
+            }
             0usize
         }
     }

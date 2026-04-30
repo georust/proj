@@ -2,17 +2,17 @@ use libc::c_int;
 use libc::{c_char, c_double};
 use num_traits::Float;
 use proj_sys::{
-    proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_as_projjson, proj_as_wkt,
-    proj_cleanup, proj_context_clone, proj_context_create, proj_context_destroy,
-    proj_context_errno, proj_context_get_url_endpoint, proj_context_is_network_enabled,
-    proj_context_set_search_paths, proj_context_set_url_endpoint, proj_coordinate_metadata_create,
-    proj_coordinate_metadata_get_epoch, proj_create, proj_create_crs_to_crs,
-    proj_create_crs_to_crs_from_pj, proj_destroy, proj_errno_string, proj_get_area_of_use,
-    proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization, proj_pj_info,
-    proj_trans, proj_trans_array, proj_trans_bounds, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD,
-    PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_WKT_TYPE_PJ_WKT1_ESRI,
-    PJ_WKT_TYPE_PJ_WKT1_GDAL, PJ_WKT_TYPE_PJ_WKT2_2015, PJ_WKT_TYPE_PJ_WKT2_2015_SIMPLIFIED,
-    PJ_WKT_TYPE_PJ_WKT2_2019, PJ_WKT_TYPE_PJ_WKT2_2019_SIMPLIFIED, PJ_XYZT,
+    PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT,
+    PJ_WKT_TYPE_PJ_WKT1_ESRI, PJ_WKT_TYPE_PJ_WKT1_GDAL, PJ_WKT_TYPE_PJ_WKT2_2015,
+    PJ_WKT_TYPE_PJ_WKT2_2015_SIMPLIFIED, PJ_WKT_TYPE_PJ_WKT2_2019,
+    PJ_WKT_TYPE_PJ_WKT2_2019_SIMPLIFIED, PJ_XYZT, PJconsts, proj_area_create, proj_area_destroy,
+    proj_area_set_bbox, proj_as_projjson, proj_as_wkt, proj_cleanup, proj_context_clone,
+    proj_context_create, proj_context_destroy, proj_context_errno, proj_context_get_url_endpoint,
+    proj_context_is_network_enabled, proj_context_set_search_paths, proj_context_set_url_endpoint,
+    proj_coordinate_metadata_create, proj_coordinate_metadata_get_epoch, proj_create,
+    proj_create_crs_to_crs, proj_create_crs_to_crs_from_pj, proj_destroy, proj_errno_string,
+    proj_get_area_of_use, proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization,
+    proj_pj_info, proj_trans, proj_trans_array, proj_trans_bounds,
 };
 use std::{
     convert, ffi,
@@ -147,7 +147,9 @@ pub enum ProjCreateError {
     ArgumentNulError(ffi::NulError),
     #[error("The underlying PROJ call failed: {0}")]
     ProjError(String),
-    #[error("Pipeline objects cannot be used to produce a MetadataObject. Try assigning the epoch to one of the input projections")]
+    #[error(
+        "Pipeline objects cannot be used to produce a MetadataObject. Try assigning the epoch to one of the input projections"
+    )]
     MetadataObjectCreation,
 }
 
@@ -1863,17 +1865,21 @@ mod test {
         .unwrap();
 
         // we expect this first conversion to fail (copied from above test case)
-        assert!(nad83_m
-            .convert(MyPoint::new(4760096.421921, 3744293.729449))
-            .is_err());
+        assert!(
+            nad83_m
+                .convert(MyPoint::new(4760096.421921, 3744293.729449))
+                .is_err()
+        );
 
         // but a subsequent valid conversion should still be successful
         assert!(nad83_m.convert(MyPoint::new(0.0, 0.0)).is_ok());
 
         // also test with project() function
-        assert!(nad83_m
-            .project(MyPoint::new(99999.0, 99999.0), false)
-            .is_err());
+        assert!(
+            nad83_m
+                .project(MyPoint::new(99999.0, 99999.0), false)
+                .is_err()
+        );
         assert!(nad83_m.project(MyPoint::new(0.0, 0.0), false).is_ok());
     }
 
