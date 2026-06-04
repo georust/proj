@@ -7,7 +7,7 @@
   files) when a `Proj` or `ProjBuilder` is dropped. These caches persist for
   the lifetime of the process, substantially speeding up repeated creation of
   transformation objects (https://github.com/georust/proj/issues/256).
-
+- Add Proj::equivalent_to() method to assess whether two Proj instances are the same
 - Refactored options logic
 
 # 0.31.0 - 2025-08-29
@@ -231,4 +231,3 @@
 
 * [Use `c_void` instead of unit](https://github.com/georust/rust-proj/pull/5)
     * Add example to README
-
