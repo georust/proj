@@ -2,17 +2,20 @@ use libc::c_int;
 use libc::{c_char, c_double};
 use num_traits::Float;
 use proj_sys::{
-    PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT,
-    PJ_WKT_TYPE_PJ_WKT1_ESRI, PJ_WKT_TYPE_PJ_WKT1_GDAL, PJ_WKT_TYPE_PJ_WKT2_2015,
-    PJ_WKT_TYPE_PJ_WKT2_2015_SIMPLIFIED, PJ_WKT_TYPE_PJ_WKT2_2019,
+    PJ_AREA, PJ_COMPARISON_CRITERION_PJ_COMP_EQUIVALENT,
+    PJ_COMPARISON_CRITERION_PJ_COMP_EQUIVALENT_EXCEPT_AXIS_ORDER_GEOGCRS,
+    PJ_COMPARISON_CRITERION_PJ_COMP_STRICT, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD,
+    PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_WKT_TYPE_PJ_WKT1_ESRI, PJ_WKT_TYPE_PJ_WKT1_GDAL,
+    PJ_WKT_TYPE_PJ_WKT2_2015, PJ_WKT_TYPE_PJ_WKT2_2015_SIMPLIFIED, PJ_WKT_TYPE_PJ_WKT2_2019,
     PJ_WKT_TYPE_PJ_WKT2_2019_SIMPLIFIED, PJ_XYZT, PJconsts, proj_area_create, proj_area_destroy,
     proj_area_set_bbox, proj_as_projjson, proj_as_wkt, proj_context_clone, proj_context_create,
     proj_context_destroy, proj_context_errno, proj_context_get_url_endpoint,
     proj_context_is_network_enabled, proj_context_set_search_paths, proj_context_set_url_endpoint,
     proj_coordinate_metadata_create, proj_coordinate_metadata_get_epoch, proj_create,
     proj_create_crs_to_crs, proj_create_crs_to_crs_from_pj, proj_destroy, proj_errno_string,
-    proj_get_area_of_use, proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization,
-    proj_pj_info, proj_trans, proj_trans_array, proj_trans_bounds,
+    proj_get_area_of_use, proj_grid_cache_set_enable, proj_info, proj_is_equivalent_to_with_ctx,
+    proj_normalize_for_visualization, proj_pj_info, proj_trans, proj_trans_array,
+    proj_trans_bounds,
 };
 use std::{
     convert, ffi,
@@ -151,6 +154,13 @@ pub enum ProjCreateError {
         "Pipeline objects cannot be used to produce a MetadataObject. Try assigning the epoch to one of the input projections"
     )]
     MetadataObjectCreation,
+}
+
+#[derive(Debug)]
+pub enum ComparisonCriterion {
+    Strict,
+    Equivalent,
+    EquivalentExceptAxisOrder,
 }
 
 /// The bounding box of an area of use
@@ -1343,6 +1353,39 @@ impl Proj {
             Ok(_string(wkt)?)
         }
     }
+
+    /// Checks whether two proj instances are equivalent.
+    /// The comparison_criterion determines how to compare the Proj instances.
+    ///
+    ///  - ComparisonCriterion::Strict
+    ///      All properties are identical
+    ///  - ComparisonCriterion::Equivalent
+    ///      The objects are equivalent for the purpose of coordinate operations.
+    ///      They can differ by the name of their objects, identifiers, unit or other metadata.
+    ///  - ComparisonCriterion::EquivalentExceptAxisOrder
+    ///      Same as Equivalent, relaxed with an exception that the axis order is ignored.
+    ///      Only to be used with DerivedCRS/ProjectedCRS/GeographicCRS
+    ///
+    pub fn equivalent_to(&self, other: &Proj, comparison_criterion: ComparisonCriterion) -> bool {
+        let proj_comparison_criterion = match comparison_criterion {
+            ComparisonCriterion::Strict => PJ_COMPARISON_CRITERION_PJ_COMP_STRICT,
+            ComparisonCriterion::Equivalent => PJ_COMPARISON_CRITERION_PJ_COMP_EQUIVALENT,
+            ComparisonCriterion::EquivalentExceptAxisOrder => {
+                PJ_COMPARISON_CRITERION_PJ_COMP_EQUIVALENT_EXCEPT_AXIS_ORDER_GEOGCRS
+            }
+        };
+
+        let is_equivalent = unsafe {
+            proj_is_equivalent_to_with_ctx(
+                self.ctx,
+                self.c_proj,
+                other.c_proj,
+                proj_comparison_criterion,
+            )
+        };
+
+        is_equivalent == 1
+    }
 }
 
 #[derive(Default)]
@@ -1966,5 +2009,30 @@ mod test {
             wkt,
             r#"GEOGCRS["WGS 84",ENSEMBLE["World Geodetic System 1984 ensemble",MEMBER["World Geodetic System 1984 (Transit)"],MEMBER["World Geodetic System 1984 (G730)"],MEMBER["World Geodetic System 1984 (G873)"],MEMBER["World Geodetic System 1984 (G1150)"],MEMBER["World Geodetic System 1984 (G1674)"],MEMBER["World Geodetic System 1984 (G1762)"],MEMBER["World Geodetic System 1984 (G2139)"],MEMBER["World Geodetic System 1984 (G2296)"],ELLIPSOID["WGS 84",6378137,298.257223563,LENGTHUNIT["metre",1]],ENSEMBLEACCURACY[2.0]],PRIMEM["Greenwich",0,ANGLEUNIT["degree",0.0174532925199433]],CS[ellipsoidal,2],AXIS["geodetic latitude (Lat)",north,ORDER[1],ANGLEUNIT["degree",0.0174532925199433]],AXIS["geodetic longitude (Lon)",east,ORDER[2],ANGLEUNIT["degree",0.0174532925199433]],USAGE[SCOPE["Horizontal component of 3D system."],AREA["World."],BBOX[-90,-180,90,180]],ID["EPSG",4326]]"#
         );
+    }
+
+    #[test]
+    fn test_equivalent_to() {
+        // Compare same CRS
+        let crs1 = Proj::new("EPSG:4326").unwrap();
+        let crs2 = Proj::new("EPSG:4326").unwrap();
+
+        assert!(crs1.equivalent_to(&crs2, ComparisonCriterion::Strict));
+        assert!(crs1.equivalent_to(&crs2, ComparisonCriterion::Equivalent));
+        assert!(crs1.equivalent_to(&crs2, ComparisonCriterion::EquivalentExceptAxisOrder));
+
+        // Compare similar crs, with different axis order
+        let crs3 = Proj::new("OGC:CRS84").unwrap();
+
+        assert!(!crs1.equivalent_to(&crs3, ComparisonCriterion::Strict));
+        assert!(!crs1.equivalent_to(&crs3, ComparisonCriterion::Equivalent));
+        assert!(crs1.equivalent_to(&crs3, ComparisonCriterion::EquivalentExceptAxisOrder));
+
+        // Compare clearly different CRS
+        let crs4 = Proj::new("EPSG:3857").unwrap();
+
+        assert!(!crs1.equivalent_to(&crs4, ComparisonCriterion::Strict));
+        assert!(!crs1.equivalent_to(&crs4, ComparisonCriterion::Equivalent));
+        assert!(!crs1.equivalent_to(&crs4, ComparisonCriterion::EquivalentExceptAxisOrder));
     }
 }
