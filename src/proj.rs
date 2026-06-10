@@ -8,12 +8,12 @@ use proj_sys::{
     PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_WKT_TYPE_PJ_WKT1_ESRI, PJ_WKT_TYPE_PJ_WKT1_GDAL,
     PJ_WKT_TYPE_PJ_WKT2_2015, PJ_WKT_TYPE_PJ_WKT2_2015_SIMPLIFIED, PJ_WKT_TYPE_PJ_WKT2_2019,
     PJ_WKT_TYPE_PJ_WKT2_2019_SIMPLIFIED, PJ_XYZT, PJconsts, proj_area_create, proj_area_destroy,
-    proj_area_set_bbox, proj_as_projjson, proj_as_wkt, proj_context_clone, proj_context_create,
-    proj_context_destroy, proj_context_errno, proj_context_get_url_endpoint,
-    proj_context_is_network_enabled, proj_context_set_search_paths, proj_context_set_url_endpoint,
-    proj_coordinate_metadata_create, proj_coordinate_metadata_get_epoch, proj_create,
-    proj_create_crs_to_crs, proj_create_crs_to_crs_from_pj, proj_destroy, proj_errno_string,
-    proj_get_area_of_use, proj_grid_cache_set_enable, proj_info, proj_is_equivalent_to_with_ctx,
+    proj_area_set_bbox, proj_as_projjson, proj_as_wkt, proj_context_errno,
+    proj_context_get_url_endpoint, proj_context_is_network_enabled, proj_context_set_search_paths,
+    proj_context_set_url_endpoint, proj_coordinate_metadata_create,
+    proj_coordinate_metadata_get_epoch, proj_create, proj_create_crs_to_crs,
+    proj_create_crs_to_crs_from_pj, proj_destroy, proj_errno_string, proj_get_area_of_use,
+    proj_grid_cache_set_enable, proj_info, proj_is_equivalent_to_with_ctx,
     proj_normalize_for_visualization, proj_pj_info, proj_trans, proj_trans_array,
     proj_trans_bounds,
 };
@@ -23,6 +23,7 @@ use std::{
     str,
 };
 
+use crate::context::{Context, ProjContext};
 use crate::cstring_array::CStringArray;
 
 #[cfg(feature = "network")]
@@ -217,92 +218,100 @@ fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
     }
 }
 
-/// called by Proj::new and ProjBuilder::transform_new_crs
-fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Result<Proj, ProjCreateError> {
-    let c_definition = CString::new(definition).map_err(ProjCreateError::ArgumentNulError)?;
-    let ptr = result_from_create(ctx, unsafe { proj_create(ctx, c_definition.as_ptr()) })
-        .map_err(|e| ProjCreateError::ProjError(e.message(ctx)))?;
-    Ok(Proj {
-        c_proj: ptr,
-        ctx,
-        area: None,
-    })
-}
-
-/// Called by new_known_crs and proj_known_crs
-fn transform_epsg(
-    ctx: *mut PJ_CONTEXT,
-    from: &str,
-    to: &str,
-    area: Option<Area>,
-) -> Result<Proj, ProjCreateError> {
-    let from_c = CString::new(from).map_err(ProjCreateError::ArgumentNulError)?;
-    let to_c = CString::new(to).map_err(ProjCreateError::ArgumentNulError)?;
-    let proj_area = unsafe { proj_area_create() };
-    area_set_bbox(proj_area, area);
-    let ptr = result_from_create(ctx, unsafe {
-        proj_create_crs_to_crs(ctx, from_c.as_ptr(), to_c.as_ptr(), proj_area)
-    })
-    .map_err(|e| ProjCreateError::ProjError(e.message(ctx)))?;
-    // Normalise input and output order to Lon, Lat / Easting Northing by inserting
-    // An axis swap operation if necessary
-    let normalised = unsafe {
-        let normalised = proj_normalize_for_visualization(ctx, ptr);
-        // deallocate stale PJ pointer
-        proj_destroy(ptr);
-        normalised
-    };
-    Ok(Proj {
-        c_proj: normalised,
-        ctx,
-        area: Some(proj_area),
-    })
-}
-
-// called by Proj and ProjBuilder
-fn crs_to_crs_from_pj(
-    ctx: *mut PJ_CONTEXT,
-    source_crs: &Proj,
-    target_crs: &Proj,
-    area: Option<Area>,
-    options: Option<Vec<&str>>,
-) -> Result<Proj, ProjCreateError> {
-    let proj_area = unsafe { proj_area_create() };
-    area_set_bbox(proj_area, area);
-
-    let mut proj_options = CStringArray::new();
-    if let Some(options) = options {
-        for option in options {
-            proj_options
-                .push(option)
-                .map_err(ProjCreateError::ArgumentNulError)?;
-        }
+// These constructors consume the context, handing ownership to the `Proj` they create. They live
+// here rather than in the `context` module because they build a `Proj` from its private fields.
+impl ProjContext {
+    /// Build a transformation object from a PROJ definition string (used by `Proj::new` and
+    /// `ProjBuilder::proj`).
+    fn transform_string(self, definition: &str) -> Result<Proj, ProjCreateError> {
+        let ctx_ptr = self.as_ptr();
+        let c_definition = CString::new(definition).map_err(ProjCreateError::ArgumentNulError)?;
+        let ptr = result_from_create(ctx_ptr, unsafe {
+            proj_create(ctx_ptr, c_definition.as_ptr())
+        })
+        .map_err(|e| ProjCreateError::ProjError(e.message(ctx_ptr)))?;
+        Ok(Proj {
+            c_proj: ptr,
+            ctx: self,
+            area: None,
+        })
     }
 
-    let ptr = result_from_create(ctx, unsafe {
-        proj_create_crs_to_crs_from_pj(
-            ctx,
-            source_crs.c_proj,
-            target_crs.c_proj,
-            proj_area,
-            proj_options.as_ptr(),
-        )
-    })
-    .map_err(|e| ProjCreateError::ProjError(e.message(ctx)))?;
+    /// Build a transformation object that is a pipeline between two known CRSs (used by
+    /// `Proj::new_known_crs` and `ProjBuilder::proj_known_crs`).
+    fn transform_epsg(
+        self,
+        from: &str,
+        to: &str,
+        area: Option<Area>,
+    ) -> Result<Proj, ProjCreateError> {
+        let ctx_ptr = self.as_ptr();
+        let from_c = CString::new(from).map_err(ProjCreateError::ArgumentNulError)?;
+        let to_c = CString::new(to).map_err(ProjCreateError::ArgumentNulError)?;
+        let proj_area = unsafe { proj_area_create() };
+        area_set_bbox(proj_area, area);
+        let ptr = result_from_create(ctx_ptr, unsafe {
+            proj_create_crs_to_crs(ctx_ptr, from_c.as_ptr(), to_c.as_ptr(), proj_area)
+        })
+        .map_err(|e| ProjCreateError::ProjError(e.message(ctx_ptr)))?;
+        // Normalise input and output order to Lon, Lat / Easting Northing by inserting
+        // An axis swap operation if necessary
+        let normalised = unsafe {
+            let normalised = proj_normalize_for_visualization(ctx_ptr, ptr);
+            // deallocate stale PJ pointer
+            proj_destroy(ptr);
+            normalised
+        };
+        Ok(Proj {
+            c_proj: normalised,
+            ctx: self,
+            area: Some(proj_area),
+        })
+    }
 
-    Ok(Proj {
-        c_proj: ptr,
-        ctx,
-        area: Some(proj_area),
-    })
+    /// Build a transformation object that is a pipeline between two existing `Proj` objects (used
+    /// by `Proj::create_crs_to_crs_from_pj` and `ProjBuilder::proj_create_crs_to_crs_from_pj`).
+    fn crs_to_crs_from_pj(
+        self,
+        source_crs: &Proj,
+        target_crs: &Proj,
+        area: Option<Area>,
+        options: Option<Vec<&str>>,
+    ) -> Result<Proj, ProjCreateError> {
+        let ctx_ptr = self.as_ptr();
+        let proj_area = unsafe { proj_area_create() };
+        area_set_bbox(proj_area, area);
+
+        let mut proj_options = CStringArray::new();
+        if let Some(options) = options {
+            for option in options {
+                proj_options
+                    .push(option)
+                    .map_err(ProjCreateError::ArgumentNulError)?;
+            }
+        }
+
+        let ptr = result_from_create(ctx_ptr, unsafe {
+            proj_create_crs_to_crs_from_pj(
+                ctx_ptr,
+                source_crs.c_proj,
+                target_crs.c_proj,
+                proj_area,
+                proj_options.as_ptr(),
+            )
+        })
+        .map_err(|e| ProjCreateError::ProjError(e.message(ctx_ptr)))?;
+
+        Ok(Proj {
+            c_proj: ptr,
+            ctx: self,
+            area: Some(proj_area),
+        })
+    }
 }
 
 macro_rules! define_info_methods {
     () => {
-        fn ctx(&self) -> *mut PJ_CONTEXT {
-            self.ctx
-        }
-
         /// Return information about the current instance of the PROJ libary.
         ///
         /// See: <https://proj.org/development/reference/datatypes.html#c.PJ_INFO>
@@ -347,6 +356,10 @@ macro_rules! define_info_methods {
 
 impl ProjBuilder {
     define_info_methods!();
+
+    fn ctx(&self) -> *mut PJ_CONTEXT {
+        self.ctx.as_ptr()
+    }
 
     /// Enable or disable network access for [resource file download](https://proj.org/resource_files.html#where-are-proj-resource-files-looked-for).
     ///
@@ -447,14 +460,15 @@ pub struct Info {
 ///
 /// Create a transformation object by calling [`ProjBuilder::proj()`], [`ProjBuilder::proj_known_crs()`], [`ProjBuilder::proj_create_crs_to_crs_from_pj()`].
 pub struct ProjBuilder {
-    ctx: *mut PJ_CONTEXT,
+    ctx: Context,
 }
 
 impl ProjBuilder {
     /// Create a new `ProjBuilder`, allowing grid downloads and other customisation.
     pub fn new() -> Self {
-        let ctx = unsafe { proj_context_create() };
-        ProjBuilder { ctx }
+        ProjBuilder {
+            ctx: Context::new(),
+        }
     }
 
     /// Try to create a coordinate transformation object
@@ -468,9 +482,8 @@ impl ProjBuilder {
     ///
     /// # Safety
     /// This method contains unsafe code.
-    pub fn proj(mut self, definition: &str) -> Result<Proj, ProjCreateError> {
-        let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
-        transform_string(ctx, definition)
+    pub fn proj(self, definition: &str) -> Result<Proj, ProjCreateError> {
+        ProjContext::Owned(self.ctx).transform_string(definition)
     }
 
     /// Try to create a transformation object that is a pipeline between two known coordinate reference systems.
@@ -511,24 +524,22 @@ impl ProjBuilder {
     /// # Safety
     /// This method contains unsafe code.
     pub fn proj_known_crs(
-        mut self,
+        self,
         from: &str,
         to: &str,
         area: Option<Area>,
     ) -> Result<Proj, ProjCreateError> {
-        let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
-        transform_epsg(ctx, from, to, area)
+        ProjContext::Owned(self.ctx).transform_epsg(from, to, area)
     }
     /// Builder version of [`create_crs_to_crs_from_pj()`](fn@Proj::create_crs_to_crs_from_pj())
     pub fn proj_create_crs_to_crs_from_pj(
-        mut self,
+        self,
         source_crs: &Proj,
         target_crs: &Proj,
         area: Option<Area>,
         options: Option<Vec<&str>>,
     ) -> Result<Proj, ProjCreateError> {
-        let ctx = unsafe { std::mem::replace(&mut self.ctx, proj_context_create()) };
-        crs_to_crs_from_pj(ctx, source_crs, target_crs, area, options)
+        ProjContext::Owned(self.ctx).crs_to_crs_from_pj(source_crs, target_crs, area, options)
     }
 }
 
@@ -563,9 +574,14 @@ impl Default for ProjBuilder {
 /// ```
 pub struct Proj {
     c_proj: *mut PJconsts,
-    ctx: *mut PJ_CONTEXT,
+    ctx: ProjContext,
     area: Option<*mut PJ_AREA>,
 }
+
+// `Proj` is intentionally neither `Send` nor `Sync` (enforced by its raw pointers and the `Rc`
+// inside `ProjContext`). A PROJ context must not be used concurrently from more than one thread,
+// and the shared per-thread context is reference counted with a non-atomic `Rc`. Do not add
+// `unsafe impl Send`/`Sync`: create a separate `Proj` per thread instead (as pyproj does).
 
 impl Proj {
     /// Create a coordinate metadata object to be used in coordinate operations.
@@ -589,17 +605,19 @@ impl Proj {
     /// # Safety
     /// This method contains unsafe code.
     pub fn coordinate_metadata_create(&self, epoch: f64) -> Result<Proj, ProjCreateError> {
-        // Clone the context to avoid double-free in Drop implementations
-        let cloned_ctx = unsafe { proj_context_clone(self.ctx) };
+        // Clone the context so the metadata object owns a distinct one rather than continuing to
+        // share the source's context.
+        let ctx = self.ctx.clone_owned();
+        let ctx_ptr = ctx.as_ptr();
 
-        let ptr = result_from_create(cloned_ctx, unsafe {
-            proj_coordinate_metadata_create(cloned_ctx, self.c_proj, epoch)
+        let ptr = result_from_create(ctx_ptr, unsafe {
+            proj_coordinate_metadata_create(ctx_ptr, self.c_proj, epoch)
         })
         .map_err(|_| ProjCreateError::MetadataObjectCreation)?;
 
         Ok(Proj {
             c_proj: ptr,
-            ctx: cloned_ctx,
+            ctx,
             area: None,
         })
     }
@@ -615,7 +633,7 @@ impl Proj {
     /// # Safety
     /// This method contains unsafe code.
     pub fn coordinate_metadata_get_epoch(&self) -> f64 {
-        unsafe { proj_coordinate_metadata_get_epoch(self.ctx, self.c_proj) }
+        unsafe { proj_coordinate_metadata_get_epoch(self.ctx(), self.c_proj) }
     }
 
     /// Try to create a new transformation object
@@ -655,8 +673,7 @@ impl Proj {
     // PJ_LP signals projection of geodetic coordinates, with output being PJ_XY
     // and vice versa, or using PJ_XY for conversion operations
     pub fn new(definition: &str) -> Result<Proj, ProjCreateError> {
-        let ctx = unsafe { proj_context_create() };
-        transform_string(ctx, definition)
+        ProjContext::Owned(Context::new()).transform_string(definition)
     }
 
     /// Try to create a new transformation object that is a pipeline between two known coordinate reference systems.
@@ -711,8 +728,7 @@ impl Proj {
         to: &str,
         area: Option<Area>,
     ) -> Result<Proj, ProjCreateError> {
-        let ctx = unsafe { proj_context_create() };
-        transform_epsg(ctx, from, to, area)
+        ProjContext::Owned(Context::new()).transform_epsg(from, to, area)
     }
 
     /// Create a transformation object that is a pipeline _between_ two known coordinate reference systems.
@@ -765,9 +781,11 @@ impl Proj {
         area: Option<Area>,
         options: Option<Vec<&str>>,
     ) -> Result<Proj, ProjCreateError> {
-        // Clone the context to avoid double-free in Drop implementations
-        let ctx = unsafe { proj_context_clone(self.ctx) };
-        crs_to_crs_from_pj(ctx, self, target_crs, area, options)
+        // Clone the context so the new object owns a distinct one rather than continuing to share
+        // the source's context.
+        self.ctx
+            .clone_owned()
+            .crs_to_crs_from_pj(self, target_crs, area, options)
     }
 
     /// Set the bounding box of the area of use
@@ -796,6 +814,10 @@ impl Proj {
 
     define_info_methods!();
 
+    fn ctx(&self) -> *mut PJ_CONTEXT {
+        self.ctx.as_ptr()
+    }
+
     /// Returns the area of use of a projection
     ///
     /// When multiple usages are available, the first one will be returned.
@@ -811,7 +833,7 @@ impl Proj {
         let mut out_area_name = MaybeUninit::uninit();
         let res = unsafe {
             proj_get_area_of_use(
-                self.ctx,
+                self.ctx(),
                 self.c_proj,
                 out_west_lon_degree.as_mut_ptr(),
                 out_south_lat_degree.as_mut_ptr(),
@@ -1154,7 +1176,7 @@ impl Proj {
         unsafe {
             proj_errno_reset(self.c_proj);
             let _success = proj_trans_bounds(
-                self.ctx,
+                self.ctx(),
                 self.c_proj,
                 PJ_DIRECTION_PJ_FWD,
                 left.to_f64().ok_or(ProjError::FloatConversion)?,
@@ -1276,7 +1298,7 @@ impl Proj {
             proj_options.push(format!("SCHEMA={schema}"))?;
         }
         unsafe {
-            let out_ptr = proj_as_projjson(self.ctx, self.c_proj, proj_options.as_ptr());
+            let out_ptr = proj_as_projjson(self.ctx(), self.c_proj, proj_options.as_ptr());
             if out_ptr.is_null() {
                 Err(ProjError::ExportToJson)
             } else {
@@ -1349,7 +1371,7 @@ impl Proj {
         };
 
         unsafe {
-            let wkt = proj_as_wkt(self.ctx, self.c_proj, wkt_type, proj_options.as_ptr());
+            let wkt = proj_as_wkt(self.ctx(), self.c_proj, wkt_type, proj_options.as_ptr());
             Ok(_string(wkt)?)
         }
     }
@@ -1377,7 +1399,7 @@ impl Proj {
 
         let is_equivalent = unsafe {
             proj_is_equivalent_to_with_ctx(
-                self.ctx,
+                self.ctx(),
                 self.c_proj,
                 other.c_proj,
                 proj_comparison_criterion,
@@ -1500,21 +1522,15 @@ impl Drop for Proj {
             if let Some(area) = self.area {
                 proj_area_destroy(area)
             }
+            // Destroy the PJ before the context: PROJ objects reference their creating context,
+            // so it must outlive them. `self.ctx` (a `ProjContext`) is a field, so it is dropped
+            // after this explicit body runs, which destroys the context in the right order.
             proj_destroy(self.c_proj);
-            proj_context_destroy(self.ctx);
-            // We deliberately do not call proj_cleanup() here. It frees PROJ's
-            // process-global resources (the grid and +init file caches), so calling
-            // it whenever a single object is dropped clears caches that the next
-            // object would otherwise reuse, forcing reloads from disk. PROJ intends
-            // it to be called once before process termination, not per object.
-        }
-    }
-}
-
-impl Drop for ProjBuilder {
-    fn drop(&mut self) {
-        unsafe {
-            proj_context_destroy(self.ctx);
+            // We deliberately do not call proj_cleanup() here. It frees PROJ's process-global
+            // resources (the grid and +init file caches), so calling it whenever a single object
+            // is dropped clears caches that the next object would otherwise reuse, forcing
+            // reloads from disk. PROJ intends it to be called once before process termination,
+            // not per object.
         }
     }
 }

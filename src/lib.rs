@@ -254,6 +254,7 @@ mod geo_types;
 #[macro_use]
 extern crate approx;
 
+mod context;
 mod cstring_array;
 mod proj;
 mod transform;
