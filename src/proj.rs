@@ -23,7 +23,7 @@ use std::{
     str,
 };
 
-use crate::context::{Context, ProjContext};
+use crate::context::{Context, ProjContext, thread_local_context};
 use crate::cstring_array::CStringArray;
 
 #[cfg(feature = "network")]
@@ -673,7 +673,7 @@ impl Proj {
     // PJ_LP signals projection of geodetic coordinates, with output being PJ_XY
     // and vice versa, or using PJ_XY for conversion operations
     pub fn new(definition: &str) -> Result<Proj, ProjCreateError> {
-        ProjContext::Owned(Context::new()).transform_string(definition)
+        thread_local_context().transform_string(definition)
     }
 
     /// Try to create a new transformation object that is a pipeline between two known coordinate reference systems.
@@ -728,7 +728,7 @@ impl Proj {
         to: &str,
         area: Option<Area>,
     ) -> Result<Proj, ProjCreateError> {
-        ProjContext::Owned(Context::new()).transform_epsg(from, to, area)
+        thread_local_context().transform_epsg(from, to, area)
     }
 
     /// Create a transformation object that is a pipeline _between_ two known coordinate reference systems.
@@ -1655,6 +1655,81 @@ mod test {
         let proj = Proj::new(wgs84).unwrap();
         let np = proj.coordinate_metadata_create(epoch).unwrap();
         assert_eq!(np.coordinate_metadata_get_epoch(), 2021.3);
+        // The metadata object clones the context, so it owns a distinct one rather than
+        // borrowing the shared per-thread context.
+        assert_ne!(np.ctx() as usize, proj.ctx() as usize);
+    }
+
+    #[test]
+    fn test_new_reuses_thread_context() {
+        // Every Proj::new on a thread borrows the same per-thread context.
+        let a = Proj::new("EPSG:4326").unwrap();
+        let b = Proj::new_known_crs("EPSG:4326", "EPSG:3857", None).unwrap();
+        assert_eq!(a.ctx(), b.ctx());
+    }
+
+    #[test]
+    fn test_each_thread_gets_its_own_context() {
+        // The shared context is per-thread: each thread must get a distinct context. A barrier
+        // keeps every context alive simultaneously while addresses are captured, so a freed
+        // context's address cannot be reused by another thread and falsely collide.
+        use std::sync::{Arc, Barrier};
+
+        let threads = 4;
+        let barrier = Arc::new(Barrier::new(threads + 1));
+        let main = Proj::new("EPSG:4326").unwrap();
+
+        let handles: Vec<_> = (0..threads)
+            .map(|_| {
+                let barrier = Arc::clone(&barrier);
+                // Send the context address (usize), not the !Send Proj itself.
+                std::thread::spawn(move || {
+                    let proj = Proj::new("EPSG:4326").unwrap();
+                    let addr = proj.ctx() as usize;
+                    barrier.wait();
+                    drop(proj);
+                    addr
+                })
+            })
+            .collect();
+
+        barrier.wait();
+        let mut seen = vec![main.ctx() as usize];
+        for handle in handles {
+            seen.push(handle.join().unwrap());
+        }
+
+        let total = seen.len();
+        seen.sort_unstable();
+        seen.dedup();
+        assert_eq!(
+            seen.len(),
+            total,
+            "each thread should get a distinct context"
+        );
+    }
+
+    #[test]
+    fn test_builder_context_is_not_shared() {
+        // ProjBuilder owns its context (it mutates context state), so it must not borrow the
+        // shared per-thread context.
+        let shared = Proj::new("EPSG:4326").unwrap().ctx() as usize;
+        let built = ProjBuilder::new().proj("EPSG:4326").unwrap();
+        assert_ne!(built.ctx() as usize, shared);
+    }
+
+    #[test]
+    fn test_drop_does_not_free_shared_context() {
+        // Dropping a Proj must not destroy the shared context other Proj instances still use.
+        // Under AddressSanitizer this would surface as a use-after-free if the invariant broke.
+        let first = Proj::new("EPSG:4326").unwrap().ctx() as usize;
+        for _ in 0..1000 {
+            let _ = Proj::new("EPSG:4326").unwrap();
+        }
+        let transformer = Proj::new_known_crs("EPSG:4326", "EPSG:3857", None).unwrap();
+        assert_eq!(transformer.ctx() as usize, first);
+        // The shared context is still valid and usable.
+        transformer.convert((2.0, 49.0)).unwrap();
     }
 
     #[test]
@@ -1669,6 +1744,8 @@ mod test {
 
         assert_relative_eq!(result.x(), 1450880.2910605022, epsilon = 1.0e-8);
         assert_relative_eq!(result.y(), 1141263.0111604782, epsilon = 1.0e-8);
+        // The transformer clones the source context, so it owns a distinct one.
+        assert_ne!(transformer.ctx() as usize, from.ctx() as usize);
     }
 
     #[test]
