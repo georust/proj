@@ -137,6 +137,19 @@
 //! The path used to search for resource files can be modified using
 //! [`set_search_paths`](proj/struct.ProjBuilder.html#method.set_search_paths)
 //!
+//! ### Resource Caching
+//! Separately from the on-disk [Grid File Cache](#grid-file-cache) described above, PROJ keeps
+//! process-global caches of resources *in memory*: grids that have been loaded, and the contents
+//! of `+init` files. These caches are shared across all `Proj` and `ProjBuilder` instances and
+//! persist for the lifetime of the process; they are not released when individual instances are
+//! dropped. Repeated creation of transformation objects therefore reuses already-loaded resources
+//! rather than reading them from disk again.
+//!
+//! These in-memory caches are never explicitly freed, so they remain resident until the process
+//! exits, at which point the operating system reclaims them. They are bounded by the set of
+//! resources actually loaded and so do not grow without bound: the cost is memory residency for
+//! the lifetime of the process, not additional disk usage.
+//!
 //! ## Conform your own types
 //!
 //! If you have your own geometric types, you can conform them to the `Coord` trait and use `proj`

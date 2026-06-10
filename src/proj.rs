@@ -6,8 +6,8 @@ use proj_sys::{
     PJ_WKT_TYPE_PJ_WKT1_ESRI, PJ_WKT_TYPE_PJ_WKT1_GDAL, PJ_WKT_TYPE_PJ_WKT2_2015,
     PJ_WKT_TYPE_PJ_WKT2_2015_SIMPLIFIED, PJ_WKT_TYPE_PJ_WKT2_2019,
     PJ_WKT_TYPE_PJ_WKT2_2019_SIMPLIFIED, PJ_XYZT, PJconsts, proj_area_create, proj_area_destroy,
-    proj_area_set_bbox, proj_as_projjson, proj_as_wkt, proj_cleanup, proj_context_clone,
-    proj_context_create, proj_context_destroy, proj_context_errno, proj_context_get_url_endpoint,
+    proj_area_set_bbox, proj_as_projjson, proj_as_wkt, proj_context_clone, proj_context_create,
+    proj_context_destroy, proj_context_errno, proj_context_get_url_endpoint,
     proj_context_is_network_enabled, proj_context_set_search_paths, proj_context_set_url_endpoint,
     proj_coordinate_metadata_create, proj_coordinate_metadata_get_epoch, proj_create,
     proj_create_crs_to_crs, proj_create_crs_to_crs_from_pj, proj_destroy, proj_errno_string,
@@ -1459,9 +1459,11 @@ impl Drop for Proj {
             }
             proj_destroy(self.c_proj);
             proj_context_destroy(self.ctx);
-            // NB do NOT call until proj_destroy and proj_context_destroy have both returned:
-            // https://proj.org/development/reference/functions.html#c.proj_cleanup
-            proj_cleanup()
+            // We deliberately do not call proj_cleanup() here. It frees PROJ's
+            // process-global resources (the grid and +init file caches), so calling
+            // it whenever a single object is dropped clears caches that the next
+            // object would otherwise reuse, forcing reloads from disk. PROJ intends
+            // it to be called once before process termination, not per object.
         }
     }
 }
@@ -1470,7 +1472,6 @@ impl Drop for ProjBuilder {
     fn drop(&mut self) {
         unsafe {
             proj_context_destroy(self.ctx);
-            proj_cleanup()
         }
     }
 }

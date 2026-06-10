@@ -3,6 +3,10 @@
 - Add fixes for buffer overflow and incorrect char replacement
 - Persist network client between requests, which should speed up grid
   operations that require multiple network requests.
+- No longer free PROJ's process-global resource caches (grids and `+init`
+  files) when a `Proj` or `ProjBuilder` is dropped. These caches persist for
+  the lifetime of the process, substantially speeding up repeated creation of
+  transformation objects (https://github.com/georust/proj/issues/256).
 
 - Refactored options logic
 
