@@ -54,8 +54,6 @@ impl Drop for Context {
 /// exit.
 pub(crate) enum ProjContext {
     Owned(Context),
-    // Wired into Proj::new/new_known_crs in a follow-up commit.
-    #[allow(dead_code)]
     Shared(Rc<Context>),
 }
 
@@ -89,7 +87,6 @@ thread_local! {
 }
 
 /// Return a reference-counted handle to the calling thread's shared PROJ context.
-#[allow(dead_code)] // wired into Proj::new/new_known_crs in a follow-up commit
 pub(crate) fn thread_local_context() -> ProjContext {
     ProjContext::Shared(SHARED_CONTEXT.with(Rc::clone))
 }
