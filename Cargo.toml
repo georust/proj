@@ -29,6 +29,7 @@ members = ["proj-sys"]
 [features]
 default = ["geo-types"]
 bundled_proj = [ "proj-sys/bundled_proj" ]
+bundled_proj_sqlite = [ "proj-sys/bundled_proj_sqlite" ]
 pkg_config = [ "proj-sys/pkg_config" ]
 network = ["ureq", "http", "proj-sys/network"]
 
