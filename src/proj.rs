@@ -1,6 +1,5 @@
 use libc::c_int;
 use libc::{c_char, c_double};
-use num_traits::Float;
 use proj_sys::{
     PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT,
     PJ_WKT_TYPE_PJ_WKT1_ESRI, PJ_WKT_TYPE_PJ_WKT1_GDAL, PJ_WKT_TYPE_PJ_WKT2_2015,
@@ -33,8 +32,18 @@ use std::mem::MaybeUninit;
 use std::path::Path;
 use thiserror::Error;
 
-pub trait CoordinateType: Float + Copy + PartialOrd + Debug {}
-impl<T: Float + Copy + PartialOrd + Debug> CoordinateType for T {}
+#[cfg(feature = "geo-types")]
+use geo_types::CoordFloat;
+#[cfg(not(feature = "geo-types"))]
+use num_traits::{Num, Float, NumCast};
+#[cfg(not(feature = "geo-types"))]
+pub trait CoordFloat: Float + Num + Copy + NumCast + PartialOrd + PartialOrd + Debug + Default {}
+#[cfg(not(feature = "geo-types"))]
+impl<T: Float + Num + Copy + NumCast + PartialOrd + PartialOrd + Debug + Default> CoordFloat for T {}
+
+
+pub trait CoordinateType: CoordFloat {}
+impl<T: CoordFloat> CoordinateType for T {}
 
 /// An error number returned from a PROJ call.
 pub(crate) struct Errno(pub libc::c_int);
