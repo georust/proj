@@ -150,6 +150,18 @@
 //! resources actually loaded and so do not grow without bound: the cost is memory residency for
 //! the lifetime of the process, not additional disk usage.
 //!
+//! ## Threading
+//!
+//! Each PROJ context (`PJ_CONTEXT`) is tied to a single thread and must not be used concurrently
+//! from more than one thread. `Proj` is therefore deliberately neither `Send` nor `Sync`; to
+//! transform coordinates on several threads, create a `Proj` on each thread.
+//!
+//! [`Proj::new`] and [`Proj::new_known_crs`] reuse one context per thread rather than creating a
+//! new one for every object. This keeps the connection to the PROJ database and its caches warm,
+//! so constructing many transformation objects on a thread is considerably cheaper than it would
+//! otherwise be. [`ProjBuilder`] keeps its own context, since it is used to configure
+//! context-specific state such as network access and search paths.
+//!
 //! ## Conform your own types
 //!
 //! If you have your own geometric types, you can conform them to the `Coord` trait and use `proj`
