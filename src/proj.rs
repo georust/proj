@@ -1,6 +1,5 @@
 use libc::c_int;
 use libc::{c_char, c_double};
-use num_traits::Float;
 use proj_sys::{
     PJ_AREA, PJ_COMPARISON_CRITERION_PJ_COMP_EQUIVALENT,
     PJ_COMPARISON_CRITERION_PJ_COMP_EQUIVALENT_EXCEPT_AXIS_ORDER_GEOGCRS,
@@ -37,8 +36,18 @@ use std::mem::MaybeUninit;
 use std::path::Path;
 use thiserror::Error;
 
-pub trait CoordinateType: Float + Copy + PartialOrd + Debug {}
-impl<T: Float + Copy + PartialOrd + Debug> CoordinateType for T {}
+#[cfg(feature = "geo-types")]
+use geo_types::CoordFloat;
+#[cfg(not(feature = "geo-types"))]
+use num_traits::{Num, Float, NumCast};
+#[cfg(not(feature = "geo-types"))]
+pub trait CoordFloat: Float + Num + Copy + NumCast + PartialOrd + PartialOrd + Debug + Default {}
+#[cfg(not(feature = "geo-types"))]
+impl<T: Float + Num + Copy + NumCast + PartialOrd + PartialOrd + Debug + Default> CoordFloat for T {}
+
+
+pub trait CoordinateType: CoordFloat {}
+impl<T: CoordFloat> CoordinateType for T {}
 
 /// An error number returned from a PROJ call.
 pub(crate) struct Errno(pub libc::c_int);
