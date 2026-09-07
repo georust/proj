@@ -15,6 +15,8 @@
 - Add Proj::equivalent_to() method to assess whether two Proj instances are the same
 - Refactored options logic
 - Update MSRV to 1.88
+- Add an RAII wrapper for a `PJ_AREA` allocated by `proj_area_create`, which
+  prevents memory leaks on error paths (https://github.com/georust/proj/pull/262)
 
 # 0.31.0 - 2025-08-29
 
