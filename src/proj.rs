@@ -208,6 +208,25 @@ fn error_message(code: c_int) -> Result<String, str::Utf8Error> {
     }
 }
 
+/// RAII wrapper for a `PJ_AREA` allocated by `proj_area_create`.
+struct ProjArea(*mut PJ_AREA);
+
+impl ProjArea {
+    fn new() -> Self {
+        ProjArea(unsafe { proj_area_create() })
+    }
+
+    fn as_ptr(&self) -> *mut PJ_AREA {
+        self.0
+    }
+}
+
+impl Drop for ProjArea {
+    fn drop(&mut self) {
+        unsafe { proj_area_destroy(self.0) };
+    }
+}
+
 /// Set the bounding box of the area of use
 fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
     // if a bounding box has been passed, modify the proj area object
@@ -248,10 +267,10 @@ impl ProjContext {
         let ctx_ptr = self.as_ptr();
         let from_c = CString::new(from).map_err(ProjCreateError::ArgumentNulError)?;
         let to_c = CString::new(to).map_err(ProjCreateError::ArgumentNulError)?;
-        let proj_area = unsafe { proj_area_create() };
-        area_set_bbox(proj_area, area);
+        let proj_area = ProjArea::new();
+        area_set_bbox(proj_area.as_ptr(), area);
         let ptr = result_from_create(ctx_ptr, unsafe {
-            proj_create_crs_to_crs(ctx_ptr, from_c.as_ptr(), to_c.as_ptr(), proj_area)
+            proj_create_crs_to_crs(ctx_ptr, from_c.as_ptr(), to_c.as_ptr(), proj_area.as_ptr())
         })
         .map_err(|e| ProjCreateError::ProjError(e.message(ctx_ptr)))?;
         // Normalise input and output order to Lon, Lat / Easting Northing by inserting
@@ -279,8 +298,8 @@ impl ProjContext {
         options: Option<Vec<&str>>,
     ) -> Result<Proj, ProjCreateError> {
         let ctx_ptr = self.as_ptr();
-        let proj_area = unsafe { proj_area_create() };
-        area_set_bbox(proj_area, area);
+        let proj_area = ProjArea::new();
+        area_set_bbox(proj_area.as_ptr(), area);
 
         let mut proj_options = CStringArray::new();
         if let Some(options) = options {
@@ -296,7 +315,7 @@ impl ProjContext {
                 ctx_ptr,
                 source_crs.c_proj,
                 target_crs.c_proj,
-                proj_area,
+                proj_area.as_ptr(),
                 proj_options.as_ptr(),
             )
         })
@@ -575,7 +594,7 @@ impl Default for ProjBuilder {
 pub struct Proj {
     c_proj: *mut PJconsts,
     ctx: ProjContext,
-    area: Option<*mut PJ_AREA>,
+    area: Option<ProjArea>,
 }
 
 // `Proj` is intentionally neither `Send` nor `Sync` (enforced by its raw pointers and the `Rc`
@@ -799,10 +818,10 @@ impl Proj {
     /// This method contains unsafe code.
     // calling this on a non-CRS-to-CRS instance of Proj will be harmless, because self.area will be None
     pub fn area_set_bbox(&mut self, new_bbox: Area) {
-        if let Some(new_area) = self.area {
+        if let Some(new_area) = self.area.as_ref() {
             unsafe {
                 proj_area_set_bbox(
-                    new_area,
+                    new_area.as_ptr(),
                     new_bbox.west,
                     new_bbox.south,
                     new_bbox.east,
@@ -1519,9 +1538,7 @@ impl fmt::Debug for Proj {
 impl Drop for Proj {
     fn drop(&mut self) {
         unsafe {
-            if let Some(area) = self.area {
-                proj_area_destroy(area)
-            }
+            self.area.take();
             // Destroy the PJ before the context: PROJ objects reference their creating context,
             // so it must outlive them. `self.ctx` (a `ProjContext`) is a field, so it is dropped
             // after this explicit body runs, which destroys the context in the right order.
