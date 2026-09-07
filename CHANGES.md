@@ -18,6 +18,8 @@
   ~300us to ~1us per object (https://github.com/georust/proj/issues/256).
 - Refactored options logic
 - Update MSRV to 1.88
+- Add an RAII wrapper for a `PJ_AREA` allocated by `proj_area_create`, which
+  prevents memory leaks on error paths (https://github.com/georust/proj/pull/262)
 
 # 0.31.0 - 2025-08-29
 
