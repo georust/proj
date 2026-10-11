@@ -39,5 +39,17 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 #[cfg(all(feature = "nobuild", not(feature = "buildtime_bindgen")))]
 include!("bindings_docs-rs.rs");
 
-#[cfg(all(not(feature = "nobuild"), not(feature = "buildtime_bindgen")))]
+#[cfg(all(
+    not(feature = "nobuild"),
+    not(feature = "buildtime_bindgen"),
+    not(target_arch = "wasm32")
+))]
 include!("bundled_bindings.rs");
+
+// The struct layout checks in the bindings depend on the pointer size.
+#[cfg(all(
+    not(feature = "nobuild"),
+    not(feature = "buildtime_bindgen"),
+    target_arch = "wasm32"
+))]
+include!("bundled_bindings_wasm32.rs");
