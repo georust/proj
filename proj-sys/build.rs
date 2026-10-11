@@ -156,13 +156,26 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
                 "the network and tiff features do not support the emscripten target".into(),
             );
         }
-        // PROJ uses C++ exceptions. Rust's emscripten target uses wasm
-        // exception handling, and all objects must use the same model.
+        // PROJ uses C++ exceptions, and all objects must use the same
+        // exception model as the Rust code. From Rust 1.93, the emscripten
+        // target uses wasm exceptions. Before 1.93, it uses JS exceptions.
         // The cc defaults add -fno-exceptions for all wasm targets, and the
         // emscripten toolchain file supplies the other flags.
+        let exceptions = if rustc_minor_version()? >= 93 {
+            "-fwasm-exceptions"
+        } else {
+            "-fexceptions"
+        };
         config.no_default_flags(true);
-        config.cflag("-fwasm-exceptions");
-        config.cxxflag("-fwasm-exceptions");
+        config.cflag(exceptions);
+        config.cxxflag(exceptions);
+        // emcmake adds the toolchain file, but cmake-rs cannot see it and
+        // also sets CMAKE_<LANG>_COMPILER. The toolchain file sets a different
+        // compiler path, and the next configure then fails. With a defined
+        // toolchain file, cmake-rs does not set the compilers.
+        if emscripten_toolchain_file_from_env().is_none() {
+            config.define("CMAKE_TOOLCHAIN_FILE", emscripten_toolchain_file()?);
+        }
         // There is no file system for proj.db at runtime.
         config.define("EMBED_RESOURCE_FILES", "ON");
         config.define("USE_ONLY_EMBEDDED_RESOURCE_FILES", "ON");
@@ -231,4 +244,49 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
     }
 
     Ok(proj.join("include"))
+}
+
+// Returns the minor version of the rustc that compiles the target code.
+#[cfg(not(feature = "nobuild"))]
+fn rustc_minor_version() -> Result<u32, Box<dyn std::error::Error>> {
+    let rustc = env::var("RUSTC")?;
+    let output = std::process::Command::new(rustc)
+        .arg("--version")
+        .output()?;
+    let version = String::from_utf8(output.stdout)?;
+    // The output has the form "rustc 1.93.0 (... )".
+    version
+        .split_whitespace()
+        .nth(1)
+        .and_then(|v| v.split('.').nth(1))
+        .and_then(|minor| minor.parse().ok())
+        .ok_or_else(|| format!("cannot parse the rustc version: {version}").into())
+}
+
+// Returns a toolchain file from the environment variables that cmake-rs reads.
+#[cfg(not(feature = "nobuild"))]
+fn emscripten_toolchain_file_from_env() -> Option<String> {
+    let target = env::var("TARGET").ok()?;
+    [
+        format!("CMAKE_TOOLCHAIN_FILE_{target}"),
+        format!("CMAKE_TOOLCHAIN_FILE_{}", target.replace('-', "_")),
+        "TARGET_CMAKE_TOOLCHAIN_FILE".to_string(),
+        "CMAKE_TOOLCHAIN_FILE".to_string(),
+    ]
+    .iter()
+    .find_map(|var| env::var(var).ok())
+}
+
+// Returns the CMake toolchain file of the emscripten installation that em-config finds.
+#[cfg(not(feature = "nobuild"))]
+fn emscripten_toolchain_file() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let output = std::process::Command::new("em-config")
+        .arg("EMSCRIPTEN_ROOT")
+        .output()
+        .map_err(|err| format!("cannot run em-config: {err}"))?;
+    if !output.status.success() {
+        return Err("em-config cannot find the emscripten root".into());
+    }
+    let root = String::from_utf8(output.stdout)?;
+    Ok(PathBuf::from(root.trim()).join("cmake/Modules/Platform/Emscripten.cmake"))
 }
