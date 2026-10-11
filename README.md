@@ -158,7 +158,9 @@ tests it with Emscripten 6.0.12. `wasm32-unknown-unknown` is not supported.
 2. Make sure that the `sqlite3` executable is on your `PATH`. The PROJ build
    uses it to generate `proj.db`.
 3. Enable the `bundled_proj_sqlite` feature. The `network` feature is not
-   available on this target.
+   available on this target. PROJ 9.8 adds network support for Emscripten.
+   When `proj` updates to PROJ 9.8, we will examine whether this target can
+   support the `network` feature.
 
    ```toml
    proj = { version = "...", features = ["bundled_proj_sqlite"] }
