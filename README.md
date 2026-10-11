@@ -120,6 +120,34 @@ There are two options for creating a transformation:
 By default, the crate requires `libproj` 9.6.x to be present on your system. While it may be
 backwards-compatible with older PROJ 6 versions, this is neither tested nor supported. If a suitable library can't be found, `proj` will attempt to build `libproj` from source.
 
+### Building on Windows
+
+CI tests three configurations on Windows. Use one of them.
+
+**MSVC, PROJ built from source.** This needs CMake (included with Visual Studio)
+and the `sqlite3` executable on your `PATH`; the PROJ build uses it to generate
+`proj.db`. Enable the `bundled_proj_sqlite` feature:
+
+```toml
+proj = { version = "...", features = ["bundled_proj_sqlite"] }
+```
+
+`proj.db` is embedded in the library, so you do not have to distribute it with
+your executable.
+
+**MSVC, PROJ from vcpkg.**
+
+1. Install PROJ: `vcpkg install proj:x64-windows`.
+2. Install a `pkg-config` executable, for example `choco install pkgconfiglite`.
+3. Set `PKG_CONFIG_PATH` to `<vcpkg root>\installed\x64-windows\lib\pkgconfig`.
+4. At run time, add `<vcpkg root>\installed\x64-windows\bin` to `PATH`, and
+   set `PROJ_DATA` to `<vcpkg root>\installed\x64-windows\share\proj` if
+   PROJ cannot find `proj.db`.
+
+**MSYS2 (UCRT64).** Install the `mingw-w64-ucrt-x86_64-proj`, `-pkgconf`,
+`-rust` and `-toolchain` packages, then build from the UCRT64 shell. To build
+PROJ from source, also install `-cmake` and `-sqlite3`, and enable `bundled_proj`.
+
 ## Feature Flags
 
 - `geo-types`: include [trait impls for
@@ -130,6 +158,9 @@ backwards-compatible with older PROJ 6 versions, this is neither tested nor supp
 - `bundled_proj`: builds `libproj` from source bundled in the `proj-sys` crate.
   Note that this feature requires Sqlite3 and `libtiff` to be present on your
   system.
+- `bundled_proj_sqlite`: as `bundled_proj`, and also builds SQLite from source.
+  Use this feature on Windows (MSVC). The `sqlite3` executable must still be on
+  your `PATH` at build time.
 - `network`: exposes APIs which, when enabled, can fetch grid data from the internet to improve
   projection accuracy. See [`enable_network`](https://docs.rs/proj/latest/proj/struct.ProjBuilder.html#method.enable_network)
   for details.
