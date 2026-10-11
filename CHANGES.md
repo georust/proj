@@ -5,6 +5,9 @@
   (https://github.com/georust/proj/pull/245)
 - Document how to build on Windows with MSVC and MSYS2, and test these builds
   in CI (https://github.com/georust/proj/issues/161)
+- Support the `wasm32-unknown-emscripten` target with the `bundled_proj_sqlite`
+  feature, and test it in CI with Node
+  (https://github.com/georust/proj/issues/115)
 - Add fixes for buffer overflow and incorrect char replacement
 - Persist network client between requests, which should speed up grid
   operations that require multiple network requests.

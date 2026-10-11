@@ -148,6 +148,36 @@ your executable.
 `-rust` and `-toolchain` packages, then build from the UCRT64 shell. To build
 PROJ from source, also install `-cmake` and `-sqlite3`, and enable `bundled_proj`.
 
+### Building for WebAssembly (Emscripten)
+
+The `wasm32-unknown-emscripten` target builds PROJ and SQLite from source. CI
+tests it with Emscripten 6.0.12. `wasm32-unknown-unknown` is not supported.
+
+1. Install [Emscripten](https://emscripten.org/docs/getting_started/downloads.html),
+   and make sure that `emcc`, `emcmake` and `em-config` are on your `PATH`.
+2. Make sure that the `sqlite3` executable is on your `PATH`. The PROJ build
+   uses it to generate `proj.db`.
+3. Enable the `bundled_proj_sqlite` feature. The `network` feature is not
+   available on this target.
+
+   ```toml
+   proj = { version = "...", features = ["bundled_proj_sqlite"] }
+   ```
+
+4. Tell `emcc` to link as C++. Add this to `.cargo/config.toml` in your project:
+
+   ```toml
+   [target.wasm32-unknown-emscripten]
+   rustflags = ["-C", "link-arg=-sDEFAULT_TO_CXX"]
+   ```
+
+   If you set `RUSTFLAGS`, Cargo ignores `rustflags` in `.cargo/config.toml`.
+   Add the flag to `RUSTFLAGS` instead.
+
+`proj.db` is embedded in the library, and PROJ does not read data files at run
+time. The output is an Emscripten module. `wasm-bindgen` and `wasm-pack` do not
+support this target.
+
 ## Feature Flags
 
 - `geo-types`: include [trait impls for
