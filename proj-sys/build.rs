@@ -151,6 +151,12 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
         }
         // No libtiff exists for this target, and the network feature
         // uses sockets.
+        // TODO: PROJ 9.8 adds the ENABLE_EMSCRIPTEN_FETCH option, which
+        // downloads grids with Emscripten fetch. When the bundled PROJ is 9.8
+        // or later, examine whether this target can support the network
+        // feature. It also needs libtiff built for wasm32. wasm-proj
+        // (https://github.com/jjimenezshaw/wasm-proj) also uses pthreads, and
+        // calls PROJ from a Web Worker.
         if cfg!(feature = "tiff") {
             return Err(
                 "the network and tiff features do not support the emscripten target".into(),
