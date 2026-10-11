@@ -153,6 +153,10 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
     } else {
         println!("cargo:rustc-link-lib=static=proj");
     }
+    // link against shell32 on windows/msys2.
+    if cfg!(all(target_os = "windows", target_env = "gnu")) {
+        println!("cargo:rustc-link-lib=dylib=shell32");
+    }
     println!(
         "cargo:rustc-link-search=native={}",
         proj.join("lib").display()
