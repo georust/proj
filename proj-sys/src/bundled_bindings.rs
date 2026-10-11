@@ -2,7 +2,7 @@
 
 pub const PROJ_VERSION_MAJOR: u32 = 9;
 pub const PROJ_VERSION_MINOR: u32 = 6;
-pub const PROJ_VERSION_PATCH: u32 = 0;
+pub const PROJ_VERSION_PATCH: u32 = 2;
 pub const PJ_DEFAULT_CTX: u32 = 0;
 pub const PROJ_ERR_INVALID_OP: u32 = 1024;
 pub const PROJ_ERR_INVALID_OP_WRONG_SYNTAX: u32 = 1025;
@@ -1889,7 +1889,7 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn proj_datum_ensemble_get_accuracy(ctx: *mut PJ_CONTEXT, datum_ensemble: *const PJ)
-        -> f64;
+    -> f64;
 }
 unsafe extern "C" {
     pub fn proj_datum_ensemble_get_member(
