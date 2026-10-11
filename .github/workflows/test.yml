@@ -96,7 +96,7 @@ jobs:
       image: ghcr.io/georust/proj-ci:proj-${{ needs.compute.outputs.LIBPROJ_VERSION }}-rust-${{ matrix.rust_version }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - if: matrix.rust_version  == env.RUST_LATEST
         run: |
           cargo build ${{ matrix.features }}
@@ -129,7 +129,7 @@ jobs:
         features: ["", "--features network"]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - run: cargo build ${{ matrix.features }}
       - run: cargo test ${{ matrix.features }}
 
@@ -180,7 +180,7 @@ jobs:
             features: ""
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - if: matrix.rust_version  == env.RUST_LATEST
         run: |
           cargo build ${{ matrix.features }}
@@ -206,7 +206,7 @@ jobs:
         working-directory: proj-sys
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       # At some point around Feb. 2023, the GH macos CI runner no longer had
       # pkg-config installed by default, so we need to install it manually.
       #
@@ -332,6 +332,6 @@ jobs:
       ASAN_OPTIONS: "detect_leaks=0"
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo +nightly test --features bundled_proj --target x86_64-unknown-linux-gnu
