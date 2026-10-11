@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .atleast_version(MINIMUM_PROJ_VERSION)
         .probe("proj")
         .map(|pk| {
-            eprintln!("found acceptable libproj already installed at: {:?}", pk.link_paths[0]);
+            eprintln!("found acceptable libproj already installed at: {:?}", pk.link_paths);
             if cfg!(feature = "network") {
                 // Generally, system proj installations have been built with tiff support
                 // allowing for network grid interaction. If this proves to be untrue
@@ -33,11 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
 
-            // Tell cargo to tell rustc to link the system proj
-            // shared library.
-            println!("cargo:rustc-link-search=native={:?}", pk.link_paths[0]);
-            println!("cargo:rustc-link-lib=proj");
-
+            // pkg-config prints the link directives for the system libproj.
             pk.include_paths[0].clone()
         })
         .or_else(|err| {
@@ -194,11 +190,8 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
             .probe("libtiff-4")
         {
             Ok(pk) => {
-                eprintln!(
-                    "found acceptable libtiff installed at: {:?}",
-                    pk.link_paths[0]
-                );
-                println!("cargo:rustc-link-search=native={:?}", pk.link_paths[0]);
+                // pkg-config prints the link search path for libtiff.
+                eprintln!("found acceptable libtiff installed at: {:?}", pk.link_paths);
             }
             Err(err) => {
                 // pkg-config might not even be installed. Let's try to stumble forward
