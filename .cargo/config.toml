@@ -1,0 +1,6 @@
+# PROJ is C++. emcc links the C++ runtime and its JS support code only when it
+# links as C++.
+[target.wasm32-unknown-emscripten]
+rustflags = ["-C", "link-arg=-sDEFAULT_TO_CXX"]
+rustdocflags = ["-C", "link-arg=-sDEFAULT_TO_CXX"]
+runner = "node"
