@@ -149,6 +149,13 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
         if env::var("DEP_SQLITE3_LIB_DIR").is_err() {
             return Err("the emscripten target requires the bundled_proj_sqlite feature".into());
         }
+        // No libtiff exists for this target, and the network feature
+        // uses sockets.
+        if cfg!(feature = "tiff") {
+            return Err(
+                "the network and tiff features do not support the emscripten target".into(),
+            );
+        }
         // PROJ uses C++ exceptions. Rust's emscripten target uses wasm
         // exception handling, and all objects must use the same model.
         // The cc defaults add -fno-exceptions for all wasm targets, and the
