@@ -23,6 +23,10 @@ libproj from source bundled in the crate.
   `libproj` **without** its native network functionality; you will have to
   implement your own set of callbacks if you wish to make use of them (see the
 [`proj`](https://crates.io/crates/proj) crate for an example).
+- `bundled_proj_sqlite` - as `bundled_proj`, and also builds SQLite from
+  source with `libsqlite3-sys`. Use this feature on Windows (MSVC), where SQLite
+  is not usually installed. The `sqlite3` executable must still be on your
+  `PATH`, because the PROJ build uses it to generate `proj.db`.
 - `bundled_proj_tiff` - If the `bundled_proj` feature is enabled, adding the
   `bundled_proj_tiff` feature will build PROJ with TIFF support. Note that
   libtiff must be present on your system if you wish to use this feature.
