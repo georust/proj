@@ -36,8 +36,11 @@ network = ["ureq", "http", "proj-sys/network"]
 [dev-dependencies]
 # approx version must match the one used in geo-types
 approx = "0.5"
-criterion = "0.7"
 geo-types = { version = "0.7.16", features = ["approx"] }
+
+# Rayon, which criterion uses, does not build for wasm targets.
+[target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
+criterion = "0.7"
 
 [[bench]]
 name = "proj_creation"
