@@ -9,6 +9,7 @@
 - Give CMake the correct SQLite library file name for MSVC
 - Do not emit quoted link-search paths for a system PROJ found through
   pkg-config
+- Allow `libsqlite3-sys` up to 0.38
 - Update MSRV to 1.88
 
 # 0.27.0 - 2025-07-11
