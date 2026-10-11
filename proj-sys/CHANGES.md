@@ -9,6 +9,11 @@
 - Give CMake the correct SQLite library file name for MSVC
 - Do not emit quoted link-search paths for a system PROJ found through
   pkg-config
+- Build PROJ for the `wasm32-unknown-emscripten` target. The C++ exception
+  model follows the rustc version, and `proj.db` is embedded in the library
+  (https://github.com/georust/proj/issues/115)
+- Add bindings with 32-bit struct layout checks for wasm32 targets
+- Regenerate the bundled bindings from the PROJ 9.6.2 headers
 
 # 0.27.0 - 2025-07-11
 

@@ -26,7 +26,10 @@ libproj from source bundled in the crate.
 - `bundled_proj_sqlite` - as `bundled_proj`, and also builds SQLite from
   source with `libsqlite3-sys`. Use this feature on Windows (MSVC), where SQLite
   is not usually installed. The `sqlite3` executable must still be on your
-  `PATH`, because the PROJ build uses it to generate `proj.db`.
+  `PATH`, because the PROJ build uses it to generate `proj.db`. The
+  `wasm32-unknown-emscripten` target requires this feature. See the
+  [`proj`](https://github.com/georust/proj#building-for-webassembly-emscripten)
+  README for the other requirements of that target.
 - `bundled_proj_tiff` - If the `bundled_proj` feature is enabled, adding the
   `bundled_proj_tiff` feature will build PROJ with TIFF support. Note that
   libtiff must be present on your system if you wish to use this feature.
