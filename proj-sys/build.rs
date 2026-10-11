@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map(|pk| {
                 eprintln!(
                     "found acceptable libproj already installed at: {:?}",
-                    pk.link_paths[0]
+                    pk.link_paths
                 );
                 if cfg!(feature = "network") {
                     // Generally, system proj installations have been built with tiff support
@@ -40,11 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     );
                 }
 
-                // Tell cargo to tell rustc to link the system proj
-                // shared library.
-                println!("cargo:rustc-link-search=native={:?}", pk.link_paths[0]);
-                println!("cargo:rustc-link-lib=proj");
-
+                // pkg-config prints the link directives for the system libproj.
                 pk.include_paths[0].clone()
             })
             .or_else(|err| {
@@ -52,12 +48,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 build_from_source()
             })?
     };
-
-    // Link Windows system libs, which are used in cargo test
-    if cfg!(target_env = "msvc") {
-        println!("cargo:rustc-link-lib=ole32");
-        println!("cargo:rustc-link-lib=shell32");
-    }
 
     #[cfg(feature = "buildtime_bindgen")]
     generate_bindings(include_path)?;
@@ -104,6 +94,11 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
         panic!("for testing purposes: package was building from source but should not have been");
     }
 
+    // A build script is compiled for the host, so cfg! gives the host
+    // configuration. Cargo sets these variables for the target.
+    let target_os = env::var("CARGO_CFG_TARGET_OS")?;
+    let target_env = env::var("CARGO_CFG_TARGET_ENV")?;
+
     let path = format!("PROJSRC/proj-{MINIMUM_PROJ_VERSION}.tar.gz");
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     let tar_gz = File::open(path)?;
@@ -122,6 +117,7 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
     config.define("BUILD_PROJINFO", "OFF");
     config.define("BUILD_PROJSYNC", "OFF");
     config.define("ENABLE_CURL", "OFF");
+    config.define("NLOHMANN_JSON_ORIGIN", "internal");
 
     // we check here whether or not these variables are set by cargo
     // if they are set, `libsqlite3-sys` was built with the bundled feature
@@ -134,7 +130,13 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
         config.define("SQLITE3_INCLUDE_DIR", sqlite_include);
     }
     if let Ok(sqlite_lib_dir) = std::env::var("DEP_SQLITE3_LIB_DIR") {
-        config.define("SQLITE3_LIBRARY", format!("{sqlite_lib_dir}/libsqlite3.a",));
+        // The cc crate gives the static library an MSVC or a Unix-style name.
+        let sqlite_lib = if target_env == "msvc" {
+            "sqlite3.lib"
+        } else {
+            "libsqlite3.a"
+        };
+        config.define("SQLITE3_LIBRARY", format!("{sqlite_lib_dir}/{sqlite_lib}"));
     }
 
     if cfg!(feature = "tiff") {
@@ -145,7 +147,7 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
         config.define("ENABLE_TIFF", "OFF");
     }
 
-    if cfg!(target_env = "msvc") {
+    if target_env == "msvc" {
         // rust links the release MVSC runtime
         // also for debug builds. If we let
         // cmake choose debug/release builds
@@ -164,9 +166,12 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
     } else {
         println!("cargo:rustc-link-lib=static=proj");
     }
-    // link against shell32 on windows/msys2.
-    if cfg!(all(target_os = "windows", target_env = "gnu")) {
+    // The static libproj does not carry its link dependencies. On Windows,
+    // filemanager.cpp uses shell32 (SHGetFolderPathW, SHGetKnownFolderPath)
+    // and ole32 (CoTaskMemFree).
+    if target_os == "windows" {
         println!("cargo:rustc-link-lib=dylib=shell32");
+        println!("cargo:rustc-link-lib=dylib=ole32");
     }
     println!(
         "cargo:rustc-link-search=native={}",
@@ -191,11 +196,8 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
             .probe("libtiff-4")
         {
             Ok(pk) => {
-                eprintln!(
-                    "found acceptable libtiff installed at: {:?}",
-                    pk.link_paths[0]
-                );
-                println!("cargo:rustc-link-search=native={:?}", pk.link_paths[0]);
+                // pkg-config prints the link search path for libtiff.
+                eprintln!("found acceptable libtiff installed at: {:?}", pk.link_paths);
             }
             Err(err) => {
                 // pkg-config might not even be installed. Let's try to stumble forward
