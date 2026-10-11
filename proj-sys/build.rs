@@ -14,6 +14,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let include_path = if cfg!(feature = "bundled_proj") {
         eprintln!("feature flags specified source build");
         build_from_source()?
+    } else if env::var("CARGO_CFG_TARGET_OS")? == "emscripten" {
+        eprintln!("no system libproj exists for emscripten: building from source");
+        build_from_source()?
     } else {
         pkg_config::Config::new()
         .atleast_version(MINIMUM_PROJ_VERSION)
@@ -139,6 +142,23 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
     } else {
         eprintln!("disabling tiff support");
         config.define("ENABLE_TIFF", "OFF");
+    }
+
+    if target_os == "emscripten" {
+        // The libsqlite3-sys build supplies the only wasm32 SQLite.
+        if env::var("DEP_SQLITE3_LIB_DIR").is_err() {
+            return Err("the emscripten target requires the bundled_proj_sqlite feature".into());
+        }
+        // PROJ uses C++ exceptions. Rust's emscripten target uses wasm
+        // exception handling, and all objects must use the same model.
+        // The cc defaults add -fno-exceptions for all wasm targets, and the
+        // emscripten toolchain file supplies the other flags.
+        config.no_default_flags(true);
+        config.cflag("-fwasm-exceptions");
+        config.cxxflag("-fwasm-exceptions");
+        // There is no file system for proj.db at runtime.
+        config.define("EMBED_RESOURCE_FILES", "ON");
+        config.define("USE_ONLY_EMBEDDED_RESOURCE_FILES", "ON");
     }
 
     if target_env == "msvc" {
