@@ -1,5 +1,14 @@
 # Unreleased
 
+- Add the `bundled_proj_sqlite` feature, which also builds SQLite from source
+  (https://github.com/georust/proj/pull/245)
+- Fix linking a bundled PROJ on Windows: link `shell32` and `ole32`
+  (https://github.com/georust/proj/pull/252)
+- Use the target configuration, not the host configuration, in the build
+  script. This fixes cross-compilation to Windows.
+- Give CMake the correct SQLite library file name for MSVC
+- Do not emit quoted link-search paths for a system PROJ found through
+  pkg-config
 - Update MSRV to 1.88
 
 # 0.27.0 - 2025-07-11
