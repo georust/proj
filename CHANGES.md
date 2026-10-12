@@ -9,6 +9,7 @@
   transformation objects (https://github.com/georust/proj/issues/256).
 - Add Proj::equivalent_to() method to assess whether two Proj instances are the same
 - Refactored options logic
+- RAII wrapper for a `PJ_AREA` allocated by `proj_area_create`, aiming to eliminate the memory leaks happening on erro path.
 
 # 0.31.0 - 2025-08-29
 
