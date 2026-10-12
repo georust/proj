@@ -8,6 +8,9 @@
   the lifetime of the process, substantially speeding up repeated creation of
   transformation objects (https://github.com/georust/proj/issues/256).
 - Add Proj::equivalent_to() method to assess whether two Proj instances are the same
+- `Proj::new` and `Proj::new_known_crs` now reuse one PROJ context per thread
+  instead of creating a new one per call, reducing construction time from
+  ~300us to ~1us per object (https://github.com/georust/proj/issues/256).
 - Refactored options logic
 
 # 0.31.0 - 2025-08-29
