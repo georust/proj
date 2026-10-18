@@ -15,7 +15,7 @@ edition = "2024"
 rust-version = "1.88"
 
 [dependencies]
-proj-sys = { version = "0.27.0", path = "proj-sys" }
+proj-sys = { version = "0.28.0", path = "proj-sys" }
 geo-types = { version = "0.7.16", optional = true }
 libc = "0.2.172"
 num-traits = "0.2.14"
