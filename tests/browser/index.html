@@ -1,0 +1,10 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>PROJ fetch test</title>
+<pre id="out"></pre>
+<script>
+  const outEl = document.getElementById("out");
+  const pageLog = (s) => { outEl.textContent += s + "\n"; console.log(s); };
+  var Module = { arguments: ["--nocapture", "--test-threads=1", "fetch_json_grid"], print: pageLog, printErr: pageLog };
+</script>
+<script src="fetch_exp-9d0d43f17e70b78e.js"></script>

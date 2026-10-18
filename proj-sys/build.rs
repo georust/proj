@@ -185,6 +185,9 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
         config.no_default_flags(true);
         config.cflag(exceptions);
         config.cxxflag(exceptions);
+        config.cflag("-pthread");
+        config.cxxflag("-pthread");
+        config.define("ENABLE_EMSCRIPTEN_FETCH", "ON");
         // emcmake adds the toolchain file, but cmake-rs cannot see it and
         // also sets CMAKE_<LANG>_COMPILER. The toolchain file sets a different
         // compiler path, and the next configure then fails. With a defined
@@ -194,7 +197,7 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
         }
         // There is no file system for proj.db at runtime.
         config.define("EMBED_RESOURCE_FILES", "ON");
-        config.define("USE_ONLY_EMBEDDED_RESOURCE_FILES", "ON");
+        config.define("USE_ONLY_EMBEDDED_RESOURCE_FILES", "OFF");
     }
 
     if target_env == "msvc" {
