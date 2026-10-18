@@ -1,3 +1,6 @@
+// The docs.rs build (nobuild) does not use the imports and the version.
+#![cfg_attr(feature = "nobuild", allow(unused_imports, dead_code))]
+
 use flate2::read::GzDecoder;
 use std::env;
 use std::fs::File;
@@ -88,6 +91,7 @@ fn generate_bindings(include_path: std::path::PathBuf) -> Result<(), Box<dyn std
 }
 
 // returns the path of "include" for the built proj
+#[cfg(not(feature = "nobuild"))]
 fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
     eprintln!("building libproj from source");
     println!("cargo:rustc-cfg=bundled_build");
