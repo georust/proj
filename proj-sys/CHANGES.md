@@ -11,6 +11,8 @@
   pkg-config
 - Allow any 0.x version of `libsqlite3-sys` from 0.28
   (https://github.com/georust/proj/pull/261)
+- Update to PROJ 9.9.0, and regenerate the bundled bindings from its headers.
+  Building PROJ from source requires CMake 3.22.1 or later.
 - Update MSRV to 1.88
 
 # 0.27.0 - 2025-07-11
