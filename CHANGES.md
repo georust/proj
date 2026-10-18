@@ -1,5 +1,8 @@
 # Unreleased
 
+- Update to proj-sys 0.28.0:
+  - Update to PROJ 9.9.0. Building PROJ from source requires CMake 3.22.1 or
+    later.
 - Add the `bundled_proj_sqlite` feature, which builds PROJ and SQLite from
   source. Use it to build on Windows with MSVC.
   (https://github.com/georust/proj/pull/245)
