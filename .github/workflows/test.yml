@@ -11,9 +11,9 @@ on:
   schedule: [cron: "45 6 * * *"]
 
 env:
-  LIBPROJ_VERSION: 9.6.2
-  RUST_MSRV: "1.85"
-  RUST_LATEST: "1.88"
+  LIBPROJ_VERSION: 9.9.0
+  RUST_MSRV: "1.88"
+  RUST_LATEST: "1.99"
 
 jobs:
   # work around GHA env strictness
@@ -95,15 +95,6 @@ jobs:
         run: |
           cargo build ${{ matrix.features }}
           cargo test ${{ matrix.features }}
-      # install-action installs jq with apt if it is missing. The Debian
-      # bullseye mirrors no longer have the jq package that the image's
-      # package index names, so install a static jq binary.
-      - name: Install jq
-        if: matrix.rust_version == env.RUST_MSRV
-        run: |
-          curl -sSfL -o /usr/local/bin/jq https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-linux-amd64
-          echo "b1c22172dd303f3be49e935aa56aa48a8b7a46e0bc838b4997d3bb451495870f  /usr/local/bin/jq" | sha256sum -c -
-          chmod +x /usr/local/bin/jq
       - uses: taiki-e/install-action@cargo-hack
         if: matrix.rust_version == env.RUST_MSRV
       - uses: taiki-e/install-action@cargo-minimal-versions

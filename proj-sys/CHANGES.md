@@ -1,3 +1,7 @@
+# Unreleased
+
+- Update MSRV to 1.88
+
 # 0.27.0 - 2025-07-11
 
 - Update to PROJ 9.6.2

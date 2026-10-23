@@ -12,7 +12,7 @@ categories = ["science::geo", "api-bindings"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 
 [dependencies]
 proj-sys = { version = "0.27.0", path = "proj-sys" }
