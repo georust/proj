@@ -1217,8 +1217,6 @@ impl Proj {
         C: Coord<F>,
         F: CoordinateType,
     {
-        let err;
-        let trans;
         let inv = if inverse {
             PJ_DIRECTION_PJ_INV
         } else {
@@ -1244,18 +1242,22 @@ impl Proj {
         // explicitly create the raw pointer to ensure it lives long enough
         let mp = pj.as_mut_ptr();
         // Transformation operations are slightly different
-        match op {
+        let (trans, err) = match op {
             Transformation::Conversion => unsafe {
                 proj_errno_reset(self.c_proj);
-                trans = proj_trans_array(self.c_proj, PJ_DIRECTION_PJ_FWD, pj.len(), mp);
-                err = proj_errno(self.c_proj);
+                (
+                    proj_trans_array(self.c_proj, PJ_DIRECTION_PJ_FWD, pj.len(), mp),
+                    proj_errno(self.c_proj),
+                )
             },
             Transformation::Projection => unsafe {
                 proj_errno_reset(self.c_proj);
-                trans = proj_trans_array(self.c_proj, inv, pj.len(), mp);
-                err = proj_errno(self.c_proj);
+                (
+                    proj_trans_array(self.c_proj, inv, pj.len(), mp),
+                    proj_errno(self.c_proj),
+                )
             },
-        }
+        };
         if err == 0 && trans == 0 {
             // re-fill original slice with Coords
             // feels a bit clunky, but we're guaranteed that pj and points have the same length
@@ -1379,14 +1381,14 @@ impl Proj {
     /// Checks whether two proj instances are equivalent.
     /// The comparison_criterion determines how to compare the Proj instances.
     ///
-    ///  - ComparisonCriterion::Strict
-    ///      All properties are identical
-    ///  - ComparisonCriterion::Equivalent
-    ///      The objects are equivalent for the purpose of coordinate operations.
-    ///      They can differ by the name of their objects, identifiers, unit or other metadata.
-    ///  - ComparisonCriterion::EquivalentExceptAxisOrder
-    ///      Same as Equivalent, relaxed with an exception that the axis order is ignored.
-    ///      Only to be used with DerivedCRS/ProjectedCRS/GeographicCRS
+    /// - ComparisonCriterion::Strict
+    ///   All properties are identical
+    /// - ComparisonCriterion::Equivalent
+    ///   The objects are equivalent for the purpose of coordinate operations.
+    ///   They can differ by the name of their objects, identifiers, unit or other metadata.
+    /// - ComparisonCriterion::EquivalentExceptAxisOrder
+    ///   Same as Equivalent, relaxed with an exception that the axis order is ignored.
+    ///   Only to be used with DerivedCRS/ProjectedCRS/GeographicCRS
     ///
     pub fn equivalent_to(&self, other: &Proj, comparison_criterion: ComparisonCriterion) -> bool {
         let proj_comparison_criterion = match comparison_criterion {

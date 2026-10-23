@@ -16,34 +16,41 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         build_from_source()?
     } else {
         pkg_config::Config::new()
-        .atleast_version(MINIMUM_PROJ_VERSION)
-        .probe("proj")
-        .map(|pk| {
-            eprintln!("found acceptable libproj already installed at: {:?}", pk.link_paths[0]);
-            if cfg!(feature = "network") {
-                // Generally, system proj installations have been built with tiff support
-                // allowing for network grid interaction. If this proves to be untrue
-                // could we try to determine some kind of runtime check and fall back
-                // to building from source?
-                eprintln!("assuming existing system libproj installation has network (tiff) support");
-            }
-            if let Ok(val) = &env::var("_PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC") {
-                if val != "0" {
-                    panic!("for testing purposes: existing package was found, but should not have been");
+            .atleast_version(MINIMUM_PROJ_VERSION)
+            .probe("proj")
+            .map(|pk| {
+                eprintln!(
+                    "found acceptable libproj already installed at: {:?}",
+                    pk.link_paths[0]
+                );
+                if cfg!(feature = "network") {
+                    // Generally, system proj installations have been built with tiff support
+                    // allowing for network grid interaction. If this proves to be untrue
+                    // could we try to determine some kind of runtime check and fall back
+                    // to building from source?
+                    eprintln!(
+                        "assuming existing system libproj installation has network (tiff) support"
+                    );
                 }
-            }
+                if let Ok(val) = &env::var("_PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC")
+                    && val != "0"
+                {
+                    panic!(
+                        "for testing purposes: existing package was found, but should not have been"
+                    );
+                }
 
-            // Tell cargo to tell rustc to link the system proj
-            // shared library.
-            println!("cargo:rustc-link-search=native={:?}", pk.link_paths[0]);
-            println!("cargo:rustc-link-lib=proj");
+                // Tell cargo to tell rustc to link the system proj
+                // shared library.
+                println!("cargo:rustc-link-search=native={:?}", pk.link_paths[0]);
+                println!("cargo:rustc-link-lib=proj");
 
-            pk.include_paths[0].clone()
-        })
-        .or_else(|err| {
-            eprintln!("pkg-config unable to find existing libproj installation: {err}");
-            build_from_source()
-        })?
+                pk.include_paths[0].clone()
+            })
+            .or_else(|err| {
+                eprintln!("pkg-config unable to find existing libproj installation: {err}");
+                build_from_source()
+            })?
     };
 
     #[cfg(feature = "buildtime_bindgen")]
@@ -85,12 +92,10 @@ fn generate_bindings(include_path: std::path::PathBuf) -> Result<(), Box<dyn std
 fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
     eprintln!("building libproj from source");
     println!("cargo:rustc-cfg=bundled_build");
-    if let Ok(val) = &env::var("_PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC") {
-        if val == "0" {
-            panic!(
-                "for testing purposes: package was building from source but should not have been"
-            );
-        }
+    if let Ok(val) = &env::var("_PROJ_SYS_TEST_EXPECT_BUILD_FROM_SRC")
+        && val == "0"
+    {
+        panic!("for testing purposes: package was building from source but should not have been");
     }
 
     let path = format!("PROJSRC/proj-{MINIMUM_PROJ_VERSION}.tar.gz");
@@ -161,11 +166,11 @@ fn build_from_source() -> Result<std::path::PathBuf, Box<dyn std::error::Error>>
     // This is producing a warning - this directory doesn't exist (on aarch64 anyway)
     println!(
         "cargo:rustc-link-search={}",
-        &out_path.join("lib64").display()
+        out_path.join("lib64").display()
     );
     println!(
         "cargo:rustc-link-search={}",
-        &out_path.join("build/lib").display()
+        out_path.join("build/lib").display()
     );
 
     if cfg!(feature = "tiff") {

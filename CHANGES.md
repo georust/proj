@@ -9,6 +9,7 @@
   transformation objects (https://github.com/georust/proj/issues/256).
 - Add Proj::equivalent_to() method to assess whether two Proj instances are the same
 - Refactored options logic
+- Update MSRV to 1.88
 
 # 0.31.0 - 2025-08-29
 
