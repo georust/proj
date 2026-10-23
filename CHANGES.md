@@ -1,5 +1,10 @@
 # Unreleased
 
+- Add the `bundled_proj_sqlite` feature, which builds PROJ and SQLite from
+  source. Use it to build on Windows with MSVC.
+  (https://github.com/georust/proj/pull/245)
+- Document how to build on Windows with MSVC and MSYS2, and test these builds
+  in CI (https://github.com/georust/proj/issues/161)
 - Add fixes for buffer overflow and incorrect char replacement
 - Persist network client between requests, which should speed up grid
   operations that require multiple network requests.
