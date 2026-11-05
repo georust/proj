@@ -20,6 +20,9 @@
 - Update MSRV to 1.88
 - Add an RAII wrapper for a `PJ_AREA` allocated by `proj_area_create`, which
   prevents memory leaks on error paths (https://github.com/georust/proj/pull/262)
+- Deprecate `Proj::area_set_bbox`. It has no effect, because PROJ reads the area
+  of use only when it creates a transformation object. Pass the area of use to
+  the constructor instead.
 
 # 0.31.0 - 2025-08-29
 
