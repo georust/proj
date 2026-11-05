@@ -2,7 +2,7 @@ use libc::c_int;
 use libc::{c_char, c_double};
 use num_traits::Float;
 use proj_sys::{
-    PJ_AREA, PJ_COMPARISON_CRITERION_PJ_COMP_EQUIVALENT,
+    PJ, PJ_AREA, PJ_COMPARISON_CRITERION_PJ_COMP_EQUIVALENT,
     PJ_COMPARISON_CRITERION_PJ_COMP_EQUIVALENT_EXCEPT_AXIS_ORDER_GEOGCRS,
     PJ_COMPARISON_CRITERION_PJ_COMP_STRICT, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD,
     PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_WKT_TYPE_PJ_WKT1_ESRI, PJ_WKT_TYPE_PJ_WKT1_GDAL,
@@ -13,9 +13,9 @@ use proj_sys::{
     proj_context_set_url_endpoint, proj_coordinate_metadata_create,
     proj_coordinate_metadata_get_epoch, proj_create, proj_create_crs_to_crs,
     proj_create_crs_to_crs_from_pj, proj_destroy, proj_errno_string, proj_get_area_of_use,
-    proj_grid_cache_set_enable, proj_info, proj_is_equivalent_to_with_ctx,
-    proj_normalize_for_visualization, proj_pj_info, proj_trans, proj_trans_array,
-    proj_trans_bounds,
+    proj_get_id_auth_name, proj_get_id_code, proj_grid_cache_set_enable, proj_info,
+    proj_is_equivalent_to_with_ctx, proj_normalize_for_visualization, proj_pj_info, proj_trans,
+    proj_trans_array, proj_trans_bounds,
 };
 use std::{
     convert, ffi,
@@ -737,6 +737,28 @@ impl Proj {
         area: Option<Area>,
     ) -> Result<Proj, ProjCreateError> {
         thread_local_context().transform_epsg(from, to, area)
+    }
+
+    /// Return Authority code for Proj
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn id_code(&self) -> Result<&str, str::Utf8Error> {
+        let pj = self.c_proj as *const PJ;
+        let c_char = unsafe { proj_get_id_code(pj, 0) };
+        let c_str = unsafe { CStr::from_ptr(c_char) };
+        c_str.to_str()
+    }
+
+    /// Return Authority Name for Proj
+    ///
+    /// # Safety
+    /// This method contains unsafe code.
+    pub fn id_auth_name(&self) -> Result<&str, str::Utf8Error> {
+        let pj = self.c_proj as *const PJ;
+        let c_char = unsafe { proj_get_id_auth_name(pj, 0) };
+        let c_str = unsafe { CStr::from_ptr(c_char) };
+        c_str.to_str()
     }
 
     /// Create a transformation object that is a pipeline _between_ two known coordinate reference systems.
@@ -2081,6 +2103,20 @@ mod test {
             unrestricted.convert(texas).unwrap(),
             restricted.convert(texas).unwrap()
         );
+    }
+
+    #[test]
+    fn test_id_code() {
+        let proj = Proj::new("EPSG:3035").unwrap();
+        let code = proj.id_code().unwrap();
+        assert_eq!(code, "3035")
+    }
+
+    #[test]
+    fn test_id_auth_name() {
+        let proj = Proj::new("EPSG:3035").unwrap();
+        let auth_name = proj.id_auth_name().unwrap();
+        assert_eq!(auth_name, "EPSG")
     }
 
     #[test]
