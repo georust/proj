@@ -25,6 +25,8 @@
   the constructor instead.
 - Add `Proj::identifiers`, which returns the authority names and codes of an
   object, for example `EPSG:3035` (https://github.com/georust/proj/pull/267)
+- Add `Proj::identify`, which finds known CRSs that match a CRS, with a
+  confidence value for each match (https://github.com/georust/proj/pull/267)
 
 # 0.31.0 - 2025-08-29
 
