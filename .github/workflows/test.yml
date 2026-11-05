@@ -281,11 +281,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # MSYS2 has PROJ 9.8.1, which is older than the minimum version, so
+        # these configurations also build PROJ from source. When MSYS2 has
+        # PROJ 9.9.0 or later, set expect_build_from_src to 0 for the first
+        # two configurations.
         include:
           - features: ""
-            expect_build_from_src: 0
+            expect_build_from_src: 1
           - features: "--features network"
-            expect_build_from_src: 0
+            expect_build_from_src: 1
           - features: "--features bundled_proj"
             expect_build_from_src: 1
           - features: "--features bundled_proj_sqlite"
