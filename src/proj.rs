@@ -2,7 +2,7 @@ use libc::c_int;
 use libc::{c_char, c_double};
 use num_traits::Float;
 use proj_sys::{
-    PJ, PJ_AREA, PJ_COMPARISON_CRITERION_PJ_COMP_EQUIVALENT,
+    PJ_AREA, PJ_COMPARISON_CRITERION_PJ_COMP_EQUIVALENT,
     PJ_COMPARISON_CRITERION_PJ_COMP_EQUIVALENT_EXCEPT_AXIS_ORDER_GEOGCRS,
     PJ_COMPARISON_CRITERION_PJ_COMP_STRICT, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD,
     PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_WKT_TYPE_PJ_WKT1_ESRI, PJ_WKT_TYPE_PJ_WKT1_GDAL,
@@ -162,6 +162,23 @@ pub enum ComparisonCriterion {
     Strict,
     Equivalent,
     EquivalentExceptAxisOrder,
+}
+
+/// An authority name and code that identify a PROJ object, for example `EPSG:3035`.
+///
+/// The [`Display`](fmt::Display) form is `AUTH_NAME:CODE`, which [`Proj::new`] accepts.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Identifier {
+    /// The authority name, for example `EPSG`.
+    pub auth_name: String,
+    /// The code in the authority, for example `3035`.
+    pub code: String,
+}
+
+impl fmt::Display for Identifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.auth_name, self.code)
+    }
 }
 
 /// The bounding box of an area of use
@@ -739,26 +756,35 @@ impl Proj {
         thread_local_context().transform_epsg(from, to, area)
     }
 
-    /// Return Authority code for Proj
+    /// Return the authority identifiers of the object, for example `EPSG:3035`.
     ///
-    /// # Safety
-    /// This method contains unsafe code.
-    pub fn id_code(&self) -> Result<&str, str::Utf8Error> {
-        let pj = self.c_proj as *const PJ;
-        let c_char = unsafe { proj_get_id_code(pj, 0) };
-        let c_str = unsafe { CStr::from_ptr(c_char) };
-        c_str.to_str()
-    }
-
-    /// Return Authority Name for Proj
+    /// The result is empty if the object has no identifier. This is the case for a CRS created
+    /// from a PROJ string, a custom CRS, and most ESRI WKT.
     ///
-    /// # Safety
-    /// This method contains unsafe code.
-    pub fn id_auth_name(&self) -> Result<&str, str::Utf8Error> {
-        let pj = self.c_proj as *const PJ;
-        let c_char = unsafe { proj_get_id_auth_name(pj, 0) };
-        let c_str = unsafe { CStr::from_ptr(c_char) };
-        c_str.to_str()
+    /// ```rust
+    /// use proj::Proj;
+    ///
+    /// let crs = Proj::new("EPSG:3035").unwrap();
+    /// let ids = crs.identifiers().unwrap();
+    /// assert_eq!(ids[0].auth_name, "EPSG");
+    /// assert_eq!(ids[0].code, "3035");
+    /// assert_eq!(ids[0].to_string(), "EPSG:3035");
+    /// ```
+    pub fn identifiers(&self) -> Result<Vec<Identifier>, ProjError> {
+        let mut identifiers = Vec::new();
+        for index in 0.. {
+            // PROJ returns null when the index is out of range or the object has no identifiers.
+            let auth_name = unsafe { proj_get_id_auth_name(self.c_proj, index) };
+            let code = unsafe { proj_get_id_code(self.c_proj, index) };
+            if auth_name.is_null() || code.is_null() {
+                break;
+            }
+            identifiers.push(Identifier {
+                auth_name: unsafe { _string(auth_name)? },
+                code: unsafe { _string(code)? },
+            });
+        }
+        Ok(identifiers)
     }
 
     /// Create a transformation object that is a pipeline _between_ two known coordinate reference systems.
@@ -2106,17 +2132,23 @@ mod test {
     }
 
     #[test]
-    fn test_id_code() {
+    fn test_identifiers() {
         let proj = Proj::new("EPSG:3035").unwrap();
-        let code = proj.id_code().unwrap();
-        assert_eq!(code, "3035")
+        let ids = proj.identifiers().unwrap();
+        assert_eq!(
+            ids,
+            vec![Identifier {
+                auth_name: "EPSG".to_string(),
+                code: "3035".to_string(),
+            }]
+        );
+        assert_eq!(ids[0].to_string(), "EPSG:3035");
     }
 
     #[test]
-    fn test_id_auth_name() {
-        let proj = Proj::new("EPSG:3035").unwrap();
-        let auth_name = proj.id_auth_name().unwrap();
-        assert_eq!(auth_name, "EPSG")
+    fn test_identifiers_none() {
+        let proj = Proj::new("+proj=merc +ellps=WGS84 +type=crs").unwrap();
+        assert!(proj.identifiers().unwrap().is_empty());
     }
 
     #[test]

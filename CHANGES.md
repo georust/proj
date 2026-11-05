@@ -23,6 +23,8 @@
 - Deprecate `Proj::area_set_bbox`. It has no effect, because PROJ reads the area
   of use only when it creates a transformation object. Pass the area of use to
   the constructor instead.
+- Add `Proj::identifiers`, which returns the authority names and codes of an
+  object, for example `EPSG:3035` (https://github.com/georust/proj/pull/267)
 
 # 0.31.0 - 2025-08-29
 
