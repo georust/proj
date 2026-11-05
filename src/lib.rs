@@ -160,7 +160,9 @@
 //! new one for every object. This keeps the connection to the PROJ database and its caches warm,
 //! so constructing many transformation objects on a thread is considerably cheaper than it would
 //! otherwise be. [`ProjBuilder`] keeps its own context, since it is used to configure
-//! context-specific state such as network access and search paths.
+//! context-specific state such as network access and search paths. If you need a context that is
+//! independent of the per-thread one, create the `Proj` with [`ProjBuilder::proj`] or
+//! [`ProjBuilder::proj_known_crs`].
 //!
 //! ## Conform your own types
 //!
