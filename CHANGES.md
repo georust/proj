@@ -18,6 +18,8 @@
   ~300us to ~1us per object (https://github.com/georust/proj/issues/256).
 - Refactored options logic
 - Update MSRV to 1.88
+- Add `Proj::identifiers`, which returns the authority names and codes of an
+  object, for example `EPSG:3035` (https://github.com/georust/proj/pull/267)
 
 # 0.31.0 - 2025-08-29
 
