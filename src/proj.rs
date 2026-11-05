@@ -5,22 +5,23 @@ use proj_sys::{
     PJ_AREA, PJ_COMPARISON_CRITERION_PJ_COMP_EQUIVALENT,
     PJ_COMPARISON_CRITERION_PJ_COMP_EQUIVALENT_EXCEPT_AXIS_ORDER_GEOGCRS,
     PJ_COMPARISON_CRITERION_PJ_COMP_STRICT, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD,
-    PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_WKT_TYPE_PJ_WKT1_ESRI, PJ_WKT_TYPE_PJ_WKT1_GDAL,
-    PJ_WKT_TYPE_PJ_WKT2_2015, PJ_WKT_TYPE_PJ_WKT2_2015_SIMPLIFIED, PJ_WKT_TYPE_PJ_WKT2_2019,
-    PJ_WKT_TYPE_PJ_WKT2_2019_SIMPLIFIED, PJ_XYZT, PJconsts, proj_area_create, proj_area_destroy,
-    proj_area_set_bbox, proj_as_projjson, proj_as_wkt, proj_context_errno,
-    proj_context_get_url_endpoint, proj_context_is_network_enabled, proj_context_set_search_paths,
-    proj_context_set_url_endpoint, proj_coordinate_metadata_create,
+    PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_OBJ_LIST, PJ_WKT_TYPE_PJ_WKT1_ESRI,
+    PJ_WKT_TYPE_PJ_WKT1_GDAL, PJ_WKT_TYPE_PJ_WKT2_2015, PJ_WKT_TYPE_PJ_WKT2_2015_SIMPLIFIED,
+    PJ_WKT_TYPE_PJ_WKT2_2019, PJ_WKT_TYPE_PJ_WKT2_2019_SIMPLIFIED, PJ_XYZT, PJconsts,
+    proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_as_projjson, proj_as_wkt,
+    proj_context_errno, proj_context_get_url_endpoint, proj_context_is_network_enabled,
+    proj_context_set_search_paths, proj_context_set_url_endpoint, proj_coordinate_metadata_create,
     proj_coordinate_metadata_get_epoch, proj_create, proj_create_crs_to_crs,
     proj_create_crs_to_crs_from_pj, proj_destroy, proj_errno_string, proj_get_area_of_use,
-    proj_get_id_auth_name, proj_get_id_code, proj_grid_cache_set_enable, proj_info,
-    proj_is_equivalent_to_with_ctx, proj_normalize_for_visualization, proj_pj_info, proj_trans,
+    proj_get_id_auth_name, proj_get_id_code, proj_grid_cache_set_enable, proj_identify, proj_info,
+    proj_int_list_destroy, proj_is_equivalent_to_with_ctx, proj_list_destroy, proj_list_get,
+    proj_list_get_count, proj_normalize_for_visualization, proj_pj_info, proj_trans,
     proj_trans_array, proj_trans_bounds,
 };
 use std::{
     convert, ffi,
     fmt::{self, Debug},
-    str,
+    ptr, str,
 };
 
 use crate::context::{Context, ProjContext, thread_local_context};
@@ -136,6 +137,8 @@ pub enum ProjError {
     Definition,
     #[error("The definition could not be represented in the requested JSON format")]
     ExportToJson,
+    #[error("The object could not be identified. It may not be a CRS")]
+    Identify,
 }
 
 #[cfg(feature = "network")]
@@ -222,6 +225,23 @@ fn error_message(code: c_int) -> Result<String, str::Utf8Error> {
     unsafe {
         let rv = proj_errno_string(code);
         _string(rv)
+    }
+}
+
+/// The result of `proj_identify`: a list of candidate CRSs and their confidence values.
+///
+/// Dropping an `IdentifyResult` releases both lists.
+struct IdentifyResult {
+    list: *mut PJ_OBJ_LIST,
+    confidence: *mut c_int,
+}
+
+impl Drop for IdentifyResult {
+    fn drop(&mut self) {
+        unsafe {
+            proj_int_list_destroy(self.confidence);
+            proj_list_destroy(self.list);
+        }
     }
 }
 
@@ -777,6 +797,76 @@ impl Proj {
             });
         }
         Ok(identifiers)
+    }
+
+    /// Find known CRSs that match this CRS.
+    ///
+    /// Use this method when [`Proj::identifiers`] returns no identifier, for example for a CRS
+    /// created from a PROJ string or ESRI WKT. PROJ compares the CRS with the CRSs in its
+    /// database. Each result is a candidate CRS and a confidence value from 0 to 100, in order of
+    /// decreasing confidence. The result is empty if PROJ finds no match.
+    ///
+    /// `auth_name` limits the search to one authority, for example `Some("EPSG")`. If it is
+    /// `None`, PROJ searches all authorities.
+    ///
+    /// Each candidate has its own context, cloned from the context of `self`.
+    ///
+    /// See <https://proj.org/en/stable/development/reference/functions.html#c.proj_identify>
+    ///
+    /// ```rust
+    /// use proj::Proj;
+    ///
+    /// let crs = Proj::new("+proj=utm +zone=31 +datum=WGS84 +type=crs").unwrap();
+    /// assert!(crs.identifiers().unwrap().is_empty());
+    ///
+    /// let candidates = crs.identify(Some("EPSG")).unwrap();
+    /// let (best, confidence) = &candidates[0];
+    /// assert_eq!(best.identifiers().unwrap()[0].to_string(), "EPSG:32631");
+    /// assert!(*confidence >= 70);
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProjError::Identify`] if PROJ cannot identify the object, for example because
+    /// it is not a CRS.
+    pub fn identify(&self, auth_name: Option<&str>) -> Result<Vec<(Proj, i32)>, ProjError> {
+        let auth_name = auth_name.map(CString::new).transpose()?;
+        let auth_name_ptr = auth_name.as_ref().map_or(ptr::null(), |name| name.as_ptr());
+        let mut confidence = ptr::null_mut();
+        let list = unsafe {
+            proj_identify(
+                self.ctx(),
+                self.c_proj,
+                auth_name_ptr,
+                ptr::null(),
+                &mut confidence,
+            )
+        };
+        let result = IdentifyResult { list, confidence };
+        if result.list.is_null() {
+            return Err(ProjError::Identify);
+        }
+        let count = unsafe { proj_list_get_count(result.list) };
+        if count > 0 && result.confidence.is_null() {
+            return Err(ProjError::Identify);
+        }
+        let mut candidates = Vec::with_capacity(count.max(0) as usize);
+        for index in 0..count {
+            let ctx = self.ctx.clone_owned();
+            let ctx_ptr = ctx.as_ptr();
+            let c_proj = unsafe { proj_list_get(ctx_ptr, result.list, index) };
+            if c_proj.is_null() {
+                return Err(ProjError::Identify);
+            }
+            let candidate = Proj {
+                c_proj,
+                ctx,
+                area: None,
+            };
+            let confidence = unsafe { *result.confidence.add(index as usize) };
+            candidates.push((candidate, confidence));
+        }
+        Ok(candidates)
     }
 
     /// Create a transformation object that is a pipeline _between_ two known coordinate reference systems.
@@ -2129,6 +2219,24 @@ mod test {
     fn test_identifiers_none() {
         let proj = Proj::new("+proj=merc +ellps=WGS84 +type=crs").unwrap();
         assert!(proj.identifiers().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_identify() {
+        let proj = Proj::new("+proj=utm +zone=31 +datum=WGS84 +type=crs").unwrap();
+        let candidates = proj.identify(Some("EPSG")).unwrap();
+        assert!(!candidates.is_empty());
+        let (best, confidence) = &candidates[0];
+        assert_eq!(best.identifiers().unwrap()[0].to_string(), "EPSG:32631");
+        assert!((0..=100).contains(confidence));
+        // The candidates are in order of decreasing confidence.
+        assert!(candidates.windows(2).all(|pair| pair[0].1 >= pair[1].1));
+    }
+
+    #[test]
+    fn test_identify_not_a_crs() {
+        let proj = Proj::new_known_crs("EPSG:4326", "EPSG:3857", None).unwrap();
+        assert!(matches!(proj.identify(None), Err(ProjError::Identify)));
     }
 
     #[test]
