@@ -208,12 +208,19 @@ fn error_message(code: c_int) -> Result<String, str::Utf8Error> {
     }
 }
 
-/// RAII wrapper for a `PJ_AREA` allocated by `proj_area_create`.
+/// A `PJ_AREA` for one `proj_create_crs_to_crs*` call.
+///
+/// PROJ reads the area only during that call and does not keep the pointer, so the area must
+/// live only until the call returns.
 struct ProjArea(*mut PJ_AREA);
 
 impl ProjArea {
-    fn new() -> Self {
-        ProjArea(unsafe { proj_area_create() })
+    fn new(area: Option<Area>) -> Self {
+        let parea = unsafe { proj_area_create() };
+        if let Some(area) = area {
+            unsafe { proj_area_set_bbox(parea, area.west, area.south, area.east, area.north) };
+        }
+        ProjArea(parea)
     }
 
     fn as_ptr(&self) -> *mut PJ_AREA {
@@ -224,16 +231,6 @@ impl ProjArea {
 impl Drop for ProjArea {
     fn drop(&mut self) {
         unsafe { proj_area_destroy(self.0) };
-    }
-}
-
-/// Set the bounding box of the area of use
-fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
-    // if a bounding box has been passed, modify the proj area object
-    if let Some(narea) = new_area {
-        unsafe {
-            proj_area_set_bbox(parea, narea.west, narea.south, narea.east, narea.north);
-        }
     }
 }
 
@@ -252,7 +249,6 @@ impl ProjContext {
         Ok(Proj {
             c_proj: ptr,
             ctx: self,
-            area: None,
         })
     }
 
@@ -267,8 +263,7 @@ impl ProjContext {
         let ctx_ptr = self.as_ptr();
         let from_c = CString::new(from).map_err(ProjCreateError::ArgumentNulError)?;
         let to_c = CString::new(to).map_err(ProjCreateError::ArgumentNulError)?;
-        let proj_area = ProjArea::new();
-        area_set_bbox(proj_area.as_ptr(), area);
+        let proj_area = ProjArea::new(area);
         let ptr = result_from_create(ctx_ptr, unsafe {
             proj_create_crs_to_crs(ctx_ptr, from_c.as_ptr(), to_c.as_ptr(), proj_area.as_ptr())
         })
@@ -284,7 +279,6 @@ impl ProjContext {
         Ok(Proj {
             c_proj: normalised,
             ctx: self,
-            area: Some(proj_area),
         })
     }
 
@@ -298,8 +292,7 @@ impl ProjContext {
         options: Option<Vec<&str>>,
     ) -> Result<Proj, ProjCreateError> {
         let ctx_ptr = self.as_ptr();
-        let proj_area = ProjArea::new();
-        area_set_bbox(proj_area.as_ptr(), area);
+        let proj_area = ProjArea::new(area);
 
         let mut proj_options = CStringArray::new();
         if let Some(options) = options {
@@ -324,7 +317,6 @@ impl ProjContext {
         Ok(Proj {
             c_proj: ptr,
             ctx: self,
-            area: Some(proj_area),
         })
     }
 }
@@ -513,7 +505,8 @@ impl ProjBuilder {
     /// - the name of a CRS as found in the PROJ database, e.g `"WGS84"`, `"NAD27"`, etc.
     /// - more generally, any string accepted by [`new()`](struct.Proj.html#method.new)
     ///
-    /// If you wish to alter the particular area of use, you may do so using [`area_set_bbox()`](struct.Proj.html#method.area_set_bbox)
+    /// To limit the choice of coordinate operations to an area of use, pass it as `area`.
+    ///
     /// ## A Note on Coordinate Order
     /// The required input **and** output coordinate order is **normalised** to `Longitude, Latitude` / `Easting, Northing`.
     ///
@@ -594,7 +587,6 @@ impl Default for ProjBuilder {
 pub struct Proj {
     c_proj: *mut PJconsts,
     ctx: ProjContext,
-    area: Option<ProjArea>,
 }
 
 // `Proj` is intentionally neither `Send` nor `Sync` (enforced by its raw pointers and the `Rc`
@@ -634,11 +626,7 @@ impl Proj {
         })
         .map_err(|_| ProjCreateError::MetadataObjectCreation)?;
 
-        Ok(Proj {
-            c_proj: ptr,
-            ctx,
-            area: None,
-        })
+        Ok(Proj { c_proj: ptr, ctx })
     }
 
     /// Get the epoch from a coordinate metadata object.
@@ -703,7 +691,8 @@ impl Proj {
     /// - the name of a CRS as found in the PROJ database, e.g `"WGS84"`, `"NAD27"`, etc.
     /// - more generally, any string accepted by [`new()`](struct.Proj.html#method.new)
     ///
-    /// If you wish to alter the particular area of use, you may do so using [`area_set_bbox()`](struct.Proj.html#method.area_set_bbox)
+    /// To limit the choice of coordinate operations to an area of use, pass it as `area`.
+    ///
     /// ## A Note on Coordinate Order
     /// The required input **and** output coordinate order is **normalised** to `Longitude, Latitude` / `Easting, Northing`.
     ///
@@ -807,29 +796,18 @@ impl Proj {
             .crs_to_crs_from_pj(self, target_crs, area, options)
     }
 
-    /// Set the bounding box of the area of use
+    /// This method has no effect.
     ///
-    /// This bounding box will be used to specify the area of use
-    /// for the choice of relevant coordinate operations.
-    /// In the case of an area of use crossing the antimeridian (longitude +/- 180 degrees),
-    /// `west` **must** be greater than `east`.
-    ///
-    /// # Safety
-    /// This method contains unsafe code.
-    // calling this on a non-CRS-to-CRS instance of Proj will be harmless, because self.area will be None
-    pub fn area_set_bbox(&mut self, new_bbox: Area) {
-        if let Some(new_area) = self.area.as_ref() {
-            unsafe {
-                proj_area_set_bbox(
-                    new_area.as_ptr(),
-                    new_bbox.west,
-                    new_bbox.south,
-                    new_bbox.east,
-                    new_bbox.north,
-                );
-            }
-        }
-    }
+    /// PROJ reads the area of use only when it creates a transformation object, to choose the
+    /// candidate coordinate operations. A change to the area after creation does not change
+    /// the operations. To limit the operations to an area of use, pass it as `area` to
+    /// [`Proj::new_known_crs`], [`Proj::create_crs_to_crs_from_pj`], or the equivalent
+    /// [`ProjBuilder`] methods.
+    #[deprecated(
+        since = "0.32.0",
+        note = "this method has no effect: pass the area of use when you create the `Proj`"
+    )]
+    pub fn area_set_bbox(&mut self, _new_bbox: Area) {}
 
     define_info_methods!();
 
@@ -1540,7 +1518,6 @@ impl fmt::Debug for Proj {
 impl Drop for Proj {
     fn drop(&mut self) {
         unsafe {
-            self.area.take();
             // Destroy the PJ before the context: PROJ objects reference their creating context,
             // so it must outlive them. `self.ctx` (a `ProjContext`) is a field, so it is dropped
             // after this explicit body runs, which destroys the context in the right order.
@@ -2078,6 +2055,32 @@ mod test {
         assert_eq!(area.east, 44.83);
         assert_eq!(area.north, 84.73);
         assert!(name.contains("Europe"));
+    }
+
+    #[test]
+    fn test_area_limits_operations() {
+        // NAD27 to WGS84 uses a different operation in each region. An area of use in Alaska
+        // excludes the operations that apply to a point in Texas.
+        let texas = (-100.0, 30.0);
+        let alaska = Some(Area::new(-170.0, 54.0, -130.0, 71.0));
+
+        let unrestricted = Proj::new_known_crs("EPSG:4267", "EPSG:4326", None).unwrap();
+        let restricted = Proj::new_known_crs("EPSG:4267", "EPSG:4326", alaska).unwrap();
+        assert_ne!(
+            unrestricted.convert(texas).unwrap(),
+            restricted.convert(texas).unwrap()
+        );
+
+        let from = Proj::new("EPSG:4267").unwrap();
+        let to = Proj::new("EPSG:4326").unwrap();
+        let unrestricted = from.create_crs_to_crs_from_pj(&to, None, None).unwrap();
+        let restricted = from.create_crs_to_crs_from_pj(&to, alaska, None).unwrap();
+        // This path does not normalise the axis order, so EPSG:4267 expects latitude first.
+        let texas = (texas.1, texas.0);
+        assert_ne!(
+            unrestricted.convert(texas).unwrap(),
+            restricted.convert(texas).unwrap()
+        );
     }
 
     #[test]
