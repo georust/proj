@@ -2,17 +2,17 @@ use libc::c_int;
 use libc::{c_char, c_double};
 use num_traits::Float;
 use proj_sys::{
-    proj_area_create, proj_area_destroy, proj_area_set_bbox, proj_as_projjson, proj_as_wkt,
-    proj_cleanup, proj_context_clone, proj_context_create, proj_context_destroy,
-    proj_context_errno, proj_context_get_url_endpoint, proj_context_is_network_enabled,
-    proj_context_set_search_paths, proj_context_set_url_endpoint, proj_coordinate_metadata_create,
-    proj_coordinate_metadata_get_epoch, proj_create, proj_create_crs_to_crs,
-    proj_create_crs_to_crs_from_pj, proj_destroy, proj_errno_string, proj_get_area_of_use,
-    proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization, proj_pj_info,
-    proj_trans, proj_trans_array, proj_trans_bounds, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD,
-    PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT, PJ_WKT_TYPE_PJ_WKT1_ESRI,
-    PJ_WKT_TYPE_PJ_WKT1_GDAL, PJ_WKT_TYPE_PJ_WKT2_2015, PJ_WKT_TYPE_PJ_WKT2_2015_SIMPLIFIED,
-    PJ_WKT_TYPE_PJ_WKT2_2019, PJ_WKT_TYPE_PJ_WKT2_2019_SIMPLIFIED, PJ_XYZT,
+    PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD, PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LPZT,
+    PJ_WKT_TYPE_PJ_WKT1_ESRI, PJ_WKT_TYPE_PJ_WKT1_GDAL, PJ_WKT_TYPE_PJ_WKT2_2015,
+    PJ_WKT_TYPE_PJ_WKT2_2015_SIMPLIFIED, PJ_WKT_TYPE_PJ_WKT2_2019,
+    PJ_WKT_TYPE_PJ_WKT2_2019_SIMPLIFIED, PJ_XYZT, PJconsts, proj_area_create, proj_area_destroy,
+    proj_area_set_bbox, proj_as_projjson, proj_as_wkt, proj_cleanup, proj_context_clone,
+    proj_context_create, proj_context_destroy, proj_context_errno, proj_context_get_url_endpoint,
+    proj_context_is_network_enabled, proj_context_set_search_paths, proj_context_set_url_endpoint,
+    proj_coordinate_metadata_create, proj_coordinate_metadata_get_epoch, proj_create,
+    proj_create_crs_to_crs, proj_create_crs_to_crs_from_pj, proj_destroy, proj_errno_string,
+    proj_get_area_of_use, proj_grid_cache_set_enable, proj_info, proj_normalize_for_visualization,
+    proj_pj_info, proj_trans, proj_trans_array, proj_trans_bounds,
 };
 use std::ptr;
 use std::{
@@ -59,10 +59,21 @@ fn result_from_create<T>(context: *mut PJ_CONTEXT, ptr: *mut T) -> Result<*mut T
     }
 }
 
-/// A point in two dimensional space. The primary unit of input/output for proj.
+/// A point in two or three dimensional space, with an optional time. The primary unit of
+/// input/output for proj.
 ///
-/// By default, any numeric `(x, y)` or `(x, y, z)` tuple implements `Coord`, but you can conform
-/// your type to `Coord` to pass it directly into proj.
+/// By default, any numeric `(x, y)`, `(x, y, z)` or `(x, y, z, t)` tuple implements `Coord`, but
+/// you can conform your type to `Coord` to pass it directly into proj.
+///
+/// A two dimensional type implements [`x`](Self::x), [`y`](Self::y) and
+/// [`from_xy`](Self::from_xy) only. Its Z input is zero, and the Z output is discarded.
+///
+/// A three dimensional type must also implement [`z`](Self::z) and [`from_xyz`](Self::from_xyz).
+/// If it implements `z` but not `from_xyz`, the Z output is discarded.
+///
+/// A type that holds a time must also implement [`t`](Self::t) and
+/// [`from_xyzt`](Self::from_xyzt). Time-dependent transformations, for example a Helmert
+/// transformation with rates, use `t` as the coordinate epoch in decimal years.
 ///
 /// See the [`geo-types` feature](#feature-flags) for interop with the [`geo-types`
 /// crate](https://docs.rs/crate/geo-types)
@@ -72,8 +83,32 @@ where
 {
     fn x(&self) -> T;
     fn y(&self) -> T;
-    fn z(&self) -> T;
-    fn from_xyz(x: T, y: T, z: T) -> Self;
+    /// The Z component. The default is zero.
+    fn z(&self) -> T {
+        T::zero()
+    }
+    fn from_xy(x: T, y: T) -> Self;
+    /// Construct a coordinate from X, Y and Z components. The default calls
+    /// [`from_xy`](Self::from_xy) and discards `z`.
+    fn from_xyz(x: T, y: T, _z: T) -> Self
+    where
+        Self: Sized,
+    {
+        Self::from_xy(x, y)
+    }
+    /// The time component, in decimal years. The default is infinity: PROJ then applies no
+    /// time-dependent shift.
+    fn t(&self) -> T {
+        T::infinity()
+    }
+    /// Construct a coordinate from X, Y, Z and time components. The default calls
+    /// [`from_xyz`](Self::from_xyz) and discards `t`.
+    fn from_xyzt(x: T, y: T, z: T, _t: T) -> Self
+    where
+        Self: Sized,
+    {
+        Self::from_xyz(x, y, z)
+    }
 }
 
 impl<T: CoordinateType> Coord<T> for (T, T) {
@@ -83,10 +118,7 @@ impl<T: CoordinateType> Coord<T> for (T, T) {
     fn y(&self) -> T {
         self.1
     }
-    fn z(&self) -> T {
-        T::zero()
-    }
-    fn from_xyz(x: T, y: T, _z: T) -> Self {
+    fn from_xy(x: T, y: T) -> Self {
         (x, y)
     }
 }
@@ -101,8 +133,35 @@ impl<T: CoordinateType> Coord<T> for (T, T, T) {
     fn z(&self) -> T {
         self.2
     }
+    fn from_xy(x: T, y: T) -> Self {
+        (x, y, T::zero())
+    }
     fn from_xyz(x: T, y: T, z: T) -> Self {
         (x, y, z)
+    }
+}
+
+impl<T: CoordinateType> Coord<T> for (T, T, T, T) {
+    fn x(&self) -> T {
+        self.0
+    }
+    fn y(&self) -> T {
+        self.1
+    }
+    fn z(&self) -> T {
+        self.2
+    }
+    fn t(&self) -> T {
+        self.3
+    }
+    fn from_xy(x: T, y: T) -> Self {
+        (x, y, T::zero(), T::infinity())
+    }
+    fn from_xyz(x: T, y: T, z: T) -> Self {
+        (x, y, z, T::infinity())
+    }
+    fn from_xyzt(x: T, y: T, z: T, t: T) -> Self {
+        (x, y, z, t)
     }
 }
 
@@ -165,7 +224,9 @@ pub enum ProjCreateError {
     ArgumentNulError(ffi::NulError),
     #[error("The underlying PROJ call failed: {0}")]
     ProjError(String),
-    #[error("Pipeline objects cannot be used to produce a MetadataObject. Try assigning the epoch to one of the input projections")]
+    #[error(
+        "Pipeline objects cannot be used to produce a MetadataObject. Try assigning the epoch to one of the input projections"
+    )]
     MetadataObjectCreation,
 }
 
@@ -939,20 +1000,21 @@ impl Proj {
         let c_x: c_double = point.x().to_f64().ok_or(ProjError::FloatConversion)?;
         let c_y: c_double = point.y().to_f64().ok_or(ProjError::FloatConversion)?;
         let c_z: c_double = point.z().to_f64().ok_or(ProjError::FloatConversion)?;
+        let c_t: c_double = point.t().to_f64().ok_or(ProjError::FloatConversion)?;
         let new_x;
         let new_y;
         let new_z;
+        let new_t;
         let err;
         // Input coords are defined in terms of lambda & phi, using the PJ_LP struct.
         // This signals that we wish to project geodetic coordinates.
         // For conversion (i.e. between projected coordinates) you should use
         // PJ_XY {x: , y: }
-        // We also initialize t in case libproj tries to read it.
         let coords = PJ_LPZT {
             lam: c_x,
             phi: c_y,
             z: c_z,
-            t: f64::INFINITY,
+            t: c_t,
         };
         unsafe {
             proj_errno_reset(self.c_proj);
@@ -962,13 +1024,15 @@ impl Proj {
             new_x = trans.xyz.x;
             new_y = trans.xyz.y;
             new_z = trans.xyz.z;
+            new_t = trans.xyzt.t;
             err = proj_errno(self.c_proj);
         }
         if err == 0 {
-            Ok(Coord::from_xyz(
+            Ok(Coord::from_xyzt(
                 F::from(new_x).ok_or(ProjError::FloatConversion)?,
                 F::from(new_y).ok_or(ProjError::FloatConversion)?,
                 F::from(new_z).ok_or(ProjError::FloatConversion)?,
+                F::from(new_t).ok_or(ProjError::FloatConversion)?,
             ))
         } else {
             Err(ProjError::Projection(error_message(err)?))
@@ -1017,9 +1081,11 @@ impl Proj {
         let c_x: c_double = point.x().to_f64().ok_or(ProjError::FloatConversion)?;
         let c_y: c_double = point.y().to_f64().ok_or(ProjError::FloatConversion)?;
         let c_z: c_double = point.z().to_f64().ok_or(ProjError::FloatConversion)?;
+        let c_t: c_double = point.t().to_f64().ok_or(ProjError::FloatConversion)?;
         let new_x;
         let new_y;
         let new_z;
+        let new_t;
         let err;
 
         // This doesn't seem strictly correct, but if we set PJ_XY or PJ_LP here, the
@@ -1029,7 +1095,7 @@ impl Proj {
             x: c_x,
             y: c_y,
             z: c_z,
-            t: f64::INFINITY,
+            t: c_t,
         };
         unsafe {
             proj_errno_reset(self.c_proj);
@@ -1037,13 +1103,15 @@ impl Proj {
             new_x = trans.xyz.x;
             new_y = trans.xyz.y;
             new_z = trans.xyz.z;
+            new_t = trans.xyzt.t;
             err = proj_errno(self.c_proj);
         }
         if err == 0 {
-            Ok(C::from_xyz(
+            Ok(C::from_xyzt(
                 F::from(new_x).ok_or(ProjError::FloatConversion)?,
                 F::from(new_y).ok_or(ProjError::FloatConversion)?,
                 F::from(new_z).ok_or(ProjError::FloatConversion)?,
+                F::from(new_t).ok_or(ProjError::FloatConversion)?,
             ))
         } else {
             Err(ProjError::Conversion(error_message(err)?))
@@ -1236,12 +1304,13 @@ impl Proj {
                 let c_x: c_double = point.x().to_f64().ok_or(ProjError::FloatConversion)?;
                 let c_y: c_double = point.y().to_f64().ok_or(ProjError::FloatConversion)?;
                 let c_z: c_double = point.z().to_f64().ok_or(ProjError::FloatConversion)?;
+                let c_t: c_double = point.t().to_f64().ok_or(ProjError::FloatConversion)?;
                 Ok(PJ_COORD {
                     xyzt: PJ_XYZT {
                         x: c_x,
                         y: c_y,
                         z: c_z,
-                        t: f64::INFINITY,
+                        t: c_t,
                     },
                 })
             })
@@ -1267,10 +1336,11 @@ impl Proj {
             // feels a bit clunky, but we're guaranteed that pj and points have the same length
             unsafe {
                 for (i, coord) in pj.iter().enumerate() {
-                    points[i] = Coord::from_xyz(
-                        F::from(coord.xyz.x).ok_or(ProjError::FloatConversion)?,
-                        F::from(coord.xyz.y).ok_or(ProjError::FloatConversion)?,
-                        F::from(coord.xyz.z).ok_or(ProjError::FloatConversion)?,
+                    points[i] = Coord::from_xyzt(
+                        F::from(coord.xyzt.x).ok_or(ProjError::FloatConversion)?,
+                        F::from(coord.xyzt.y).ok_or(ProjError::FloatConversion)?,
+                        F::from(coord.xyzt.z).ok_or(ProjError::FloatConversion)?,
+                        F::from(coord.xyzt.t).ok_or(ProjError::FloatConversion)?,
                     )
                 }
             }
@@ -1377,11 +1447,7 @@ impl Proj {
                 ))?);
             }
 
-            if opts.is_empty() {
-                None
-            } else {
-                Some(opts)
-            }
+            if opts.is_empty() { None } else { Some(opts) }
         } else {
             None
         };
@@ -1570,11 +1636,7 @@ mod test {
             self.y
         }
 
-        fn z(&self) -> f64 {
-            0.0
-        }
-
-        fn from_xyz(x: f64, y: f64, _z: f64) -> Self {
+        fn from_xy(x: f64, y: f64) -> Self {
             MyPoint { x, y }
         }
     }
@@ -1756,6 +1818,80 @@ mod test {
         assert_relative_eq!(t.z(), 16.769676147028804, epsilon = 1e-5);
     }
 
+    // Geographic 3D to geocentric is a conversion. It uses no grids, so the results are exact.
+    const WGS84_A: f64 = 6378137.0;
+
+    #[test]
+    fn test_3d_input_height_is_used() {
+        let proj = Proj::new_known_crs("EPSG:4979", "EPSG:4978", None).unwrap();
+        let t = proj.convert((0.0, 0.0, 100.0)).unwrap();
+        assert_relative_eq!(t.0, WGS84_A + 100.0, epsilon = 1e-6);
+        assert_relative_eq!(t.1, 0.0, epsilon = 1e-6);
+        assert_relative_eq!(t.2, 0.0, epsilon = 1e-6);
+
+        let mut points = [(0.0, 0.0, 100.0), (90.0, 0.0, 50.0)];
+        proj.convert_array(&mut points).unwrap();
+        assert_relative_eq!(points[0].0, WGS84_A + 100.0, epsilon = 1e-6);
+        assert_relative_eq!(points[1].1, WGS84_A + 50.0, epsilon = 1e-6);
+    }
+
+    #[test]
+    fn test_2d_input_height_is_zero() {
+        let proj = Proj::new_known_crs("EPSG:4979", "EPSG:4978", None).unwrap();
+        let t = proj.convert(MyPoint::new(0.0, 0.0)).unwrap();
+        assert_relative_eq!(t.x, WGS84_A, epsilon = 1e-6);
+        assert_relative_eq!(t.y, 0.0, epsilon = 1e-6);
+    }
+
+    // A Helmert transformation with an X translation rate of 1 m per year from the 2000 epoch.
+    const HELMERT_RATE: &str = "+proj=helmert +x=0 +dx=1 +t_epoch=2000";
+
+    #[test]
+    fn test_time_is_used_and_returned() {
+        let proj = Proj::new(HELMERT_RATE).unwrap();
+        let t = proj.convert((0.0, 0.0, 0.0, 2010.0)).unwrap();
+        assert_relative_eq!(t.0, 10.0, epsilon = 1e-9);
+        assert_relative_eq!(t.3, 2010.0);
+
+        let mut points = [(0.0, 0.0, 0.0, 2005.0), (0.0, 0.0, 0.0, 1990.0)];
+        proj.convert_array(&mut points).unwrap();
+        assert_relative_eq!(points[0].0, 5.0, epsilon = 1e-9);
+        assert_relative_eq!(points[1].0, -10.0, epsilon = 1e-9);
+        assert_relative_eq!(points[1].3, 1990.0);
+    }
+
+    #[test]
+    fn test_default_time_applies_no_shift() {
+        let proj = Proj::new(HELMERT_RATE).unwrap();
+        let t = proj.convert((0.0, 0.0, 0.0)).unwrap();
+        assert_relative_eq!(t.0, 0.0, epsilon = 1e-9);
+        let t = proj.convert((0.0f32, 0.0f32)).unwrap();
+        assert_relative_eq!(t.0, 0.0, epsilon = 1e-6);
+    }
+
+    #[test]
+    fn test_3d_type_without_from_xyz_discards_height() {
+        struct HeightIn(f64, f64, f64);
+        impl Coord<f64> for HeightIn {
+            fn x(&self) -> f64 {
+                self.0
+            }
+            fn y(&self) -> f64 {
+                self.1
+            }
+            fn z(&self) -> f64 {
+                self.2
+            }
+            fn from_xy(x: f64, y: f64) -> Self {
+                HeightIn(x, y, f64::NAN)
+            }
+        }
+        let proj = Proj::new_known_crs("EPSG:4979", "EPSG:4978", None).unwrap();
+        let t = proj.convert(HeightIn(0.0, 0.0, 100.0)).unwrap();
+        assert_relative_eq!(t.0, WGS84_A + 100.0, epsilon = 1e-6);
+        assert!(t.2.is_nan());
+    }
+
     #[test]
     fn test_from_crs_nul_error() {
         match Proj::new_known_crs("\0", "EPSG:4326", None) {
@@ -1893,17 +2029,21 @@ mod test {
         .unwrap();
 
         // we expect this first conversion to fail (copied from above test case)
-        assert!(nad83_m
-            .convert(MyPoint::new(4760096.421921, 3744293.729449))
-            .is_err());
+        assert!(
+            nad83_m
+                .convert(MyPoint::new(4760096.421921, 3744293.729449))
+                .is_err()
+        );
 
         // but a subsequent valid conversion should still be successful
         assert!(nad83_m.convert(MyPoint::new(0.0, 0.0)).is_ok());
 
         // also test with project() function
-        assert!(nad83_m
-            .project(MyPoint::new(99999.0, 99999.0), false)
-            .is_err());
+        assert!(
+            nad83_m
+                .project(MyPoint::new(99999.0, 99999.0), false)
+                .is_err()
+        );
         assert!(nad83_m.project(MyPoint::new(0.0, 0.0), false).is_ok());
     }
 
