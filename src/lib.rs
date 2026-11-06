@@ -186,10 +186,7 @@
 //!     fn y(&self) -> f64 {
 //!         self.lat
 //!     }
-//!     fn z(&self) -> f64 {
-//!         0.0
-//!     }
-//!     fn from_xyz(x: f64, y: f64, _z: f64) -> Self {
+//!     fn from_xy(x: f64, y: f64) -> Self {
 //!         Self { lon: x, lat: y }
 //!     }
 //! }
