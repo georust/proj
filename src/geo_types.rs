@@ -23,10 +23,7 @@ impl<T: crate::proj::CoordinateType> crate::Coord<T> for geo_types::Coord<T> {
     fn y(&self) -> T {
         self.y
     }
-    fn z(&self) -> T {
-        T::zero()
-    }
-    fn from_xyz(x: T, y: T, _z: T) -> Self {
+    fn from_xy(x: T, y: T) -> Self {
         coord! { x: x, y: y }
     }
 }
@@ -53,10 +50,7 @@ impl<T: crate::proj::CoordinateType> crate::Coord<T> for geo_types::Point<T> {
     fn y(&self) -> T {
         geo_types::Point::y(*self)
     }
-    fn z(&self) -> T {
-        T::zero()
-    }
-    fn from_xyz(x: T, y: T, _z: T) -> Self {
+    fn from_xy(x: T, y: T) -> Self {
         Self::new(x, y)
     }
 }

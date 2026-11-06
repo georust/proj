@@ -59,10 +59,16 @@ fn result_from_create<T>(context: *mut PJ_CONTEXT, ptr: *mut T) -> Result<*mut T
     }
 }
 
-/// A point in two dimensional space. The primary unit of input/output for proj.
+/// A point in two or three dimensional space. The primary unit of input/output for proj.
 ///
 /// By default, any numeric `(x, y)` or `(x, y, z)` tuple implements `Coord`, but you can conform
 /// your type to `Coord` to pass it directly into proj.
+///
+/// A two dimensional type implements [`x`](Self::x), [`y`](Self::y) and
+/// [`from_xy`](Self::from_xy) only. Its Z input is zero, and the Z output is discarded.
+///
+/// A three dimensional type must also implement [`z`](Self::z) and [`from_xyz`](Self::from_xyz).
+/// If it implements `z` but not `from_xyz`, the Z output is discarded.
 ///
 /// See the [`geo-types` feature](#feature-flags) for interop with the [`geo-types`
 /// crate](https://docs.rs/crate/geo-types)
@@ -72,8 +78,19 @@ where
 {
     fn x(&self) -> T;
     fn y(&self) -> T;
-    fn z(&self) -> T;
-    fn from_xyz(x: T, y: T, z: T) -> Self;
+    /// The Z component. The default is zero.
+    fn z(&self) -> T {
+        T::zero()
+    }
+    fn from_xy(x: T, y: T) -> Self;
+    /// Construct a coordinate from X, Y and Z components. The default calls
+    /// [`from_xy`](Self::from_xy) and discards `z`.
+    fn from_xyz(x: T, y: T, _z: T) -> Self
+    where
+        Self: Sized,
+    {
+        Self::from_xy(x, y)
+    }
 }
 
 impl<T: CoordinateType> Coord<T> for (T, T) {
@@ -83,10 +100,7 @@ impl<T: CoordinateType> Coord<T> for (T, T) {
     fn y(&self) -> T {
         self.1
     }
-    fn z(&self) -> T {
-        T::zero()
-    }
-    fn from_xyz(x: T, y: T, _z: T) -> Self {
+    fn from_xy(x: T, y: T) -> Self {
         (x, y)
     }
 }
@@ -100,6 +114,9 @@ impl<T: CoordinateType> Coord<T> for (T, T, T) {
     }
     fn z(&self) -> T {
         self.2
+    }
+    fn from_xy(x: T, y: T) -> Self {
+        (x, y, T::zero())
     }
     fn from_xyz(x: T, y: T, z: T) -> Self {
         (x, y, z)
@@ -1568,11 +1585,7 @@ mod test {
             self.y
         }
 
-        fn z(&self) -> f64 {
-            0.0
-        }
-
-        fn from_xyz(x: f64, y: f64, _z: f64) -> Self {
+        fn from_xy(x: f64, y: f64) -> Self {
             MyPoint { x, y }
         }
     }
@@ -1752,6 +1765,54 @@ mod test {
         assert_relative_eq!(t.x(), 159783.64355817687, epsilon = 1e-5);
         assert_relative_eq!(t.y(), 380007.7906745551, epsilon = 1e-5);
         assert_relative_eq!(t.z(), 16.769676147028804, epsilon = 1e-5);
+    }
+
+    // Geographic 3D to geocentric is a conversion. It uses no grids, so the results are exact.
+    const WGS84_A: f64 = 6378137.0;
+
+    #[test]
+    fn test_3d_input_height_is_used() {
+        let proj = Proj::new_known_crs("EPSG:4979", "EPSG:4978", None).unwrap();
+        let t = proj.convert((0.0, 0.0, 100.0)).unwrap();
+        assert_relative_eq!(t.0, WGS84_A + 100.0, epsilon = 1e-6);
+        assert_relative_eq!(t.1, 0.0, epsilon = 1e-6);
+        assert_relative_eq!(t.2, 0.0, epsilon = 1e-6);
+
+        let mut points = [(0.0, 0.0, 100.0), (90.0, 0.0, 50.0)];
+        proj.convert_array(&mut points).unwrap();
+        assert_relative_eq!(points[0].0, WGS84_A + 100.0, epsilon = 1e-6);
+        assert_relative_eq!(points[1].1, WGS84_A + 50.0, epsilon = 1e-6);
+    }
+
+    #[test]
+    fn test_2d_input_height_is_zero() {
+        let proj = Proj::new_known_crs("EPSG:4979", "EPSG:4978", None).unwrap();
+        let t = proj.convert(MyPoint::new(0.0, 0.0)).unwrap();
+        assert_relative_eq!(t.x, WGS84_A, epsilon = 1e-6);
+        assert_relative_eq!(t.y, 0.0, epsilon = 1e-6);
+    }
+
+    #[test]
+    fn test_3d_type_without_from_xyz_discards_height() {
+        struct HeightIn(f64, f64, f64);
+        impl Coord<f64> for HeightIn {
+            fn x(&self) -> f64 {
+                self.0
+            }
+            fn y(&self) -> f64 {
+                self.1
+            }
+            fn z(&self) -> f64 {
+                self.2
+            }
+            fn from_xy(x: f64, y: f64) -> Self {
+                HeightIn(x, y, f64::NAN)
+            }
+        }
+        let proj = Proj::new_known_crs("EPSG:4979", "EPSG:4978", None).unwrap();
+        let t = proj.convert(HeightIn(0.0, 0.0, 100.0)).unwrap();
+        assert_relative_eq!(t.0, WGS84_A + 100.0, epsilon = 1e-6);
+        assert!(t.2.is_nan());
     }
 
     #[test]
