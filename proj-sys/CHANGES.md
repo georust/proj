@@ -1,5 +1,7 @@
 # Unreleased
 
+# 0.28.0 - 2026-11-10
+
 - Add the `bundled_proj_sqlite` feature, which also builds SQLite from source
   (https://github.com/georust/proj/pull/245)
 - Fix linking a bundled PROJ on Windows: link `shell32` and `ole32`
@@ -10,7 +12,8 @@
 - Do not emit quoted link-search paths for a system PROJ found through
   pkg-config
 - Allow any 0.x version of `libsqlite3-sys` from 0.28
-  (https://github.com/georust/proj/pull/261)
+  (https://github.com/georust/proj/pull/261). Version 0.39.0 and later fix
+  RUSTSEC-2026-0459 (https://github.com/georust/proj/issues/271).
 - Update to PROJ 9.9.0, and regenerate the bundled bindings from its headers.
   Building PROJ from source requires CMake 3.22.1 or later.
 - Update MSRV to 1.88
