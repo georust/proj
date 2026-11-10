@@ -1,8 +1,12 @@
 # Unreleased
 
+# 0.32.0 - 2026-11-10
+
 - Update to proj-sys 0.28.0:
   - Update to PROJ 9.9.0. Building PROJ from source requires CMake 3.22.1 or
     later.
+  - Allow any 0.x version of `libsqlite3-sys` from 0.28. Version 0.39.0 and
+    later fix RUSTSEC-2026-0459 (https://github.com/georust/proj/issues/271).
 - Add the `bundled_proj_sqlite` feature, which builds PROJ and SQLite from
   source. Use it to build on Windows with MSVC.
   (https://github.com/georust/proj/pull/245)
